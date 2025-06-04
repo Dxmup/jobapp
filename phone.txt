@@ -1,0 +1,668 @@
+// types/interview.ts
+export interface JobDescription {
+  title: string;
+  company: string;
+  requirements: string[];
+  description: string;
+  level: 'entry' | 'mid' | 'senior';
+}
+
+export interface UserResume {
+  name: string;
+  experience: string[];
+  skills: string[];
+  education: string;
+  summary: string;
+}
+
+export interface InterviewQuestion {
+  id: string;
+  category: 'technical' | 'behavioral' | 'experience' | 'cultural';
+  question: string;
+  followUpQuestions?: string[];
+  expectedDuration: number; // minutes
+}
+
+export interface InterviewSession {
+  id: string;
+  userId: string;
+  jobDescription: JobDescription;
+  userResume: UserResume;
+  questions: InterviewQuestion[];
+  status: 'pending' | 'active' | 'completed' | 'failed';
+  startTime?: Date;
+  endTime?: Date;
+  geminiSessionId?: string;
+}
+
+export interface InterviewConfig {
+  duration: number; // total interview duration in minutes
+  voice: string; // Gemini voice (Puck, Charon, Kore, etc.)
+  interruptionHandling: boolean;
+  transcriptionEnabled: boolean;
+}
+
+// lib/gemini-live-api.ts - Updated to match Mock Interview conventions
+export class GeminiLiveClient {
+  private ws: WebSocket | null = null;
+  private isConnected = false;
+  private messageQueue: any[] = [];
+  private sessionId: string;
+  private config: any;
+
+  constructor(sessionId: string) {
+    this.sessionId = sessionId;
+  }
+
+  async connect(config: {
+    jobTitle: string;
+    company: string;
+    jobDescription: string;
+    resume?: string;
+    questions: {
+      technical: string[];
+      behavioral: string[];
+    };
+    apiKey: string;
+  }) {
+    this.config = config;
+    
+    const systemInstruction = this.buildSystemInstruction(config);
+    
+    const geminiConfig = {
+      responseModalities: ["audio"],
+      systemInstruction: {
+        parts: [{ text: systemInstruction }]
+      },
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName: "Kore"
+          }
+        }
+      },
+      generationConfig: {
+        responseLogProbs: true,
+        logProbs: 5
+      }
+    };
+
+    // Connect to Gemini Live API via WebSocket
+    const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${config.apiKey}`;
+    
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(wsUrl);
+      
+      this.ws.onopen = () => {
+        this.isConnected = true;
+        
+        // Send setup message
+        this.ws!.send(JSON.stringify({
+          setup: {
+            model: "models/gemini-2.0-flash-exp",
+            ...geminiConfig
+          }
+        }));
+        
+        // Send initial prompt to start interview
+        setTimeout(() => {
+          this.sendText("Please start the interview with a professional greeting.");
+        }, 1000);
+        
+        resolve(this.sessionId);
+      };
+      
+      this.ws.onerror = (error) => {
+        reject(error);
+      };
+      
+      this.ws.onmessage = (event) => {
+        this.handleMessage(JSON.parse(event.data));
+      };
+      
+      this.ws.onclose = () => {
+        this.isConnected = false;
+      };
+    });
+  }
+
+  private buildSystemInstruction(config: any): string {
+    const allQuestions = [
+      ...config.questions.technical.map((q: string) => `[TECHNICAL] ${q}`),
+      ...config.questions.behavioral.map((q: string) => `[BEHAVIORAL] ${q}`)
+    ];
+
+    return `You are conducting a professional job interview for the ${config.jobTitle} position at ${config.company}.
+
+${config.resume ? `CANDIDATE RESUME:\n${config.resume}\n` : ''}
+
+JOB DESCRIPTION:
+${config.jobDescription}
+
+INTERVIEW GUIDELINES:
+1. Conduct a natural, conversational interview
+2. Ask questions from the provided list, but adapt based on conversation flow
+3. Ask relevant follow-up questions based on candidate responses
+4. Be professional but friendly and encouraging
+5. Keep responses concise and clear (under 30 seconds typically)
+6. Listen actively and respond appropriately to answers
+7. Provide brief positive feedback when appropriate
+8. If the candidate seems nervous, be reassuring
+9. Maintain professional interview atmosphere throughout
+10. After each answer, either ask a follow-up or move to the next question
+11. Don't rush - allow natural conversation flow
+
+QUESTIONS TO COVER:
+${allQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+Start by greeting the candidate professionally and explaining the interview process briefly. Keep your opening under 20 seconds.`;
+  }
+
+  private handleMessage(message: any) {
+    if (message.candidates?.[0]?.content?.parts) {
+      const parts = message.candidates[0].content.parts;
+      
+      parts.forEach((part: any) => {
+        if (part.text) {
+          this.onTextReceived?.(part.text);
+        }
+        
+        if (part.inlineData?.data) {
+          // Audio data received
+          this.onAudioReceived?.(part.inlineData.data);
+        }
+      });
+    }
+    
+    if (message.serverContent?.modelTurn?.parts) {
+      const parts = message.serverContent.modelTurn.parts;
+      
+      parts.forEach((part: any) => {
+        if (part.inlineData?.data) {
+          this.onAudioReceived?.(part.inlineData.data);
+        }
+      });
+    }
+  }
+
+  sendAudio(audioData: ArrayBuffer) {
+    if (!this.isConnected || !this.ws) return;
+    
+    // Convert ArrayBuffer to base64
+    const base64Audio = this.arrayBufferToBase64(audioData);
+    
+    const message = {
+      clientContent: {
+        turns: [{
+          role: "user",
+          parts: [{
+            inlineData: {
+              mimeType: "audio/pcm;rate=16000",
+              data: base64Audio
+            }
+          }]
+        }],
+        turnComplete: false
+      }
+    };
+    
+    this.ws.send(JSON.stringify(message));
+  }
+
+  sendAudioStreamEnd() {
+    if (!this.isConnected || !this.ws) return;
+    
+    const message = {
+      clientContent: {
+        turns: [],
+        turnComplete: true
+      }
+    };
+    
+    this.ws.send(JSON.stringify(message));
+  }
+
+  sendText(text: string) {
+    if (!this.isConnected || !this.ws) return;
+    
+    const message = {
+      clientContent: {
+        turns: [{
+          role: "user",
+          parts: [{ text }]
+        }],
+        turnComplete: true
+      }
+    };
+    
+    this.ws.send(JSON.stringify(message));
+  }
+
+  triggerNextResponse() {
+    // Send a message to prompt the AI for the next question
+    this.sendText("Please continue with the next question or provide feedback on my previous answer.");
+  }
+
+  disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.isConnected = false;
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    bytes.forEach(byte => binary += String.fromCharCode(byte));
+    return btoa(binary);
+  }
+
+  // Event handlers (to be set by the consumer)
+  onTextReceived?: (text: string) => void;
+  onAudioReceived?: (audioData: string) => void;
+  onError?: (error: any) => void;
+  onConnectionStateChange?: (connected: boolean) => void;
+}
+
+// API Routes following Mock Interview conventions
+
+// /api/interview/live-session (POST)
+export async function handleLiveSession(req: Request) {
+  try {
+    const { jobId, resumeId } = req.body;
+    
+    // Fetch job details from database
+    const jobData = await getJobById(jobId);
+    if (!jobData) {
+      return Response.json({ error: 'Job not found' }, { status: 404 });
+    }
+    
+    // Fetch resume if provided
+    let resumeContent = '';
+    if (resumeId) {
+      const resumeData = await getResumeById(resumeId);
+      resumeContent = resumeData?.content || '';
+    }
+    
+    // Get saved interview questions
+    const savedQuestions = await getInterviewQuestions(jobId, resumeId);
+    
+    return Response.json({
+      job: {
+        title: jobData.title,
+        company: jobData.company,
+        description: jobData.description
+      },
+      resume: resumeContent,
+      questions: savedQuestions || {
+        technical: [],
+        behavioral: []
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in live-session:', error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// /api/interview/start-live-session (POST)
+export async function handleStartLiveSession(req: Request) {
+  try {
+    const { jobId, resumeId, questions, jobDescription, resumeContent } = req.body;
+    
+    const sessionId = generateSessionId();
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
+    
+    if (!apiKey) {
+      return Response.json({ error: 'API key not configured' }, { status: 500 });
+    }
+    
+    // Store session data in memory (or database for persistence)
+    const sessionData = {
+      sessionId,
+      jobId,
+      resumeId,
+      questions,
+      jobDescription,
+      resumeContent,
+      startTime: new Date(),
+      status: 'active'
+    };
+    
+    // Store session (implement your storage mechanism)
+    await storeSession(sessionId, sessionData);
+    
+    return Response.json({
+      sessionId,
+      apiKey, // In production, don't send API key to client
+      sessionData
+    });
+    
+  } catch (error) {
+    console.error('Error starting live session:', error);
+    return Response.json({ error: 'Failed to start session' }, { status: 500 });
+  }
+}
+
+// /api/interview/chat (POST)
+export async function handleChat(req: Request) {
+  try {
+    const { sessionId, userMessage, sessionData } = req.body;
+    
+    // Validate session
+    const session = await getSession(sessionId);
+    if (!session) {
+      return Response.json({ error: 'Session not found' }, { status: 404 });
+    }
+    
+    // Create a temporary Gemini client for text-only interaction
+    const client = new GeminiLiveClient(sessionId);
+    
+    // This would need to be implemented as a text-only version
+    // For now, return a placeholder response
+    return Response.json({
+      response: "I understand you'd like to continue via text. However, this interview is designed for voice interaction. Please use the voice features for the best experience."
+    });
+    
+  } catch (error) {
+    console.error('Error in chat:', error);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// /api/interview/audio-stream (POST)
+export async function handleAudioStream(req: Request) {
+  try {
+    const formData = await req.formData();
+    const audioBlob = formData.get('audio') as Blob;
+    const sessionId = formData.get('sessionId') as string;
+    
+    if (!audioBlob || !sessionId) {
+      return Response.json({ error: 'Missing audio or session ID' }, { status: 400 });
+    }
+    
+    // Validate session
+    const session = await getSession(sessionId);
+    if (!session) {
+      return Response.json({ error: 'Session not found' }, { status: 404 });
+    }
+    
+    // Convert blob to ArrayBuffer
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    
+    // Process audio with the session's Gemini client
+    // This would require maintaining active connections per session
+    // Implementation depends on your session management strategy
+    
+    return Response.json({ success: true });
+    
+  } catch (error) {
+    console.error('Error processing audio:', error);
+    return Response.json({ error: 'Audio processing failed' }, { status: 500 });
+  }
+}
+
+// Server Actions following Mock Interview conventions
+
+export async function generateInterviewQuestions(
+  jobId: string, 
+  resumeId?: string, 
+  existingQuestions?: any[]
+) {
+  try {
+    const jobData = await getJobById(jobId);
+    if (!jobData) {
+      throw new Error('Job not found');
+    }
+    
+    let resumeData = null;
+    if (resumeId) {
+      resumeData = await getResumeById(resumeId);
+    }
+    
+    // Generate questions using AI (implement your question generation logic)
+    const questions = await generateQuestionsWithAI(jobData, resumeData);
+    
+    return {
+      technical: questions.technical || [],
+      behavioral: questions.behavioral || []
+    };
+    
+  } catch (error) {
+    console.error('Error generating questions:', error);
+    throw error;
+  }
+}
+
+export async function saveInterviewQuestions(
+  jobId: string, 
+  questions: any, 
+  resumeId?: string
+) {
+  try {
+    const userId = await getCurrentUserId(); // Implement this
+    const storagePath = `interview_questions/${userId}/${jobId}${resumeId ? `/${resumeId}` : ''}`;
+    
+    const questionsData = {
+      technical_questions: questions.technical || [],
+      behavioral_questions: questions.behavioral || [],
+      saved_at: new Date().toISOString()
+    };
+    
+    // Save to your storage system (Supabase storage, database, etc.)
+    await saveToStorage(storagePath, questionsData);
+    
+    return questionsData;
+    
+  } catch (error) {
+    console.error('Error saving questions:', error);
+    throw error;
+  }
+}
+
+export async function getInterviewQuestions(jobId: string, resumeId?: string) {
+  try {
+    const userId = await getCurrentUserId();
+    const storagePath = `interview_questions/${userId}/${jobId}${resumeId ? `/${resumeId}` : ''}`;
+    
+    const questionsData = await getFromStorage(storagePath);
+    
+    if (!questionsData) {
+      return null;
+    }
+    
+    return {
+      technical: questionsData.technical_questions || [],
+      behavioral: questionsData.behavioral_questions || []
+    };
+    
+  } catch (error) {
+    console.error('Error retrieving questions:', error);
+    return null;
+  }
+}
+
+// Utility functions
+
+function generateSessionId(): string {
+  return `interview_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Placeholder functions - implement based on your data layer
+async function getJobById(jobId: string) {
+  // Implement job retrieval from database
+  throw new Error('Not implemented');
+}
+
+async function getResumeById(resumeId: string) {
+  // Implement resume retrieval from database
+  throw new Error('Not implemented');
+}
+
+async function storeSession(sessionId: string, sessionData: any) {
+  // Implement session storage
+  throw new Error('Not implemented');
+}
+
+async function getSession(sessionId: string) {
+  // Implement session retrieval
+  throw new Error('Not implemented');
+}
+
+async function getCurrentUserId() {
+  // Implement user ID retrieval from auth context
+  throw new Error('Not implemented');
+}
+
+async function saveToStorage(path: string, data: any) {
+  // Implement storage save (Supabase, S3, etc.)
+  throw new Error('Not implemented');
+}
+
+async function getFromStorage(path: string) {
+  // Implement storage retrieval
+  throw new Error('Not implemented');
+}
+
+async function generateQuestionsWithAI(jobData: any, resumeData: any) {
+  // Implement AI question generation
+  return {
+    technical: [
+      "Can you walk me through your experience with the technologies mentioned in this role?",
+      "How would you approach solving a complex technical problem in this domain?"
+    ],
+    behavioral: [
+      "Tell me about a time when you had to learn a new technology quickly.",
+      "Describe a challenging project you worked on and how you overcame obstacles."
+    ]
+  };
+}
+
+// Audio Processing utilities following Mock Interview conventions
+
+export class AudioProcessor {
+  // Convert audio to 16-bit PCM, 16kHz format required by Gemini
+  static convertToRequiredFormat(audioData: ArrayBuffer): ArrayBuffer {
+    // For browser environment, this would typically involve Web Audio API
+    // This is a placeholder - actual implementation would depend on your audio processing needs
+    return audioData;
+  }
+  
+  // Process incoming audio from Gemini (24kHz, 16-bit PCM to playable format)
+  static processIncomingAudio(base64Data: string): ArrayBuffer {
+    // Convert base64 to ArrayBuffer
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+  
+  // Create WAV header for audio playback
+  static createWavHeader(audioData: ArrayBuffer, sampleRate: number = 24000): ArrayBuffer {
+    const buffer = new ArrayBuffer(44 + audioData.byteLength);
+    const view = new DataView(buffer);
+    
+    // WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + audioData.byteLength, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, audioData.byteLength, true);
+    
+    // Copy audio data
+    const audioView = new Uint8Array(audioData);
+    const outputView = new Uint8Array(buffer, 44);
+    outputView.set(audioView);
+    
+    return buffer;
+  }
+}
+
+// Speech Detection utility following Mock Interview conventions
+
+export class SpeechDetector {
+  private analyser: AnalyserNode;
+  private dataArray: Uint8Array;
+  private isListening = false;
+  private speechCallback?: (isSpeaking: boolean) => void;
+  private silenceTimeout?: NodeJS.Timeout;
+  private speechStartTime?: number;
+  
+  constructor(audioStream: MediaStream) {
+    const audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(audioStream);
+    this.analyser = audioContext.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    
+    source.connect(this.analyser);
+  }
+  
+  startDetection(callback: (isSpeaking: boolean) => void) {
+    this.speechCallback = callback;
+    this.isListening = true;
+    this.detectSpeech();
+  }
+  
+  stopDetection() {
+    this.isListening = false;
+    if (this.silenceTimeout) {
+      clearTimeout(this.silenceTimeout);
+    }
+  }
+  
+  private detectSpeech() {
+    if (!this.isListening) return;
+    
+    this.analyser.getByteFrequencyData(this.dataArray);
+    const average = this.dataArray.reduce((sum, value) => sum + value, 0) / this.dataArray.length;
+    
+    const isSpeaking = average > 3; // Speech threshold following Mock Interview conventions
+    
+    if (isSpeaking) {
+      if (!this.speechStartTime) {
+        this.speechStartTime = Date.now();
+      }
+      
+      if (this.silenceTimeout) {
+        clearTimeout(this.silenceTimeout);
+        this.silenceTimeout = undefined;
+      }
+      
+      this.speechCallback?.(true);
+    } else {
+      if (this.speechStartTime) {
+        const speechDuration = Date.now() - this.speechStartTime;
+        
+        if (speechDuration >= 2000) { // At least 2 seconds of speaking
+          if (!this.silenceTimeout) {
+            this.silenceTimeout = setTimeout(() => {
+              this.speechCallback?.(false);
+              this.speechStartTime = undefined;
+            }, 3000); // 3 seconds of silence
+          }
+        }
+      }
+    }
+    
+    requestAnimationFrame(() => this.detectSpeech());
+  }
+}
