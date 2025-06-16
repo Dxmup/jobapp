@@ -49,26 +49,26 @@ Before you begin, ensure you have the following installed:
 ## 🔧 Installation
 
 1. **Clone the repository**
-   ```bash
+   \`\`\`bash
    git clone https://github.com/Dxmup/jobapp.git
    cd jobapp
-   ```
+   \`\`\`
 
 2. **Install dependencies**
-   ```bash
+   \`\`\`bash
    npm install
-   ```
+   \`\`\`
 
 3. **Set up environment variables**
    
    Copy the example environment file:
-   ```bash
+   \`\`\`bash
    cp .env.example .env.local
-   ```
+   \`\`\`
 
    Configure the following environment variables:
 
-   ```env
+   \`\`\`env
    # Supabase Configuration
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -97,24 +97,24 @@ Before you begin, ensure you have the following installed:
 
    # Application Configuration
    NEXT_PUBLIC_SITE_URL=http://localhost:3000
-   ```
+   \`\`\`
 
 4. **Set up the database**
    
    Run the database migrations:
-   ```bash
+   \`\`\`bash
    npm run db:setup
-   ```
+   \`\`\`
 
 5. **Create a master admin account**
-   ```bash
+   \`\`\`bash
    npm run create-admin
-   ```
+   \`\`\`
 
 6. **Start the development server**
-   ```bash
+   \`\`\`bash
    npm run dev
-   ```
+   \`\`\`
 
    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
@@ -133,9 +133,9 @@ The application uses Supabase PostgreSQL with the following main tables:
 ### Running Migrations
 
 Execute the setup script to create all necessary tables:
-```bash
+\`\`\`bash
 npm run db:migrate
-```
+\`\`\`
 
 ## 🔐 Authentication & Authorization
 
@@ -217,7 +217,7 @@ The application uses a comprehensive design system built on:
 ## 🔧 Development
 
 ### Project Structure
-```
+\`\`\`
 ├── app/                    # Next.js app directory
 │   ├── (auth)/            # Authentication pages
 │   ├── (dashboard)/       # Main application pages
@@ -233,11 +233,11 @@ The application uses a comprehensive design system built on:
 ├── hooks/                 # Custom React hooks
 ├── types/                 # TypeScript type definitions
 └── public/                # Static assets
-```
+\`\`\`
 
 ### Available Scripts
 
-```bash
+\`\`\`bash
 npm run dev          # Start development server
 npm run build        # Build for production
 npm run start        # Start production server
@@ -246,7 +246,7 @@ npm run type-check   # Run TypeScript checks
 npm run db:setup     # Set up database
 npm run db:migrate   # Run database migrations
 npm run create-admin # Create master admin account
-```
+\`\`\`
 
 ### Code Style
 - ESLint configuration for code quality
@@ -265,14 +265,14 @@ npm run create-admin # Create master admin account
 ### Manual Deployment
 
 1. **Build the application**
-   ```bash
+   \`\`\`bash
    npm run build
-   ```
+   \`\`\`
 
 2. **Start the production server**
-   ```bash
+   \`\`\`bash
    npm run start
-   ```
+   \`\`\`
 
 ### Environment Configuration
 
@@ -299,11 +299,11 @@ Ensure all environment variables are properly configured in your deployment envi
 ## 🧪 Testing
 
 ### Test Structure
-```bash
+\`\`\`bash
 npm run test         # Run unit tests
 npm run test:e2e     # Run end-to-end tests
 npm run test:watch   # Run tests in watch mode
-```
+\`\`\`
 
 ### Testing Strategy
 - Unit tests for utility functions
@@ -337,17 +337,17 @@ npm run test:watch   # Run tests in watch mode
 
 1. **Fork the repository**
 2. **Create a feature branch**
-   ```bash
+   \`\`\`bash
    git checkout -b feature/amazing-feature
-   ```
+   \`\`\`
 3. **Commit your changes**
-   ```bash
+   \`\`\`bash
    git commit -m 'Add some amazing feature'
-   ```
+   \`\`\`
 4. **Push to the branch**
-   ```bash
+   \`\`\`bash
    git push origin feature/amazing-feature
-   ```
+   \`\`\`
 5. **Open a Pull Request**
 
 ### Development Guidelines
