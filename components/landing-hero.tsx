@@ -2,7 +2,26 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { RotatingText } from "./rotating-text"
-import { HeroDemoTabs } from "./landing/hero-demo-tabs"
+import dynamic from "next/dynamic"
+
+// Replace the existing import
+// import { HeroDemoTabs } from "./landing/hero-demo-tabs"
+
+// Add dynamic import with loading component
+const HeroDemoTabs = dynamic(() => import("./landing/hero-demo-tabs").then((mod) => ({ default: mod.HeroDemoTabs })), {
+  loading: () => (
+    <div className="mt-16 max-w-6xl mx-auto">
+      <div className="animate-pulse space-y-6">
+        <div className="text-center space-y-4">
+          <div className="h-8 bg-gray-200 rounded-md w-3/4 mx-auto"></div>
+          <div className="h-6 bg-gray-200 rounded-md w-full mx-auto"></div>
+        </div>
+        <div className="h-96 bg-gray-200 rounded-lg"></div>
+      </div>
+    </div>
+  ),
+  ssr: false,
+})
 
 export function LandingHero() {
   return (

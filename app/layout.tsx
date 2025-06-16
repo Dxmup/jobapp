@@ -26,10 +26,6 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Preload critical videos */}
-        <link rel="prefetch" href="/videos/resume-revision.webm" as="video" type="video/webm" />
-        <link rel="prefetch" href="/videos/cover-letter-demo.webm" as="video" type="video/webm" />
-        <link rel="prefetch" href="/videos/interview-questions.webm" as="video" type="video/webm" />
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
