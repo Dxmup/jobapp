@@ -305,8 +305,8 @@ export function ResumeOptimizationTab({ onActionUsed, isDisabled }: ResumeOptimi
           See Your Resume Transformed
         </h3>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Watch AI turn a basic resume into an interview magnet in seconds. Upload yours and see the difference
-          immediately. Sign up for even more powerful results!
+          Watch AI turn a any resume into an interview magnet in seconds. Upload yours and see the difference
+          immediately. Sign up for automated full results.
         </p>
       </div>
 

@@ -154,7 +154,7 @@ export function CoverLetterTab({ onActionUsed, isDisabled }: CoverLetterTabProps
           Cover Letter Generator Demo
         </h3>
         <p className="text-muted-foreground">
-          See how AI turns your everyday experience into compelling stories that make hiring managers think 'I need to
+          See how JobCraft turns your everyday experience into compelling stories that make hiring managers think 'I need to
           interview this person'.
         </p>
       </div>
