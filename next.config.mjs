@@ -1,35 +1,29 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    optimizePackageImports: ['lucide-react', 'framer-motion'],
-  },
-  images: {
-    formats: ['image/webp', 'image/avif'],
-    minimumCacheTTL: 60,
-    unoptimized: true,
-  },
-  compress: true,
-  poweredByHeader: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Add video optimization
-  async headers() {
-    return [
+  images: {
+    domains: ['placeholder.svg', 'blob.v0.dev'],
+    remotePatterns: [
       {
-        source: '/videos/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
+        protocol: 'https',
+        hostname: '**',
       },
-    ]
+    ],
+    unoptimized: true,
+  },
+  experimental: {
+    serverComponentsExternalPackages: ['pdf-parse'],
   },
 }
 
-export default nextConfig
+// Bundle analyzer configuration
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+export default withBundleAnalyzer(nextConfig)
