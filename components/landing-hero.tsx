@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Play } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { ArrowRight } from "lucide-react"
 import dynamic from "next/dynamic"
 
 // Lazy load heavy components
@@ -47,10 +48,9 @@ export function LandingHero() {
 
       <div className="container relative">
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-background/80 backdrop-blur-sm border rounded-full px-4 py-2 mb-8">
-            <Play className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">AI-Powered Job Search Assistant</span>
-          </div>
+          <Badge className="mb-4 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100 hover:bg-purple-100 dark:hover:bg-purple-900">
+            Stop Getting Rejected. Start Getting Hired.
+          </Badge>
 
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
             Land Your Dream Job with{" "}
