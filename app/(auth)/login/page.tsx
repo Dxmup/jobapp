@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { LoginForm } from "@/components/auth/login-form"
+import { LoginForm } from "@/components/auth/simple-login-form"
 import { RotatingTestimonials } from "@/components/auth/rotating-testimonials"
 
 export default function LoginPage() {

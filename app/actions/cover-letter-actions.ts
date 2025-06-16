@@ -76,6 +76,23 @@ export async function generateCoverLetter({
       return { success: false, error: "You don't have permission to access this resume" }
     }
 
+    // Get user profile information for auto-filling
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, phone, email")
+      .eq("id", userId)
+      .single()
+
+    // Fallback to auth user email if profile email is not available
+    const userEmail = profile?.email || (await supabase.auth.getUser()).data.user?.email || ""
+    const userName = profile?.full_name || "Your Name"
+    const userPhone = profile?.phone || ""
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+
     // Get the API key from environment variables
     const apiKey = process.env.GOOGLE_AI_API_KEY
     if (!apiKey) {
@@ -159,7 +176,30 @@ Formality (1-10, where 1 is casual and 10 is formal): ${formality}
       data.candidates[0].content.parts[0] &&
       data.candidates[0].content.parts[0].text
     ) {
-      const coverLetter = data.candidates[0].content.parts[0].text
+      const generatedContent = data.candidates[0].content.parts[0].text
+
+      const selectedJob = { company: job.company }
+
+      const finalCoverLetter = `I am excited about the opportunity to bring my skills to ${selectedJob.company} and contribute to your team's success. Thank you for considering my application.
+
+Sincerely,
+
+${userName}
+${userPhone ? `${userPhone}` : ""}
+${userEmail}
+
+${currentDate}`
+
+      // Auto-replace any remaining common placeholders
+      const coverLetterContent = generatedContent
+        .replace(/\[Your Name\]/g, userName)
+        .replace(/\[Your Phone\]/g, userPhone)
+        .replace(/\[Your Email\]/g, userEmail)
+        .replace(/\[Date\]/g, currentDate)
+        .replace(/\[Today's Date\]/g, currentDate)
+
+      const coverLetter = coverLetterContent
+
       return { success: true, coverLetter }
     } else {
       console.error("Unexpected response format from Gemini API:", JSON.stringify(data))

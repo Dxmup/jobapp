@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { BarChart3, ListTodo } from "lucide-react"
 import Link from "next/link"
 import { RecentActivityCard } from "./recent-activity-card"
-import { UpcomingEventsCard } from "./upcoming-events-card"
 import { QuickStatsCard } from "./quick-stats-card"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -89,9 +88,8 @@ export function EnhancedDashboardOverview() {
         <TabsContent value="overview" className="mt-4 space-y-4">
           <DashboardOverview />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <RecentActivityCard />
-            <UpcomingEventsCard />
             <QuickStatsCard />
           </div>
         </TabsContent>

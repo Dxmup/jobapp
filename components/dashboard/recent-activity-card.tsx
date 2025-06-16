@@ -60,7 +60,7 @@ export function RecentActivityCard() {
   }
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center">
           <Clock className="mr-2 h-4 w-4 text-purple-500" />
@@ -79,9 +79,9 @@ export function RecentActivityCard() {
             {activities.slice(0, 3).map((activity, index) => (
               <div
                 key={activity.id}
-                className={`flex justify-between items-center py-1 ${index < activities.length - 1 ? "border-b" : ""}`}
+                className={`flex items-center py-1 gap-2 ${index < activities.length - 1 ? "border-b" : ""}`}
               >
-                <span className="text-muted-foreground">{activity.description}</span>
+                <span className="text-muted-foreground truncate flex-1 mr-2">{activity.description}</span>
                 <span className="text-xs">{activity.timeAgo}</span>
               </div>
             ))}

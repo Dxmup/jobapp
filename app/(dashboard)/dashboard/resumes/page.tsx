@@ -80,6 +80,46 @@ export default function ResumesPage() {
     let fetchedResumes: Resume[] = []
     const errorMessages: string[] = []
 
+    // First, check if we have a valid session and try to refresh if needed
+    try {
+      console.log("Checking session status...")
+      const sessionResponse = await fetch("/api/debug/session")
+
+      if (sessionResponse.ok) {
+        const sessionData = await sessionResponse.json()
+
+        if (!sessionData.authenticated) {
+          console.log("Session check failed, attempting to refresh session...")
+
+          const refreshResponse = await fetch("/api/auth/refresh-session")
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json()
+            console.log("Session refreshed successfully:", refreshData.message)
+            toast({
+              title: "Session refreshed",
+              description: "Authentication restored, retrying...",
+            })
+          } else {
+            const refreshError = await refreshResponse.json()
+            console.error("Failed to refresh session:", refreshError)
+            toast({
+              variant: "destructive",
+              title: "Authentication issue",
+              description: "Please try logging out and back in if problems persist.",
+            })
+          }
+        } else {
+          console.log("Session is valid")
+        }
+      } else {
+        console.log("Session check endpoint failed, continuing anyway...")
+      }
+    } catch (sessionError) {
+      console.error("Error checking session:", sessionError)
+      // Don't fail the whole operation for session check errors
+    }
+
+    // Rest of the function remains the same...
     try {
       // Method 1: Try the direct API first (most reliable)
       console.log("Trying direct API...")
@@ -274,6 +314,49 @@ export default function ResumesPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  toast({
+                    title: "Refreshing session...",
+                    description: "Attempting to restore authentication",
+                  })
+
+                  const refreshResponse = await fetch("/api/auth/refresh-session")
+                  const refreshData = await refreshResponse.json()
+
+                  if (refreshResponse.ok && refreshData.success) {
+                    toast({
+                      title: "Session refreshed",
+                      description: "Attempting to fetch resumes again...",
+                    })
+                    // Wait a moment for cookies to be set
+                    setTimeout(() => {
+                      fetchResumes()
+                    }, 1000)
+                  } else {
+                    toast({
+                      variant: "destructive",
+                      title: "Session refresh failed",
+                      description: refreshData.message || "Please try logging out and back in.",
+                    })
+                  }
+                } catch (error) {
+                  console.error("Error refreshing session:", error)
+                  toast({
+                    variant: "destructive",
+                    title: "Refresh failed",
+                    description: "Please try logging out and back in.",
+                  })
+                }
+              }}
+            >
+              Refresh Session & Try Again
+            </Button>
+          </div>
         </Alert>
       )}
 
