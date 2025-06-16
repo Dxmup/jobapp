@@ -42,7 +42,6 @@ export function ProfileSocialLinks() {
             placeholder="https://linkedin.com/in/username"
             value={links.linkedin}
             onChange={(e) => setLinks({ ...links, linkedin: e.target.value })}
-            className="focus:ring-primary focus:border-primary"
           />
         </div>
 
@@ -56,7 +55,6 @@ export function ProfileSocialLinks() {
             placeholder="https://github.com/username"
             value={links.github}
             onChange={(e) => setLinks({ ...links, github: e.target.value })}
-            className="focus:ring-primary focus:border-primary"
           />
         </div>
 
@@ -70,7 +68,6 @@ export function ProfileSocialLinks() {
             placeholder="https://yourwebsite.com"
             value={links.portfolio}
             onChange={(e) => setLinks({ ...links, portfolio: e.target.value })}
-            className="focus:ring-primary focus:border-primary"
           />
         </div>
 
@@ -84,7 +81,6 @@ export function ProfileSocialLinks() {
             placeholder="https://twitter.com/username"
             value={links.twitter}
             onChange={(e) => setLinks({ ...links, twitter: e.target.value })}
-            className="focus:ring-primary focus:border-primary"
           />
         </div>
       </CardContent>

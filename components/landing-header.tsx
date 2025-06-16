@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
 import dynamic from "next/dynamic"
 
+// Replace the existing import
+// import { ModeToggle } from "@/components/mode-toggle"
+
+// Add dynamic import with loading component
 const ModeToggle = dynamic(() => import("@/components/mode-toggle").then((mod) => ({ default: mod.ModeToggle })), {
   loading: () => <div className="h-9 w-9 bg-muted animate-pulse rounded" />,
   ssr: false,

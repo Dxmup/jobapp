@@ -1,84 +1,71 @@
-"use client"
-
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight } from "lucide-react"
 import dynamic from "next/dynamic"
 
-// Lazy load heavy components
-const RotatingText = dynamic(
-  () => import("@/components/rotating-text").then((mod) => ({ default: mod.RotatingText })),
-  {
-    loading: () => <span className="inline-block min-w-[180px] h-8 bg-muted animate-pulse rounded" />,
-    ssr: false,
-  },
-)
+// Replace the existing import
+// import { RotatingText } from "./rotating-text"
 
-const HeroDemoTabs = dynamic(
-  () => import("@/components/landing/hero-demo-tabs").then((mod) => ({ default: mod.HeroDemoTabs })),
-  {
-    loading: () => (
-      <div className="w-full max-w-4xl mx-auto">
-        <div className="bg-background rounded-lg border p-8">
-          <div className="flex space-x-1 mb-6">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-10 bg-muted animate-pulse rounded flex-1" />
-            ))}
-          </div>
-          <div className="space-y-4">
-            <div className="h-6 bg-muted animate-pulse rounded" />
-            <div className="h-6 bg-muted animate-pulse rounded w-3/4" />
-            <div className="h-6 bg-muted animate-pulse rounded w-1/2" />
-          </div>
+// Add dynamic import with loading component
+const RotatingText = dynamic(() => import("./rotating-text").then((mod) => ({ default: mod.RotatingText })), {
+  loading: () => <span className="inline-block min-w-[180px] h-8 bg-muted animate-pulse rounded" />,
+  ssr: false,
+})
+
+// Replace the existing import
+// import { HeroDemoTabs } from "./landing/hero-demo-tabs"
+
+// Add dynamic import with loading component
+const HeroDemoTabs = dynamic(() => import("./landing/hero-demo-tabs").then((mod) => ({ default: mod.HeroDemoTabs })), {
+  loading: () => (
+    <div className="mt-16 max-w-6xl mx-auto">
+      <div className="animate-pulse space-y-6">
+        <div className="text-center space-y-4">
+          <div className="h-8 bg-gray-200 rounded-md w-3/4 mx-auto"></div>
+          <div className="h-6 bg-gray-200 rounded-md w-full mx-auto"></div>
         </div>
+        <div className="h-96 bg-gray-200 rounded-lg"></div>
       </div>
-    ),
-    ssr: false,
-  },
-)
+    </div>
+  ),
+  ssr: false,
+})
 
 export function LandingHero() {
   return (
-    <section className="relative py-20 lg:py-32 overflow-hidden">
-      {/* Background Elements */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 via-transparent to-cyan-50/50 dark:from-purple-950/20 dark:to-cyan-950/20" />
-      <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-purple-200/20 dark:bg-purple-800/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-cyan-200/20 dark:bg-cyan-800/20 rounded-full blur-3xl" />
-
-      <div className="container relative">
-        <div className="text-center mb-16">
+    <section className="relative py-20 md:py-32 overflow-hidden">
+      <div className="absolute inset-0 bg-grid-pattern opacity-5 dark:opacity-[0.07]" />
+      <div className="container relative z-10">
+        <div className="max-w-3xl mx-auto text-center">
           <Badge className="mb-4 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100 hover:bg-purple-100 dark:hover:bg-purple-900">
             Stop Getting Rejected. Start Getting Hired.
           </Badge>
-
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
             Land Your Dream Job with{" "}
-            <span className="block">
-              AI-Powered <RotatingText />
+            <span className="bg-gradient-to-r from-purple-600 to-cyan-500 bg-clip-text text-transparent">
+              AI-Crafted
+              <br />
+              <RotatingText />
             </span>
           </h1>
-
-          <p className="text-xl md:text-2xl text-foreground/80 max-w-3xl mx-auto mb-8">
-            Transform your job search with intelligent resume optimization, personalized cover letters, and interview
-            preparation tailored to each opportunity.
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            While you're getting rejected, smart job seekers are using AI to get 3x more interviews. Don't get left
+            behind.
           </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Button asChild size="lg" className="text-lg px-8 py-6">
-              <Link href="/signup">
-                Get Started Free
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button size="lg" asChild>
+              <Link href="/signup">Get Started Free</Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="text-lg px-8 py-6">
+            <Button size="lg" variant="outline" asChild>
               <Link href="#features">See How It Works</Link>
             </Button>
           </div>
-        </div>
 
-        {/* Interactive Demo */}
-        <HeroDemoTabs />
+          {/* Interactive Demo Section */}
+          <div className="mt-16">
+            <HeroDemoTabs />
+          </div>
+        </div>
       </div>
     </section>
   )
