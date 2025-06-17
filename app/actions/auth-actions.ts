@@ -2,6 +2,7 @@
 
 import { signIn, signUp, signOut } from "@/lib/auth"
 import { cookies } from "next/headers"
+import { STRIPE_PRICE_IDS } from "@/lib/stripe"
 
 export async function login(formData: FormData) {
   const email = formData.get("email") as string
@@ -66,6 +67,7 @@ export async function createUserAndLogin(userData: {
   name: string
   email: string
   password: string
+  selectedTier?: "free" | "pro" | "premium"
 }) {
   try {
     const result = await signUp(userData.email, userData.password, userData.name)
@@ -99,6 +101,67 @@ export async function createUserAndLogin(userData: {
         path: "/",
         sameSite: "lax",
       })
+
+      // Handle subscription tier selection
+      if (userData.selectedTier && userData.selectedTier !== "free") {
+        // Store the selected tier temporarily
+        cookieStore.set("pending_subscription_tier", userData.selectedTier, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60, // 1 hour
+          path: "/",
+          sameSite: "lax",
+        })
+
+        // Create Stripe checkout session
+        try {
+          const priceId = userData.selectedTier === "pro" ? STRIPE_PRICE_IDS.PRO : STRIPE_PRICE_IDS.PREMIUM
+
+          if (!priceId) {
+            console.error("Price ID not found for tier:", userData.selectedTier)
+            return {
+              success: true,
+              redirectUrl: "/onboarding?subscription_error=true",
+            }
+          }
+
+          // Create checkout session
+          const checkoutResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_SITE_URL}/api/stripe/create-checkout-session`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Cookie: cookieStore.toString(),
+              },
+              body: JSON.stringify({
+                priceId,
+                returnUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/onboarding?subscription_success=true`,
+              }),
+            },
+          )
+
+          if (checkoutResponse.ok) {
+            const { url } = await checkoutResponse.json()
+            return {
+              success: true,
+              checkoutUrl: url,
+            }
+          } else {
+            console.error("Failed to create checkout session")
+            return {
+              success: true,
+              redirectUrl: "/onboarding?subscription_error=true",
+            }
+          }
+        } catch (error) {
+          console.error("Error creating checkout session:", error)
+          return {
+            success: true,
+            redirectUrl: "/onboarding?subscription_error=true",
+          }
+        }
+      }
 
       console.log("Signup successful, cookies set:", {
         authenticated: "true",
@@ -148,6 +211,7 @@ export async function logout() {
     cookieStore.set("authenticated", "", { maxAge: 0, path: "/" })
     cookieStore.set("user_id", "", { maxAge: 0, path: "/" })
     cookieStore.set("has_baseline_resume", "", { maxAge: 0, path: "/" })
+    cookieStore.set("pending_subscription_tier", "", { maxAge: 0, path: "/" })
 
     console.log("Logout successful, cookies cleared")
   }

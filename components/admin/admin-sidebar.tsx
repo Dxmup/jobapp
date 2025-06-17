@@ -2,123 +2,128 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Users, FileText, Settings, Bell, CreditCard, HelpCircle, Home, ClipboardList } from "lucide-react"
-
+import { cn } from "@/lib/utils"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarSeparator,
-} from "@/components/ui/sidebar"
+  LayoutDashboard,
+  Users,
+  FileText,
+  MessageSquare,
+  Activity,
+  Database,
+  Settings,
+  ChevronRight,
+} from "lucide-react"
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  className?: string
+}
+
+export function AdminSidebar({ className }: AdminSidebarProps) {
   const pathname = usePathname()
 
-  const isActive = (path: string) => {
-    return pathname === path || pathname.startsWith(`${path}/`)
-  }
+  const routes = [
+    {
+      title: "Dashboard",
+      href: "/admin",
+      icon: LayoutDashboard,
+      description: "Overview & analytics",
+    },
+    {
+      title: "Users",
+      href: "/admin/users",
+      icon: Users,
+      description: "Manage user accounts",
+    },
+    {
+      title: "Content",
+      href: "/admin/content",
+      icon: FileText,
+      description: "Templates & prompts",
+    },
+    {
+      title: "Blogs",
+      href: "/admin/blogs",
+      icon: FileText,
+      description: "Manage blog content",
+    },
+    {
+      title: "Testimonials",
+      href: "/admin/testimonials",
+      icon: MessageSquare,
+      description: "User testimonials",
+    },
+    {
+      title: "Testing",
+      href: "/admin/testing",
+      icon: Activity,
+      description: "System testing suite",
+    },
+    {
+      title: "Audit Logs",
+      href: "/admin/audit-logs",
+      icon: Activity,
+      description: "System activity",
+    },
+    {
+      title: "Migrations",
+      href: "/admin/migrations",
+      icon: Database,
+      description: "Database migrations",
+    },
+    {
+      title: "Settings",
+      href: "/admin/settings",
+      icon: Settings,
+      description: "System configuration",
+    },
+  ]
 
   return (
-    <Sidebar>
-      <SidebarHeader className="flex h-14 items-center px-4">
-        <Link href="/admin" className="flex items-center gap-2 font-semibold">
-          <span className="text-primary">CareerAI</span>
-          <span className="rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">Admin</span>
-        </Link>
-      </SidebarHeader>
-      <SidebarSeparator />
-      <SidebarContent>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin")}>
-              <Link href="/admin">
-                <Home className="h-4 w-4" />
-                <span>Dashboard</span>
+    <div
+      className={cn(
+        "fixed left-0 top-16 h-[calc(100vh-4rem)] w-72 bg-white border-r border-gray-200 overflow-y-auto",
+        className,
+      )}
+    >
+      <div className="p-6">
+        <nav className="space-y-2">
+          {routes.map((route) => {
+            const Icon = route.icon
+            const isActive = pathname === route.href
+
+            return (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={cn(
+                  "flex items-center justify-between p-3 rounded-lg transition-all duration-200 group",
+                  isActive
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                )}
+              >
+                <div className="flex items-center space-x-3">
+                  <Icon
+                    className={cn("h-5 w-5", isActive ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600")}
+                  />
+                  <div>
+                    <div className="font-medium text-sm">{route.title}</div>
+                    <div className={cn("text-xs", isActive ? "text-blue-600" : "text-gray-400")}>
+                      {route.description}
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    isActive ? "text-blue-600 rotate-90" : "text-gray-300 group-hover:text-gray-400",
+                  )}
+                />
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin/users")}>
-              <Link href="/admin/users">
-                <Users className="h-4 w-4" />
-                <span>Users</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin/content")}>
-              <Link href="/admin/content">
-                <FileText className="h-4 w-4" />
-                <span>Content</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin/analytics")}>
-              <Link href="/admin/analytics">
-                <BarChart3 className="h-4 w-4" />
-                <span>Analytics</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin/billing")}>
-              <Link href="/admin/billing">
-                <CreditCard className="h-4 w-4" />
-                <span>Billing</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin/support")}>
-              <Link href="/admin/support">
-                <HelpCircle className="h-4 w-4" />
-                <span>Support</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin/notifications")}>
-              <Link href="/admin/notifications">
-                <Bell className="h-4 w-4" />
-                <span>Notifications</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin/audit-logs")}>
-              <Link href="/admin/audit-logs">
-                <ClipboardList className="h-4 w-4" />
-                <span>Audit Logs</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActive("/admin/settings")}>
-              <Link href="/admin/settings">
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/dashboard">
-                <Home className="h-4 w-4" />
-                <span>Back to App</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-    </Sidebar>
+            )
+          })}
+        </nav>
+      </div>
+    </div>
   )
 }

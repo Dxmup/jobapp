@@ -29,24 +29,101 @@ export function JobInterviewQuestions({ jobId, initialQuestions, resumeId }: Job
   const { toast } = useToast()
   const router = useRouter()
 
+  const [isTestingApi, setIsTestingApi] = useState(false)
+
+  const testGeminiApi = async () => {
+    setIsTestingApi(true)
+    try {
+      console.log("🧪 Testing Gemini API connection...")
+
+      const testResponse = await fetch(
+        "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": process.env.GOOGLE_AI_API_KEY || "",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: 'Say \'API connection successful\' in JSON format: {"message": "API connection successful"}',
+                  },
+                ],
+              },
+            ],
+          }),
+        },
+      )
+
+      console.log(`🧪 Test API response: ${testResponse.status}`)
+
+      if (testResponse.ok) {
+        const data = await testResponse.json()
+        console.log("✅ API test successful:", data)
+        toast({
+          title: "API Test Successful",
+          description: "Gemini API is working correctly",
+        })
+      } else {
+        const errorText = await testResponse.text()
+        console.error("❌ API test failed:", errorText)
+        toast({
+          title: "API Test Failed",
+          description: `Status: ${testResponse.status}`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("❌ API test error:", error)
+      toast({
+        title: "API Test Error",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setIsTestingApi(false)
+    }
+  }
+
   const handleRefresh = async () => {
     setIsGenerating(true)
     setError(null)
     setSaveError(null)
 
     try {
+      console.log("🔄 Starting question generation...", {
+        jobId,
+        resumeId,
+        hasExistingQuestions: questions.technical.length > 0 || questions.behavioral.length > 0,
+        refreshCount,
+      })
+
       // Pass the current questions to the API to avoid repetition
       const result = await generateInterviewQuestions(jobId, resumeId, questions)
+
+      console.log("📝 Question generation result:", {
+        success: result.success,
+        technicalCount: result.questions?.technical?.length || 0,
+        behavioralCount: result.questions?.behavioral?.length || 0,
+        error: result.error,
+      })
 
       if (result.success && result.questions) {
         setQuestions(result.questions)
         setRefreshCount((prev) => prev + 1)
 
         // Save questions to storage
+        console.log("💾 Saving questions to storage...")
         const saveResult = await saveInterviewQuestions(jobId, result.questions, resumeId)
 
         if (!saveResult.success) {
+          console.error("❌ Failed to save questions:", saveResult.error)
           setSaveError(saveResult.error || "Failed to save questions")
+        } else {
+          console.log("✅ Questions saved successfully")
         }
 
         // Refresh the page to update server components
@@ -61,6 +138,7 @@ export function JobInterviewQuestions({ jobId, initialQuestions, resumeId }: Job
           duration: 3000,
         })
       } else {
+        console.error("❌ Question generation failed:", result.error)
         setError(result.error || "Failed to generate questions")
         toast({
           title: "Error",
@@ -69,6 +147,7 @@ export function JobInterviewQuestions({ jobId, initialQuestions, resumeId }: Job
         })
       }
     } catch (err) {
+      console.error("❌ Unexpected error during question generation:", err)
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred"
       setError(errorMessage)
       toast({
@@ -100,25 +179,50 @@ export function JobInterviewQuestions({ jobId, initialQuestions, resumeId }: Job
                 : "Generate questions based on the job description and your resume"}
             </CardDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isGenerating}
-            className="flex items-center gap-2"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                {hasQuestions ? (refreshCount > 0 ? "Get More Questions" : "Refresh Questions") : "Generate Questions"}
-              </>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isGenerating}
+              className="flex items-center gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  {hasQuestions
+                    ? refreshCount > 0
+                      ? "Get More Questions"
+                      : "Refresh Questions"
+                    : "Generate Questions"}
+                </>
+              )}
+            </Button>
+
+            {process.env.NODE_ENV === "development" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={testGeminiApi}
+                disabled={isTestingApi}
+                className="flex items-center gap-2"
+              >
+                {isTestingApi ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  "Test API"
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

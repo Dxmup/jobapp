@@ -2,53 +2,106 @@
 
 import { useState, useEffect } from "react"
 
-const testimonials = [
-  {
-    quote:
-      "JobCraft AI transformed my job search. I landed interviews at 3 top companies within a week of using their AI-optimized resume and cover letters.",
-    author: "Sofia Chen, Software Engineer",
-  },
-  {
-    quote:
-      "After 2 months of job searching with no luck, JobCraft AI helped me tailor my resume perfectly. I got 5 callbacks in just one week!",
-    author: "Marcus Johnson, Marketing Director",
-  },
-  {
-    quote:
-      "The timeline feature helped me stay organized during my job hunt. I never missed a follow-up and landed my dream role at a Fortune 500 company.",
-    author: "Priya Patel, Product Manager",
-  },
-  {
-    quote:
-      "The AI-generated cover letters saved me hours of work and were better than anything I could write myself. Worth every penny!",
-    author: "James Wilson, Data Scientist",
-  },
-  {
-    quote:
-      "As a career changer, I was struggling to highlight my transferable skills. JobCraft AI helped me reframe my experience and I got hired within a month.",
-    author: "Olivia Martinez, UX Designer",
-  },
-]
+interface Testimonial {
+  id: string
+  quote: string
+  author: string
+  position?: string
+  company?: string
+}
 
 export function RotatingTestimonials() {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    fetchTestimonials()
+  }, [])
+
+  const fetchTestimonials = async () => {
+    try {
+      const response = await fetch("/api/testimonials")
+      if (response.ok) {
+        const data = await response.json()
+        if (data.testimonials && data.testimonials.length > 0) {
+          setTestimonials(data.testimonials)
+        } else {
+          // If no testimonials in database, show a single default one
+          setTestimonials([
+            {
+              id: "default",
+              quote:
+                "CareerAI has revolutionized how I approach job applications. The AI-powered tools are incredibly effective.",
+              author: "Professional User",
+              position: "Job Seeker",
+            },
+          ])
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching testimonials:", error)
+      // Fallback testimonial if API fails
+      setTestimonials([
+        {
+          id: "fallback",
+          quote:
+            "CareerAI has revolutionized how I approach job applications. The AI-powered tools are incredibly effective.",
+          author: "Professional User",
+          position: "Job Seeker",
+        },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (testimonials.length <= 1) return
+
     const interval = setInterval(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % testimonials.length)
-    }, 4000) // Rotate every 4 seconds instead of 8 seconds
+    }, 4000) // Rotate every 4 seconds
 
     return () => clearInterval(interval)
-  }, [])
+  }, [testimonials.length])
+
+  if (loading) {
+    return (
+      <blockquote className="space-y-2">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+        </div>
+      </blockquote>
+    )
+  }
+
+  if (testimonials.length === 0) {
+    return (
+      <blockquote className="space-y-2">
+        <p className="text-lg">
+          "CareerAI has revolutionized how I approach job applications. The AI-powered tools are incredibly effective."
+        </p>
+        <footer className="text-sm">Professional User, Job Seeker</footer>
+      </blockquote>
+    )
+  }
+
+  const currentTestimonial = testimonials[currentIndex]
 
   return (
     <blockquote className="space-y-2">
       <p className="text-lg relative overflow-hidden h-[120px] flex items-center">
         <span className="absolute transition-opacity duration-1000" style={{ opacity: 1 }}>
-          "{testimonials[currentIndex].quote}"
+          "{currentTestimonial.quote}"
         </span>
       </p>
-      <footer className="text-sm transition-opacity duration-1000">{testimonials[currentIndex].author}</footer>
+      <footer className="text-sm transition-opacity duration-1000">
+        {currentTestimonial.author}
+        {currentTestimonial.position && `, ${currentTestimonial.position}`}
+        {currentTestimonial.company && ` at ${currentTestimonial.company}`}
+      </footer>
     </blockquote>
   )
 }

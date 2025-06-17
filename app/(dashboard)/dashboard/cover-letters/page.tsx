@@ -172,58 +172,22 @@ export default function CoverLettersPage() {
   const fetchJobs = async () => {
     setIsLoadingJobs(true)
     try {
-      // Get the user ID
-      const currentUserId = userId || (await getUserId())
+      // Use our working API endpoint instead of direct Supabase query
+      const response = await fetch("/api/jobs/list-for-user")
 
-      if (!currentUserId) {
-        console.error("No user ID available")
-        toast({
-          title: "Authentication Error",
-          description: "Could not determine your user ID",
-          variant: "destructive",
-        })
-        setIsLoadingJobs(false)
-        return
+      if (!response.ok) {
+        throw new Error("Failed to fetch jobs")
       }
 
-      console.log("Using user ID for jobs:", currentUserId)
+      const data = await response.json()
 
-      // Try a simple query to check if we can access the jobs table
-      const { data: testData, error: testError } = await supabase.from("jobs").select("count").limit(1)
-
-      if (testError) {
-        console.error("Error testing jobs table access:", testError)
-        toast({
-          title: "Database Error",
-          description: "Could not access jobs table",
-          variant: "destructive",
-        })
-        setIsLoadingJobs(false)
-        return
+      if (data.success && data.jobs) {
+        setJobs(data.jobs)
+        console.log(`Found ${data.jobs.length} jobs:`, data.jobs)
+      } else {
+        throw new Error(data.error || "Failed to load jobs")
+        setJobs([])
       }
-
-      console.log("Jobs table access test successful")
-
-      // Now fetch the actual jobs for this user
-      const { data: jobsData, error: jobsError } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("user_id", currentUserId)
-        .order("created_at", { ascending: false })
-
-      if (jobsError) {
-        console.error("Error fetching jobs:", jobsError)
-        toast({
-          title: "Error",
-          description: "Failed to load jobs",
-          variant: "destructive",
-        })
-        setIsLoadingJobs(false)
-        return
-      }
-
-      console.log(`Found ${jobsData?.length || 0} jobs for user ID ${currentUserId}:`, jobsData)
-      setJobs(jobsData || [])
     } catch (error) {
       console.error("Error fetching jobs:", error)
       toast({
@@ -231,6 +195,7 @@ export default function CoverLettersPage() {
         description: "Failed to load jobs",
         variant: "destructive",
       })
+      setJobs([])
     } finally {
       setIsLoadingJobs(false)
     }
