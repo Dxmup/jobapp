@@ -1,42 +1,16 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { requireRouteAuthenticatedUserId } from "@/lib/auth-helpers"
+import { createRouteClient } from "@/lib/supabase/authClient"
 
 export async function GET(request: Request) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
+    // Single source of truth for authentication
+    const userId = await requireRouteAuthenticatedUserId()
+    const supabase = createRouteClient()
 
-    // Get user session
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
+    console.log(`Fetching resumes for authenticated user: ${userId}`)
 
-    let userId = null
-
-    if (session && !sessionError) {
-      userId = session.user.id
-      console.log("Found valid Supabase session for user:", userId)
-    } else {
-      // Fallback to cookie
-      userId = cookieStore.get("user_id")?.value
-      console.log("No Supabase session, trying cookie user ID:", userId)
-
-      if (!userId) {
-        console.error("No authentication found - no session and no user ID cookie")
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Authentication required. Please log in again.",
-            details: "No valid session or user ID found",
-          },
-          { status: 401 },
-        )
-      }
-    }
-
-    // Query resumes for the user
+    // Query resumes for the authenticated user
     const { data: resumes, error } = await supabase
       .from("resumes")
       .select("*")
@@ -64,6 +38,11 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error("Unexpected error in resumes API:", error)
+
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -77,29 +56,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
-
-    // Get user session
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
-
-    let userId = null
-
-    if (session && !sessionError) {
-      userId = session.user.id
-    } else {
-      // Fallback to cookie
-      userId = cookieStore.get("user_id")?.value
-      if (!userId) {
-        return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
-      }
-    }
+    // Single source of truth for authentication
+    const userId = await requireRouteAuthenticatedUserId()
+    const supabase = createRouteClient()
 
     const body = await request.json()
-    console.log("Received resume creation request:", body)
+    console.log("Received resume creation request for user:", userId)
 
     const { name, content, fileName, fileUrl, jobId, parentResumeId, isAiGenerated, versionName, jobTitle, company } =
       body
@@ -134,7 +96,7 @@ export async function POST(request: Request) {
     const { data: resume, error: resumeError } = await supabase
       .from("resumes")
       .insert({
-        user_id: userId,
+        user_id: userId, // Use consistent user_id field
         name,
         content,
         file_name: fileName || `${name.replace(/\s+/g, "-").toLowerCase()}.txt`,
@@ -217,6 +179,11 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error("Unexpected error creating resume:", error)
+
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    }
+
     return NextResponse.json(
       {
         success: false,

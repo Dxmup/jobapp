@@ -1,145 +1,153 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createMiddlewareSupabaseClient } from "@/lib/supabase/middleware-client"
 
-async function checkAdminStatus(userId: string): Promise<boolean> {
+async function checkAdminStatus(userId: string, supabase: any): Promise<boolean> {
   try {
-    const supabase = createServerSupabaseClient()
-
-    // Get user from database
-    const { data: user, error } = await supabase.from("users").select("email").eq("id", userId).single()
+    const { data: user, error } = await supabase.from("users").select("email").eq("auth_id", userId).maybeSingle()
 
     if (error || !user?.email) {
-      console.log(`No user found for ID: ${userId}`)
       return false
     }
 
-    // Define admin emails
     const adminEmails = [
       "admin@careerai.com",
       "test@admin.com",
       "admin@test.com",
-      "testing@careerai.com", // Jim Halpert
-      "mctesterson@careerai.com", // Testy McTesterson
+      "testing@careerai.com",
+      "mctesterson@careerai.com",
       process.env.ADMIN_EMAIL,
     ]
       .filter(Boolean)
       .map((email) => email.toLowerCase())
 
-    const isAdmin = adminEmails.includes(user.email.toLowerCase())
-    console.log(`Dynamic admin check for ${user.email} (ID: ${userId}): ${isAdmin}`)
-
-    return isAdmin
+    return adminEmails.includes(user.email.toLowerCase())
   } catch (error) {
-    console.error("Error checking admin status in middleware:", error)
+    console.error("Error checking admin status:", error)
     return false
   }
 }
 
 export async function middleware(request: NextRequest) {
-  const isAuthenticated = request.cookies.get("authenticated")?.value === "true"
-  const hasBaselineResume = request.cookies.get("has_baseline_resume")?.value === "true"
-  const userId = request.cookies.get("user_id")?.value
-  const isAdminCookie = request.cookies.get("is_admin")?.value === "true"
+  const response = NextResponse.next()
   const path = request.nextUrl.pathname
 
-  console.log(`Middleware processing path: ${path}`)
-  console.log(`Authentication status: ${isAuthenticated ? "authenticated" : "not authenticated"}`)
-  console.log(`Admin cookie: ${isAdminCookie ? "admin" : "not admin"}`)
-  console.log(`User ID: ${userId}`)
+  // Create Supabase client for middleware using the same pattern as auth
+  const supabase = createMiddlewareSupabaseClient(request, response)
 
-  // Special case for admin login page - allow access
-  if (path === "/admin/login") {
-    // If already authenticated, check if they're admin and redirect accordingly
-    if (isAuthenticated && userId) {
-      const isActuallyAdmin = await checkAdminStatus(userId)
-      if (isActuallyAdmin) {
-        console.log("Already authenticated admin, redirecting to admin dashboard")
-        return NextResponse.redirect(new URL("/admin", request.url))
+  try {
+    // Get session - this should now work with the same client pattern
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession()
+
+    if (error) {
+      console.error("Middleware session error:", error)
+    }
+
+    console.log(`Middleware processing: ${path}`)
+    console.log(`Session exists: ${!!session}`)
+    if (session) {
+      console.log(`Session user ID: ${session.user.id}`)
+      console.log(`Session expires: ${new Date(session.expires_at! * 1000).toISOString()}`)
+    }
+
+    // Also check cookies as backup
+    const authCookie = request.cookies.get("authenticated")?.value
+    const userIdCookie = request.cookies.get("user_id")?.value
+    console.log(`Auth cookie: ${authCookie}, User ID cookie: ${userIdCookie}`)
+
+    // Skip middleware for auth pages to prevent loops
+    if (path === "/login" || path === "/signup") {
+      if (session) {
+        console.log("Already authenticated, redirecting to dashboard")
+        return NextResponse.redirect(new URL("/dashboard", request.url))
       }
-    }
-    return NextResponse.next()
-  }
-
-  // Special case for resume pages - allow access but client-side will handle auth
-  if (path.startsWith("/dashboard/resumes")) {
-    console.log("Resume page accessed, allowing access for client-side handling")
-    return NextResponse.next()
-  }
-
-  // If user is not authenticated and trying to access protected routes
-  if (
-    !isAuthenticated &&
-    (path.startsWith("/dashboard") ||
-      path.startsWith("/jobs") ||
-      path.startsWith("/onboarding") ||
-      path.startsWith("/admin")) &&
-    !path.startsWith("/dashboard/resumes") // Exclude resume pages from middleware auth check
-  ) {
-    // For admin routes, redirect to admin login
-    if (path.startsWith("/admin")) {
-      console.log(`Redirecting unauthenticated user to admin login from ${path}`)
-      return NextResponse.redirect(new URL("/admin/login", request.url))
-    }
-
-    // For other protected routes, redirect to regular login
-    console.log(`Redirecting unauthenticated user to login from ${path}`)
-    return NextResponse.redirect(new URL("/login", request.url))
-  }
-
-  // For admin routes, check admin privileges dynamically
-  if (isAuthenticated && path.startsWith("/admin") && !path.startsWith("/admin/login")) {
-    if (!userId) {
-      console.log(`No user ID found, redirecting to login`)
-      return NextResponse.redirect(new URL("/admin/login", request.url))
-    }
-
-    // Check admin status dynamically instead of relying on cookie
-    const isActuallyAdmin = await checkAdminStatus(userId)
-
-    if (!isActuallyAdmin) {
-      console.log(`Non-admin user attempted to access admin route: ${path}`)
-      console.log(`User ID: ${userId}, dynamic admin check: false`)
-      return NextResponse.redirect(new URL("/dashboard", request.url))
-    }
-
-    console.log(`Admin user accessing admin route: ${path}`)
-
-    // Update the admin cookie if it's incorrect
-    if (!isAdminCookie) {
-      console.log("Updating admin cookie to true")
-      const response = NextResponse.next()
-      response.cookies.set("is_admin", "true", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-        path: "/",
-      })
+      console.log("No session, allowing access to auth page")
       return response
     }
-  }
 
-  // If user is authenticated but doesn't have a baseline resume
-  // and is trying to access dashboard or jobs (but not onboarding or admin)
-  if (
-    isAuthenticated &&
-    !hasBaselineResume &&
-    (path.startsWith("/dashboard") || path.startsWith("/jobs")) &&
-    !path.startsWith("/onboarding") &&
-    !path.startsWith("/admin")
-  ) {
-    console.log(`Redirecting user without baseline resume to onboarding`)
-    return NextResponse.redirect(new URL("/onboarding", request.url))
-  }
+    // Special case for admin login page
+    if (path === "/admin/login") {
+      if (session && (await checkAdminStatus(session.user.id, supabase))) {
+        return NextResponse.redirect(new URL("/admin", request.url))
+      }
+      return response
+    }
 
-  // If user is authenticated, has a baseline resume, and is trying to access onboarding
-  if (isAuthenticated && hasBaselineResume && path.startsWith("/onboarding")) {
-    console.log(`Redirecting user with baseline resume from onboarding to dashboard`)
-    return NextResponse.redirect(new URL("/dashboard", request.url))
-  }
+    // Check if path requires authentication
+    const protectedPath =
+      path.startsWith("/dashboard") ||
+      path.startsWith("/jobs") ||
+      path.startsWith("/onboarding") ||
+      path.startsWith("/admin")
 
-  return NextResponse.next()
+    // Redirect unauthenticated users from protected routes
+    if (!session && protectedPath) {
+      const redirectUrl = path.startsWith("/admin") ? "/admin/login" : "/login"
+      console.log(`No session found, redirecting from ${path} to ${redirectUrl}`)
+      return NextResponse.redirect(new URL(redirectUrl, request.url))
+    }
+
+    // If we have a session, update cookies to ensure they're fresh
+    if (session) {
+      response.cookies.set("authenticated", "true", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+        sameSite: "lax",
+      })
+
+      response.cookies.set("user_id", session.user.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+        sameSite: "lax",
+      })
+    }
+
+    // Handle admin routes
+    if (session && path.startsWith("/admin") && !path.startsWith("/admin/login")) {
+      const isAdmin = await checkAdminStatus(session.user.id, supabase)
+      if (!isAdmin) {
+        return NextResponse.redirect(new URL("/dashboard", request.url))
+      }
+    }
+
+    // Handle onboarding flow for authenticated users
+    if (session && protectedPath && !path.startsWith("/admin")) {
+      try {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("has_baseline_resume")
+          .eq("auth_id", session.user.id)
+          .maybeSingle()
+
+        if (profile) {
+          if (!profile.has_baseline_resume && !path.startsWith("/onboarding")) {
+            console.log("User needs onboarding, redirecting")
+            return NextResponse.redirect(new URL("/onboarding", request.url))
+          }
+
+          if (profile.has_baseline_resume && path.startsWith("/onboarding")) {
+            console.log("User completed onboarding, redirecting to dashboard")
+            return NextResponse.redirect(new URL("/dashboard", request.url))
+          }
+        }
+      } catch (error) {
+        console.error("Error checking user profile:", error)
+      }
+    }
+
+    console.log(`Middleware allowing access to: ${path}`)
+    return response
+  } catch (error) {
+    console.error("Middleware error:", error)
+    return response
+  }
 }
 
 export const config = {
@@ -151,5 +159,7 @@ export const config = {
     "/admin/:path*",
     "/admin",
     "/admin/login",
+    "/login",
+    "/signup",
   ],
 }
