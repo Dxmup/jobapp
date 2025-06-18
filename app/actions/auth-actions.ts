@@ -19,6 +19,34 @@ export async function login(formData: FormData) {
 
   if (result.success && result.user) {
     console.log("Login successful for", result.user.id)
+
+    // Set authentication cookies for middleware
+    const cookieStore = cookies()
+
+    cookieStore.set("authenticated", "true", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    })
+
+    cookieStore.set("user_id", result.user.auth_id || result.user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    })
+
+    // Set baseline resume status for middleware
+    cookieStore.set("has_baseline_resume", result.user.has_baseline_resume ? "true" : "false", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    })
   }
 
   return result
@@ -35,6 +63,31 @@ export async function createUserAndLogin(userData: {
 
     if (result.success && result.user) {
       const cookieStore = cookies()
+
+      // Set authentication cookies for middleware
+      cookieStore.set("authenticated", "true", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: "/",
+      })
+
+      cookieStore.set("user_id", result.user.auth_id || result.user.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: "/",
+      })
+
+      cookieStore.set("has_baseline_resume", result.user.has_baseline_resume ? "true" : "false", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: "/",
+      })
 
       // Handle subscription tier selection
       if (userData.selectedTier && userData.selectedTier !== "free") {
@@ -137,7 +190,14 @@ export async function logout() {
 
   if (result.success) {
     const cookieStore = cookies()
+
+    // Clear all authentication cookies
+    cookieStore.set("authenticated", "", { maxAge: 0, path: "/" })
+    cookieStore.set("user_id", "", { maxAge: 0, path: "/" })
+    cookieStore.set("has_baseline_resume", "", { maxAge: 0, path: "/" })
+    cookieStore.set("is_admin", "", { maxAge: 0, path: "/" })
     cookieStore.set("pending_subscription_tier", "", { maxAge: 0, path: "/" })
+
     console.log("Logout successful")
   }
 
