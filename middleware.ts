@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createServerClient } from "@supabase/ssr"
+import { createMiddlewareSupabaseClient } from "@/lib/supabase/middleware-client"
 
 async function checkAdminStatus(userId: string, supabase: any): Promise<boolean> {
   try {
@@ -32,29 +32,11 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
   const path = request.nextUrl.pathname
 
-  // Create Supabase client for middleware
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: any) {
-          request.cookies.set({ name, value, ...options })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: any) {
-          request.cookies.set({ name, value: "", ...options })
-          response.cookies.set({ name, value: "", ...options })
-        },
-      },
-    },
-  )
+  // Create Supabase client for middleware using the same pattern as auth
+  const supabase = createMiddlewareSupabaseClient(request, response)
 
   try {
-    // Get session
+    // Get session - this should now work with the same client pattern
     const {
       data: { session },
       error,
@@ -64,11 +46,17 @@ export async function middleware(request: NextRequest) {
       console.error("Middleware session error:", error)
     }
 
-    console.log(`Middleware processing: ${path}, Session: ${session ? "exists" : "none"}`)
-
+    console.log(`Middleware processing: ${path}`)
+    console.log(`Session exists: ${!!session}`)
     if (session) {
-      console.log(`Session user: ${session.user.id}`)
+      console.log(`Session user ID: ${session.user.id}`)
+      console.log(`Session expires: ${new Date(session.expires_at! * 1000).toISOString()}`)
     }
+
+    // Also check cookies as backup
+    const authCookie = request.cookies.get("authenticated")?.value
+    const userIdCookie = request.cookies.get("user_id")?.value
+    console.log(`Auth cookie: ${authCookie}, User ID cookie: ${userIdCookie}`)
 
     // Skip middleware for auth pages to prevent loops
     if (path === "/login" || path === "/signup") {
@@ -76,6 +64,7 @@ export async function middleware(request: NextRequest) {
         console.log("Already authenticated, redirecting to dashboard")
         return NextResponse.redirect(new URL("/dashboard", request.url))
       }
+      console.log("No session, allowing access to auth page")
       return response
     }
 
@@ -97,8 +86,27 @@ export async function middleware(request: NextRequest) {
     // Redirect unauthenticated users from protected routes
     if (!session && protectedPath) {
       const redirectUrl = path.startsWith("/admin") ? "/admin/login" : "/login"
-      console.log(`Redirecting unauthenticated user from ${path} to ${redirectUrl}`)
+      console.log(`No session found, redirecting from ${path} to ${redirectUrl}`)
       return NextResponse.redirect(new URL(redirectUrl, request.url))
+    }
+
+    // If we have a session, update cookies to ensure they're fresh
+    if (session) {
+      response.cookies.set("authenticated", "true", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+        sameSite: "lax",
+      })
+
+      response.cookies.set("user_id", session.user.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+        sameSite: "lax",
+      })
     }
 
     // Handle admin routes
@@ -120,10 +128,12 @@ export async function middleware(request: NextRequest) {
 
         if (profile) {
           if (!profile.has_baseline_resume && !path.startsWith("/onboarding")) {
+            console.log("User needs onboarding, redirecting")
             return NextResponse.redirect(new URL("/onboarding", request.url))
           }
 
           if (profile.has_baseline_resume && path.startsWith("/onboarding")) {
+            console.log("User completed onboarding, redirecting to dashboard")
             return NextResponse.redirect(new URL("/dashboard", request.url))
           }
         }
@@ -132,6 +142,7 @@ export async function middleware(request: NextRequest) {
       }
     }
 
+    console.log(`Middleware allowing access to: ${path}`)
     return response
   } catch (error) {
     console.error("Middleware error:", error)

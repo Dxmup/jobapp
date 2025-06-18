@@ -1,6 +1,5 @@
 import { createServerClient } from "@/lib/supabase/singleton"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
 
 export async function getSession() {
   const supabase = createServerClient()
@@ -63,43 +62,7 @@ export async function signIn(email: string, password: string) {
     }
 
     console.log("Auth successful for user:", data.user.id)
-    console.log("Session created:", !!data.session)
-
-    // Set authentication cookies immediately
-    const cookieStore = cookies()
-
-    // Set session cookies that middleware can read
-    cookieStore.set("sb-access-token", data.session.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: data.session.expires_in,
-      path: "/",
-      sameSite: "lax",
-    })
-
-    cookieStore.set("sb-refresh-token", data.session.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: "/",
-      sameSite: "lax",
-    })
-
-    cookieStore.set("authenticated", "true", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: data.session.expires_in,
-      path: "/",
-      sameSite: "lax",
-    })
-
-    cookieStore.set("user_id", data.user.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: data.session.expires_in,
-      path: "/",
-      sameSite: "lax",
-    })
+    console.log("Session created with expiry:", new Date(data.session.expires_at! * 1000).toISOString())
 
     // Try to fetch user data from our users table
     let userData = null
@@ -169,45 +132,12 @@ export async function signIn(email: string, password: string) {
       }
     }
 
-    // Set additional cookies based on user data
-    if (userData) {
-      cookieStore.set("has_baseline_resume", String(userData.has_baseline_resume || false), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: data.session.expires_in,
-        path: "/",
-        sameSite: "lax",
-      })
-
-      // Check if user is admin
-      const adminEmails = [
-        "admin@careerai.com",
-        "test@admin.com",
-        "admin@test.com",
-        "testing@careerai.com",
-        "mctesterson@careerai.com",
-        process.env.ADMIN_EMAIL,
-      ]
-        .filter(Boolean)
-        .map((email) => email.toLowerCase())
-
-      const isAdmin = adminEmails.includes(userData.email?.toLowerCase() || "")
-
-      cookieStore.set("is_admin", String(isAdmin), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: data.session.expires_in,
-        path: "/",
-        sameSite: "lax",
-      })
-    }
-
     console.log("Login successful for user:", userData?.id)
-    console.log("Cookies set, session should persist")
 
     return {
       success: true,
       user: userData,
+      session: data.session, // Return session for immediate use
       redirectUrl: userData?.has_baseline_resume ? "/dashboard" : "/onboarding",
     }
   } catch (error) {
@@ -250,51 +180,6 @@ export async function signUp(email: string, password: string, name: string) {
     }
 
     console.log("Auth signup successful for user:", data.user.id)
-
-    // Set authentication cookies if session exists
-    if (data.session) {
-      const cookieStore = cookies()
-
-      cookieStore.set("sb-access-token", data.session.access_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: data.session.expires_in,
-        path: "/",
-        sameSite: "lax",
-      })
-
-      cookieStore.set("sb-refresh-token", data.session.refresh_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-        path: "/",
-        sameSite: "lax",
-      })
-
-      cookieStore.set("authenticated", "true", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: data.session.expires_in,
-        path: "/",
-        sameSite: "lax",
-      })
-
-      cookieStore.set("user_id", data.user.id, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: data.session.expires_in,
-        path: "/",
-        sameSite: "lax",
-      })
-    }
-
-    cookieStore.set("has_baseline_resume", "false", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 7, // 1 week
-      path: "/",
-      sameSite: "lax",
-    })
 
     // Create user record in our users table using admin client
     let userData = null
@@ -359,6 +244,7 @@ export async function signUp(email: string, password: string, name: string) {
     return {
       success: true,
       user: userData,
+      session: data.session, // Return session if available
       redirectUrl: "/onboarding",
     }
   } catch (error) {
@@ -381,16 +267,7 @@ export async function signOut() {
       return { success: false, error: error.message }
     }
 
-    // Clear all authentication cookies
-    const cookieStore = cookies()
-    cookieStore.set("authenticated", "", { maxAge: 0, path: "/" })
-    cookieStore.set("user_id", "", { maxAge: 0, path: "/" })
-    cookieStore.set("has_baseline_resume", "", { maxAge: 0, path: "/" })
-    cookieStore.set("is_admin", "", { maxAge: 0, path: "/" })
-    cookieStore.set("sb-access-token", "", { maxAge: 0, path: "/" })
-    cookieStore.set("sb-refresh-token", "", { maxAge: 0, path: "/" })
-
-    console.log("Sign out successful, cookies cleared")
+    console.log("Sign out successful")
     return { success: true }
   } catch (error) {
     console.error("Exception in signOut:", error)
