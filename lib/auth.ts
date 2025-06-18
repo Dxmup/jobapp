@@ -219,6 +219,157 @@ export async function signIn(email: string, password: string) {
   }
 }
 
+export async function signUp(email: string, password: string, name: string) {
+  try {
+    const supabase = createServerClient()
+
+    console.log("Starting sign up process for:", email)
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: name,
+          full_name: name,
+        },
+      },
+    })
+
+    if (error) {
+      console.error("Supabase signup error:", error)
+      return {
+        success: false,
+        error: error.message,
+        isRateLimited: error.message.includes("For security purposes"),
+      }
+    }
+
+    if (!data.user) {
+      return { success: false, error: "No user data returned from signup" }
+    }
+
+    console.log("Auth signup successful for user:", data.user.id)
+
+    // Set authentication cookies if session exists
+    if (data.session) {
+      const cookieStore = cookies()
+
+      cookieStore.set("sb-access-token", data.session.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: data.session.expires_in,
+        path: "/",
+        sameSite: "lax",
+      })
+
+      cookieStore.set("sb-refresh-token", data.session.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        path: "/",
+        sameSite: "lax",
+      })
+
+      cookieStore.set("authenticated", "true", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: data.session.expires_in,
+        path: "/",
+        sameSite: "lax",
+      })
+
+      cookieStore.set("user_id", data.user.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: data.session.expires_in,
+        path: "/",
+        sameSite: "lax",
+      })
+    }
+
+    cookieStore.set("has_baseline_resume", "false", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: "/",
+      sameSite: "lax",
+    })
+
+    // Create user record in our users table using admin client
+    let userData = null
+    try {
+      const adminSupabase = createServerSupabaseClient()
+
+      // Check if user record already exists
+      const { data: existingUser } = await adminSupabase
+        .from("users")
+        .select("*")
+        .eq("auth_id", data.user.id)
+        .maybeSingle()
+
+      if (existingUser) {
+        console.log("User record already exists:", existingUser.id)
+        userData = existingUser
+      } else {
+        // Create new user record
+        const { data: newUserData, error: userError } = await adminSupabase
+          .from("users")
+          .insert({
+            auth_id: data.user.id,
+            email: email.toLowerCase(),
+            name,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            has_baseline_resume: false,
+            is_active: true,
+          })
+          .select()
+          .single()
+
+        if (userError) {
+          console.error("Error creating user record:", userError)
+          // Continue with minimal user data
+          userData = {
+            id: data.user.id,
+            auth_id: data.user.id,
+            email: data.user.email,
+            name,
+            has_baseline_resume: false,
+          }
+        } else {
+          userData = newUserData
+          console.log("User record created successfully:", userData.id)
+        }
+      }
+    } catch (createException) {
+      console.error("Exception creating user record:", createException)
+      // Continue with minimal user data
+      userData = {
+        id: data.user.id,
+        auth_id: data.user.id,
+        email: data.user.email,
+        name,
+        has_baseline_resume: false,
+      }
+    }
+
+    console.log("Signup successful for user:", userData?.id)
+
+    return {
+      success: true,
+      user: userData,
+      redirectUrl: "/onboarding",
+    }
+  } catch (error) {
+    console.error("Exception in signUp:", error)
+    return {
+      success: false,
+      error: "An unexpected error occurred during signup",
+    }
+  }
+}
+
 export async function signOut() {
   try {
     const supabase = createServerClient()
