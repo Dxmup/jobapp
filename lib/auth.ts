@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/supabase/authClient"
+import { createAdminSupabaseClient } from "@/lib/supabase/server"
 
 export async function getSession() {
   const supabase = createServerClient()
@@ -38,9 +39,10 @@ export async function signIn(email, password) {
 
       if (userError) {
         console.error("Error fetching user data:", userError)
-        // If no user record exists, create one
+        // If no user record exists, create one using admin client
         if (userError.code === "PGRST116") {
-          const { data: newUserData, error: createError } = await supabase
+          const adminSupabase = createAdminSupabaseClient()
+          const { data: newUserData, error: createError } = await adminSupabase
             .from("users")
             .insert({
               auth_id: data.user.id,
@@ -89,8 +91,9 @@ export async function signIn(email, password) {
       const userRecord = Array.isArray(userData) ? userData[0] : userData
 
       if (!userRecord) {
-        // No user record found, create one
-        const { data: newUserData, error: createError } = await supabase
+        // No user record found, create one using admin client
+        const adminSupabase = createAdminSupabaseClient()
+        const { data: newUserData, error: createError } = await adminSupabase
           .from("users")
           .insert({
             auth_id: data.user.id,
@@ -173,10 +176,11 @@ export async function signUp(email, password, name) {
       }
     }
 
-    // Create user record in our users table
+    // Create user record in our users table using admin client
     if (data.user) {
-      // Check if user record already exists
-      const { data: existingUser } = await supabase.from("users").select("*").eq("auth_id", data.user.id).limit(1)
+      // Check if user record already exists using admin client
+      const adminSupabase = createAdminSupabaseClient()
+      const { data: existingUser } = await adminSupabase.from("users").select("*").eq("auth_id", data.user.id).limit(1)
 
       if (existingUser && existingUser.length > 0) {
         // User record already exists, return it
@@ -187,7 +191,7 @@ export async function signUp(email, password, name) {
         }
       }
 
-      const { data: userData, error: userError } = await supabase
+      const { data: userData, error: userError } = await adminSupabase
         .from("users")
         .insert({
           auth_id: data.user.id,
