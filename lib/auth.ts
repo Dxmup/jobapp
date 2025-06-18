@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/supabase/authClient"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers"
 
 export async function getSession() {
   const supabase = createServerClient()
@@ -10,6 +11,32 @@ export async function getSession() {
     return session
   } catch (error) {
     console.error("Error getting session:", error)
+    return null
+  }
+}
+
+export async function getCurrentUser() {
+  const session = await getSession()
+  if (!session?.user) {
+    return null
+  }
+
+  try {
+    const supabase = createServerClient()
+    const { data: userData, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("auth_id", session.user.id)
+      .maybeSingle()
+
+    if (error) {
+      console.error("Error fetching current user:", error)
+      return null
+    }
+
+    return userData
+  } catch (error) {
+    console.error("Exception getting current user:", error)
     return null
   }
 }
@@ -33,6 +60,24 @@ export async function signIn(email: string, password: string) {
     }
 
     console.log("Auth successful for user:", data.user.id)
+
+    // Set authentication cookies for middleware
+    const cookieStore = cookies()
+    cookieStore.set("authenticated", "true", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: "/",
+      sameSite: "lax",
+    })
+
+    cookieStore.set("user_id", data.user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: "/",
+      sameSite: "lax",
+    })
 
     // Try to fetch user data from our users table
     let userData = null
@@ -102,6 +147,39 @@ export async function signIn(email: string, password: string) {
       }
     }
 
+    // Set additional cookies based on user data
+    if (userData) {
+      cookieStore.set("has_baseline_resume", String(userData.has_baseline_resume || false), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        path: "/",
+        sameSite: "lax",
+      })
+
+      // Check if user is admin
+      const adminEmails = [
+        "admin@careerai.com",
+        "test@admin.com",
+        "admin@test.com",
+        "testing@careerai.com",
+        "mctesterson@careerai.com",
+        process.env.ADMIN_EMAIL,
+      ]
+        .filter(Boolean)
+        .map((email) => email.toLowerCase())
+
+      const isAdmin = adminEmails.includes(userData.email?.toLowerCase() || "")
+
+      cookieStore.set("is_admin", String(isAdmin), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        path: "/",
+        sameSite: "lax",
+      })
+    }
+
     console.log("Login successful for user:", userData.id)
 
     return {
@@ -147,6 +225,32 @@ export async function signUp(email: string, password: string, name: string) {
     }
 
     console.log("Auth signup successful for user:", data.user.id)
+
+    // Set authentication cookies
+    const cookieStore = cookies()
+    cookieStore.set("authenticated", "true", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: "/",
+      sameSite: "lax",
+    })
+
+    cookieStore.set("user_id", data.user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: "/",
+      sameSite: "lax",
+    })
+
+    cookieStore.set("has_baseline_resume", "false", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: "/",
+      sameSite: "lax",
+    })
 
     // Create user record in our users table using admin client
     let userData = null
@@ -233,7 +337,15 @@ export async function signOut() {
       return { success: false, error: error.message }
     }
 
-    console.log("Sign out successful")
+    // Clear all authentication cookies
+    const cookieStore = cookies()
+    cookieStore.set("authenticated", "", { maxAge: 0, path: "/" })
+    cookieStore.set("user_id", "", { maxAge: 0, path: "/" })
+    cookieStore.set("has_baseline_resume", "", { maxAge: 0, path: "/" })
+    cookieStore.set("is_admin", "", { maxAge: 0, path: "/" })
+    cookieStore.set("pending_subscription_tier", "", { maxAge: 0, path: "/" })
+
+    console.log("Sign out successful, cookies cleared")
     return { success: true }
   } catch (error) {
     console.error("Exception in signOut:", error)
@@ -242,4 +354,22 @@ export async function signOut() {
       error: "An unexpected error occurred during sign out",
     }
   }
+}
+
+// Helper function to check if user is authenticated
+export async function requireAuth() {
+  const session = await getSession()
+  if (!session?.user) {
+    throw new Error("Authentication required")
+  }
+  return session
+}
+
+// Helper function to get authenticated user data
+export async function requireUser() {
+  const user = await getCurrentUser()
+  if (!user) {
+    throw new Error("User data not found")
+  }
+  return user
 }
