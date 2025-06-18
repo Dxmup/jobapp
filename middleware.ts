@@ -19,7 +19,7 @@ async function checkAdminStatus(userId: string, supabase: any): Promise<boolean>
       process.env.ADMIN_EMAIL,
     ]
       .filter(Boolean)
-      .map((email) => email.toLowerCase())
+      .map((email) => (email as string).toLowerCase())
 
     return adminEmails.includes(user.email.toLowerCase())
   } catch (error) {
@@ -32,66 +32,66 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
   const path = request.nextUrl.pathname
 
-  // Create Supabase client for middleware using the same pattern as auth
   const supabase = createMiddlewareSupabaseClient(request, response)
 
-  try {
-    // Get session - this should now work with the same client pattern
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession()
+  console.log(`[Middleware] Path: ${path}`)
+  const allCookies = request.cookies.getAll()
+  console.log(
+    "[Middleware] All request cookies:",
+    allCookies.map((c) => ({ name: c.name, value: c.value.substring(0, 50) + (c.value.length > 50 ? "..." : "") })),
+  ) // Log cookie names and truncated values
 
-    if (error) {
-      console.error("Middleware session error:", error)
-    }
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession()
 
-    console.log(`Middleware processing: ${path}`)
-    console.log(`Session exists: ${!!session}`)
+  if (sessionError) {
+    console.error("[Middleware] supabase.auth.getSession() error:", sessionError.message)
+  }
+  console.log(`[Middleware] Session from supabase.auth.getSession(): ${session ? session.user.id : "null"}`)
+
+  // Skip middleware for auth pages to prevent loops if already there
+  if (path === "/login" || path === "/signup") {
     if (session) {
-      console.log(`Session user ID: ${session.user.id}`)
-      console.log(`Session expires: ${new Date(session.expires_at! * 1000).toISOString()}`)
+      console.log("[Middleware] User has session, redirecting from auth page to /dashboard")
+      return NextResponse.redirect(new URL("/dashboard", request.url))
     }
+    console.log("[Middleware] No session, allowing access to auth page:", path)
+    return response
+  }
 
-    // Also check cookies as backup
-    const authCookie = request.cookies.get("authenticated")?.value
+  // Special case for admin login page
+  if (path === "/admin/login") {
+    if (session && (await checkAdminStatus(session.user.id, supabase))) {
+      console.log("[Middleware] Admin has session, redirecting from /admin/login to /admin")
+      return NextResponse.redirect(new URL("/admin", request.url))
+    }
+    console.log("[Middleware] Allowing access to /admin/login")
+    return response
+  }
+
+  const protectedPath =
+    path.startsWith("/dashboard") ||
+    path.startsWith("/jobs") ||
+    path.startsWith("/onboarding") ||
+    path.startsWith("/admin")
+
+  if (!session && protectedPath) {
+    const redirectUrl = path.startsWith("/admin") ? "/admin/login" : "/login"
+    console.log(`[Middleware] No session for protected path ${path}, redirecting to ${redirectUrl}`)
+    const fullRedirectUrl = new URL(redirectUrl, request.url)
+    fullRedirectUrl.searchParams.set("redirectedFrom", path) // Add info for debugging
+    return NextResponse.redirect(fullRedirectUrl)
+  }
+
+  // If session exists, ensure our custom cookies are also set (e.g., if session was refreshed by Supabase)
+  // This part might be redundant if actions always set them, but good for robustness.
+  if (session) {
+    const authenticatedCookie = request.cookies.get("authenticated")?.value
     const userIdCookie = request.cookies.get("user_id")?.value
-    console.log(`Auth cookie: ${authCookie}, User ID cookie: ${userIdCookie}`)
 
-    // Skip middleware for auth pages to prevent loops
-    if (path === "/login" || path === "/signup") {
-      if (session) {
-        console.log("Already authenticated, redirecting to dashboard")
-        return NextResponse.redirect(new URL("/dashboard", request.url))
-      }
-      console.log("No session, allowing access to auth page")
-      return response
-    }
-
-    // Special case for admin login page
-    if (path === "/admin/login") {
-      if (session && (await checkAdminStatus(session.user.id, supabase))) {
-        return NextResponse.redirect(new URL("/admin", request.url))
-      }
-      return response
-    }
-
-    // Check if path requires authentication
-    const protectedPath =
-      path.startsWith("/dashboard") ||
-      path.startsWith("/jobs") ||
-      path.startsWith("/onboarding") ||
-      path.startsWith("/admin")
-
-    // Redirect unauthenticated users from protected routes
-    if (!session && protectedPath) {
-      const redirectUrl = path.startsWith("/admin") ? "/admin/login" : "/login"
-      console.log(`No session found, redirecting from ${path} to ${redirectUrl}`)
-      return NextResponse.redirect(new URL(redirectUrl, request.url))
-    }
-
-    // If we have a session, update cookies to ensure they're fresh
-    if (session) {
+    if (authenticatedCookie !== "true") {
       response.cookies.set("authenticated", "true", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -99,7 +99,9 @@ export async function middleware(request: NextRequest) {
         path: "/",
         sameSite: "lax",
       })
-
+      console.log("[Middleware] Set 'authenticated' cookie as session exists but cookie was missing/incorrect.")
+    }
+    if (userIdCookie !== session.user.id) {
       response.cookies.set("user_id", session.user.id, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -107,59 +109,66 @@ export async function middleware(request: NextRequest) {
         path: "/",
         sameSite: "lax",
       })
+      console.log(
+        `[Middleware] Set/Updated 'user_id' cookie to ${session.user.id} as session exists but cookie was missing/incorrect.`,
+      )
     }
-
-    // Handle admin routes
-    if (session && path.startsWith("/admin") && !path.startsWith("/admin/login")) {
-      const isAdmin = await checkAdminStatus(session.user.id, supabase)
-      if (!isAdmin) {
-        return NextResponse.redirect(new URL("/dashboard", request.url))
-      }
-    }
-
-    // Handle onboarding flow for authenticated users
-    if (session && protectedPath && !path.startsWith("/admin")) {
-      try {
-        const { data: profile } = await supabase
-          .from("users")
-          .select("has_baseline_resume")
-          .eq("auth_id", session.user.id)
-          .maybeSingle()
-
-        if (profile) {
-          if (!profile.has_baseline_resume && !path.startsWith("/onboarding")) {
-            console.log("User needs onboarding, redirecting")
-            return NextResponse.redirect(new URL("/onboarding", request.url))
-          }
-
-          if (profile.has_baseline_resume && path.startsWith("/onboarding")) {
-            console.log("User completed onboarding, redirecting to dashboard")
-            return NextResponse.redirect(new URL("/dashboard", request.url))
-          }
-        }
-      } catch (error) {
-        console.error("Error checking user profile:", error)
-      }
-    }
-
-    console.log(`Middleware allowing access to: ${path}`)
-    return response
-  } catch (error) {
-    console.error("Middleware error:", error)
-    return response
   }
+
+  if (session && path.startsWith("/admin") && !path.startsWith("/admin/login")) {
+    const isAdmin = await checkAdminStatus(session.user.id, supabase)
+    if (!isAdmin) {
+      console.log("[Middleware] User is not admin, redirecting from /admin to /dashboard")
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+  }
+
+  if (session && protectedPath && !path.startsWith("/admin")) {
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("users")
+        .select("has_baseline_resume")
+        .eq("auth_id", session.user.id)
+        .maybeSingle()
+
+      if (profileError) {
+        console.error("[Middleware] Error fetching user profile for onboarding check:", profileError.message)
+      } else if (profile) {
+        if (!profile.has_baseline_resume && !path.startsWith("/onboarding")) {
+          console.log("[Middleware] User needs onboarding (has_baseline_resume=false), redirecting to /onboarding")
+          return NextResponse.redirect(new URL("/onboarding", request.url))
+        }
+        if (profile.has_baseline_resume && path.startsWith("/onboarding")) {
+          console.log(
+            "[Middleware] User completed onboarding (has_baseline_resume=true), redirecting from /onboarding to /dashboard",
+          )
+          return NextResponse.redirect(new URL("/dashboard", request.url))
+        }
+      } else {
+        console.log(
+          "[Middleware] No profile found for onboarding check, user might be new or an issue exists. Allowing access for now.",
+        )
+      }
+    } catch (error) {
+      console.error("[Middleware] Exception checking user profile for onboarding:", error)
+    }
+  }
+
+  console.log(`[Middleware] Allowing access to: ${path}`)
+  return response
 }
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/jobs/:path*",
-    "/onboarding/:path*",
-    "/onboarding",
-    "/admin/:path*",
-    "/admin",
-    "/admin/login",
-    "/login",
-    "/signup",
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - images/ (public images)
+     * - svgs/ (public svgs)
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico|images|svgs).*)",
   ],
 }
