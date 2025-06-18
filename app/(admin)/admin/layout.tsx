@@ -1,5 +1,4 @@
 import type React from "react"
-import { SidebarProvider } from "@/components/ui/sidebar"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 
@@ -9,14 +8,19 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen flex-col">
-        <AdminHeader />
-        <div className="flex flex-1">
-          <AdminSidebar />
-          <main className="flex-1 p-6">{children}</main>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Admin Header */}
+      <AdminHeader />
+
+      <div className="flex">
+        {/* Admin Sidebar */}
+        <AdminSidebar />
+
+        {/* Main Content */}
+        <main className="flex-1 ml-72 p-8">
+          <div className="max-w-7xl mx-auto">{children}</div>
+        </main>
       </div>
-    </SidebarProvider>
+    </div>
   )
 }

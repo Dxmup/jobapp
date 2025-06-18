@@ -62,13 +62,13 @@ export function ResumeCard({ resume, onDelete, onDuplicate }: ResumeCardProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link href={`/dashboard/resumes/${resume.id}`}>
+                <Link href={`/dashboard/resumes/view/${resume.id}`}>
                   <ExternalLink className="mr-2 h-4 w-4" />
                   <span>View Resume</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href={`/dashboard/resumes/${resume.id}/edit`}>
+                <Link href={`/dashboard/resumes/view/${resume.id}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
                   <span>Edit Resume</span>
                 </Link>
@@ -79,7 +79,7 @@ export function ResumeCard({ resume, onDelete, onDuplicate }: ResumeCardProps) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href={`/dashboard/resumes/${resume.id}/download`}>
+                <Link href={`/dashboard/resumes/view/${resume.id}/download`}>
                   <Download className="mr-2 h-4 w-4" />
                   <span>Download PDF</span>
                 </Link>
@@ -113,10 +113,10 @@ export function ResumeCard({ resume, onDelete, onDuplicate }: ResumeCardProps) {
       <CardFooter className="border-t bg-muted/40 p-3">
         <div className="flex w-full justify-between">
           <Button variant="ghost" size="sm" asChild>
-            <Link href={`/dashboard/resumes/${resume.id}`}>View</Link>
+            <Link href={`/dashboard/resumes/view/${resume.id}`}>View</Link>
           </Button>
           <Button size="sm" asChild>
-            <Link href={`/dashboard/resumes/${resume.id}/customize`}>Optimize</Link>
+            <Link href={`/dashboard/resumes/customize?resumeId=${resume.id}`}>Customize for Job</Link>
           </Button>
         </div>
       </CardFooter>
