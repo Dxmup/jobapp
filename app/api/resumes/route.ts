@@ -1,25 +1,16 @@
-import { createRouteClient } from "@/lib/supabase/authClient"
 import { NextResponse } from "next/server"
+import { requireRouteAuthenticatedUserId } from "@/lib/auth-helpers"
+import { createRouteClient } from "@/lib/supabase/authClient"
 
 export async function GET(request: Request) {
   try {
+    // Single source of truth for authentication
+    const userId = await requireRouteAuthenticatedUserId()
     const supabase = createRouteClient()
 
-    // Get user session
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
+    console.log(`Fetching resumes for authenticated user: ${userId}`)
 
-    const userId = session?.user?.id
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "Authentication required" },
-        { status: 401 },
-      )
-    }
-
-    // Query resumes for the user
+    // Query resumes for the authenticated user
     const { data: resumes, error } = await supabase
       .from("resumes")
       .select("*")
@@ -47,6 +38,11 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error("Unexpected error in resumes API:", error)
+
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -60,21 +56,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Single source of truth for authentication
+    const userId = await requireRouteAuthenticatedUserId()
     const supabase = createRouteClient()
 
-    // Get user session
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
-
-    const userId = session?.user?.id
-    if (!userId) {
-      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
-    }
-
     const body = await request.json()
-    console.log("Received resume creation request:", body)
+    console.log("Received resume creation request for user:", userId)
 
     const { name, content, fileName, fileUrl, jobId, parentResumeId, isAiGenerated, versionName, jobTitle, company } =
       body
@@ -109,7 +96,7 @@ export async function POST(request: Request) {
     const { data: resume, error: resumeError } = await supabase
       .from("resumes")
       .insert({
-        user_id: userId,
+        user_id: userId, // Use consistent user_id field
         name,
         content,
         file_name: fileName || `${name.replace(/\s+/g, "-").toLowerCase()}.txt`,
@@ -192,6 +179,11 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error("Unexpected error creating resume:", error)
+
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    }
+
     return NextResponse.json(
       {
         success: false,

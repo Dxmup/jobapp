@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
+import { requireRouteAuthenticatedUserId } from "@/lib/auth-helpers"
+import { createRouteClient } from "@/lib/supabase/authClient"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -12,37 +12,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ success: false, error: "Invalid resume ID format" }, { status: 400 })
     }
 
-    const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
+    // Single source of truth for authentication
+    const userId = await requireRouteAuthenticatedUserId()
+    const supabase = createRouteClient()
 
-    // Get user session
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
-
-    let userId = null
-
-    if (session && !sessionError) {
-      userId = session.user.id
-      console.log("Found valid Supabase session for user:", userId)
-    } else {
-      // Fallback to cookie
-      userId = cookieStore.get("user_id")?.value
-      console.log("No Supabase session, trying cookie user ID:", userId)
-
-      if (!userId) {
-        console.error("No authentication found - no session and no user ID cookie")
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Authentication required. Please log in again.",
-            details: "No valid session or user ID found",
-          },
-          { status: 401 },
-        )
-      }
-    }
+    console.log(`Fetching resume ${resumeId} for authenticated user: ${userId}`)
 
     // Fetch the resume
     const { data: resume, error } = await supabase
@@ -85,6 +59,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     })
   } catch (error) {
     console.error("Unexpected error:", error)
+
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -101,31 +80,17 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const resumeId = params.id
     const body = await request.json()
 
-    const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
-
-    // Get user session
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
-
-    let userId = null
-
-    if (session && !sessionError) {
-      userId = session.user.id
-    } else {
-      userId = cookieStore.get("user_id")?.value
-      if (!userId) {
-        return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
-      }
-    }
+    // Single source of truth for authentication
+    const userId = await requireRouteAuthenticatedUserId()
+    const supabase = createRouteClient()
 
     const { name, content } = body
 
     if (!name || !content) {
       return NextResponse.json({ success: false, error: "Name and content are required" }, { status: 400 })
     }
+
+    console.log(`Updating resume ${resumeId} for authenticated user: ${userId}`)
 
     const { data: resume, error } = await supabase
       .from("resumes")
@@ -169,6 +134,11 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     })
   } catch (error) {
     console.error("Unexpected error:", error)
+
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -184,25 +154,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   try {
     const resumeId = params.id
 
-    const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
+    // Single source of truth for authentication
+    const userId = await requireRouteAuthenticatedUserId()
+    const supabase = createRouteClient()
 
-    // Get user session
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
-
-    let userId = null
-
-    if (session && !sessionError) {
-      userId = session.user.id
-    } else {
-      userId = cookieStore.get("user_id")?.value
-      if (!userId) {
-        return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
-      }
-    }
+    console.log(`Deleting resume ${resumeId} for authenticated user: ${userId}`)
 
     // First, delete any job associations
     await supabase.from("job_resumes").delete().eq("resume_id", resumeId)
@@ -224,6 +180,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     })
   } catch (error) {
     console.error("Unexpected error:", error)
+
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    }
+
     return NextResponse.json(
       {
         success: false,
