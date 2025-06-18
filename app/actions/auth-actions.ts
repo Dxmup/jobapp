@@ -19,6 +19,23 @@ export async function login(formData: FormData) {
 
   if (result.success && result.user) {
     console.log("Login successful for", result.user.id)
+
+    const cookieStore = cookies()
+    cookieStore.set("authenticated", "true", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+      sameSite: "lax",
+    })
+
+    cookieStore.set("user_id", result.user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+      sameSite: "lax",
+    })
   }
 
   return result
