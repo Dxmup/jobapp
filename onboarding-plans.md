@@ -167,5 +167,5 @@ CREATE TABLE career_preferences (
 
 Now let me implement the immediate changes you requested:
 
-```typescriptreact file="app/(dashboard)/onboarding/page.tsx" isDeleted="true"
+\`\`\`typescriptreact file="app/(dashboard)/onboarding/page.tsx" isDeleted="true"
 ...deleted...

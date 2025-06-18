@@ -180,7 +180,7 @@ export const ratelimit = new Ratelimit({
 
 Now let's add PDF upload capability to the resume optimization tab:
 
-```typescriptreact file="components/landing/resume-optimization-tab.tsx"
+\`\`\`typescriptreact file="components/landing/resume-optimization-tab.tsx"
 [v0-no-op-code-block-prefix]"use client"
 
 import type React from "react"
