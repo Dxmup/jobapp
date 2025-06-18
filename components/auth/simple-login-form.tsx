@@ -1,98 +1,91 @@
 "use client"
-import { useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { login } from "@/app/actions/auth-actions"
-import { useSearchParams } from "next/navigation"
 
-const LoginSchema = z.object({
-  email: z.string().email({
-    message: "Please enter a valid email address.",
-  }),
-  password: z.string().min(6, {
-    message: "Password must be at least 6 characters.",
-  }),
-})
+import type React from "react"
+
+import { useState, useTransition } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { FormError } from "@/components/form-error"
+import { FormSuccess } from "@/components/form-success"
+import { login } from "@/app/actions/auth-actions"
 
 export function SimpleLoginForm() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [error, setError] = useState<string | undefined>("")
   const [success, setSuccess] = useState<string | undefined>("")
   const [isPending, startTransition] = useTransition()
-  const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
 
-  const form = useForm<z.infer<typeof LoginSchema>>({
-    resolver: zodResolver(LoginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  })
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
 
-  const onSubmit = (values: z.infer<typeof LoginSchema>) => {
-    // values is an object
+    if (isPending) return
+
     setError("")
     setSuccess("")
+
+    // Pass values as an object to match the updated login action
+    const values = { email, password }
+
     startTransition(async () => {
-      // Now compatible with the updated login action signature
-      const result = await login(values)
-      if (result?.error) {
-        setError(result.error)
-      }
-      // Ensure result.user exists before trying to access redirectUrl from it.
-      // The redirectUrl is on the top-level result from signIn.
-      if (result?.success && result.redirectUrl) {
-        window.location.href = result.redirectUrl
-      } else if (result?.success) {
-        // Fallback if redirectUrl isn't set, though it should be.
-        window.location.href = "/dashboard"
+      try {
+        const result = await login(values)
+
+        if (result?.error) {
+          setError(result.error)
+        } else if (result?.success) {
+          setSuccess("Login successful! Redirecting...")
+
+          // Wait a moment for the session to be established, then redirect
+          setTimeout(() => {
+            window.location.href = result.redirectUrl || "/dashboard"
+          }, 500)
+        }
+      } catch (error) {
+        console.error("Login error:", error)
+        setError("An unexpected error occurred")
       }
     })
   }
 
   return (
-    <div className="w-full max-w-md space-y-4">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
+    <form onSubmit={onSubmit} className="space-y-6">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
             name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="Email" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+            type="email"
+            placeholder="john@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isPending}
+            required
           />
-          <FormField
-            control={form.control}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
             name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="Password" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isPending}
+            required
           />
-          {error && <p className="text-sm text-red-500 bg-red-100 border border-red-400 p-2 rounded-md">{error}</p>}
-          {success && (
-            <p className="text-sm text-green-500 bg-green-100 border border-green-400 p-2 rounded-md">{success}</p>
-          )}
-          <Button disabled={isPending} type="submit">
-            {isPending ? "Logging in..." : "Login"}
-          </Button>
-        </form>
-      </Form>
-    </div>
+        </div>
+      </div>
+      <FormError message={error} />
+      <FormSuccess message={success} />
+      <Button type="submit" className="w-full" disabled={isPending}>
+        {isPending ? "Signing in..." : "Sign in"}
+      </Button>
+    </form>
   )
 }
+
+// Export both names for compatibility
+export const LoginForm = SimpleLoginForm
