@@ -4,9 +4,9 @@ import { signIn, signUp, signOut } from "@/lib/auth"
 import { STRIPE_PRICE_IDS } from "@/lib/stripe"
 import { cookies } from "next/headers"
 
-export async function login(formData: FormData) {
-  const email = formData.get("email") as string
-  const password = formData.get("password") as string
+export async function login(values: { email?: string; password?: string }) {
+  const email = values.email
+  const password = values.password
 
   if (!email || !password) {
     return {
@@ -17,8 +17,10 @@ export async function login(formData: FormData) {
 
   const result = await signIn(email, password)
 
-  if (result.success && result.user) {
-    console.log("Login successful for", result.user.id)
+  if (result.success && result.user && result.session) {
+    // Added check for result.session
+    console.log("Login successful for (DB user ID):", result.user.id)
+    console.log("Login successful for (Auth user ID):", result.session.user.id)
 
     const cookieStore = cookies()
     cookieStore.set("authenticated", "true", {
@@ -29,13 +31,17 @@ export async function login(formData: FormData) {
       sameSite: "lax",
     })
 
-    cookieStore.set("user_id", result.user.id, {
+    cookieStore.set("user_id", result.session.user.id, {
+      // Use Supabase Auth ID
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 7,
       path: "/",
       sameSite: "lax",
     })
+  } else if (result.success && result.user) {
+    // Fallback or log if session is missing, though signIn should provide it on success
+    console.warn("Login action: signIn was successful but session object is missing in the result.")
   }
 
   return result
