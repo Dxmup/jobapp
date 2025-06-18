@@ -1,11 +1,9 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
+import { createRouteClient } from "@/lib/supabase/authClient"
 import { NextResponse } from "next/server"
 
 export async function GET(request: Request) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
+    const supabase = createRouteClient()
 
     // Get user session
     const {
@@ -13,27 +11,12 @@ export async function GET(request: Request) {
       error: sessionError,
     } = await supabase.auth.getSession()
 
-    let userId = null
-
-    if (session && !sessionError) {
-      userId = session.user.id
-      console.log("Found valid Supabase session for user:", userId)
-    } else {
-      // Fallback to cookie
-      userId = cookieStore.get("user_id")?.value
-      console.log("No Supabase session, trying cookie user ID:", userId)
-
-      if (!userId) {
-        console.error("No authentication found - no session and no user ID cookie")
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Authentication required. Please log in again.",
-            details: "No valid session or user ID found",
-          },
-          { status: 401 },
-        )
-      }
+    const userId = session?.user?.id
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 },
+      )
     }
 
     // Query resumes for the user
@@ -77,8 +60,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
+    const supabase = createRouteClient()
 
     // Get user session
     const {
@@ -86,16 +68,9 @@ export async function POST(request: Request) {
       error: sessionError,
     } = await supabase.auth.getSession()
 
-    let userId = null
-
-    if (session && !sessionError) {
-      userId = session.user.id
-    } else {
-      // Fallback to cookie
-      userId = cookieStore.get("user_id")?.value
-      if (!userId) {
-        return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
-      }
+    const userId = session?.user?.id
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
     }
 
     const body = await request.json()

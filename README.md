@@ -152,6 +152,12 @@ The application supports multiple authentication methods:
 - Two-factor authentication (2FA) support
 - Audit logging for admin actions
 
+### Unified Session Handling
+User and admin sessions now rely exclusively on Supabase session cookies provided by
+`@supabase/auth-helpers-nextjs`. Custom cookies like `authenticated` and `user_id`
+have been removed. Middleware and API routes retrieve the current session using
+these helpers to ensure a single source of truth.
+
 ### Permissions System
 - User-level permissions for data access
 - Admin-level permissions for system management

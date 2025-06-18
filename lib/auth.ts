@@ -1,7 +1,7 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/authClient"
 
 export async function getSession() {
-  const supabase = createServerSupabaseClient()
+  const supabase = createServerClient()
   try {
     const {
       data: { session },
@@ -15,7 +15,7 @@ export async function getSession() {
 
 export async function signIn(email, password) {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -78,7 +78,7 @@ export async function signIn(email, password) {
 
 export async function signUp(email, password, name) {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -157,7 +157,7 @@ export async function signUp(email, password, name) {
 
 export async function signOut() {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createServerClient()
 
     const { error } = await supabase.auth.signOut()
 
