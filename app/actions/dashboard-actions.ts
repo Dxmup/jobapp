@@ -1,7 +1,7 @@
 "use server"
 
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getUserIdentity } from "@/lib/user-identity"
+import { cookies } from "next/headers"
 
 /**
  * Fetches dashboard statistics for the current user
@@ -9,11 +9,12 @@ import { getUserIdentity } from "@/lib/user-identity"
  */
 export async function getDashboardStats() {
   try {
-    // Get the current user
-    const user = await getUserIdentity()
+    // Use the same authentication pattern as /jobs API
+    const cookieStore = cookies()
+    const userId = cookieStore.get("user_id")?.value
 
-    if (!user) {
-      console.log("No authenticated user found in getDashboardStats")
+    if (!userId) {
+      console.log("No user_id cookie found in getDashboardStats")
       // Return empty stats instead of throwing an error
       return {
         success: true,
@@ -27,8 +28,7 @@ export async function getDashboardStats() {
       }
     }
 
-    console.log("User found in getDashboardStats:", user.id)
-    const userId = user.id
+    console.log("User ID from cookie in getDashboardStats:", userId)
 
     // Initialize stats object
     const stats = {
@@ -41,11 +41,26 @@ export async function getDashboardStats() {
 
     const supabase = createServerSupabaseClient()
 
-    // Get active applications count and job status data
-    const { data: activeJobs, error: activeJobsError } = await supabase
+    // Get active applications count and job status data using the same pattern as /jobs API
+    // Try with user_id field first, then userId field as fallback
+    let { data: activeJobs, error: activeJobsError } = await supabase
       .from("jobs")
-      .select("id, status, updated_at")
+      .select("id, status, updated_at, applied_at")
       .eq("user_id", userId)
+
+    // If no results or error, try with userId field
+    if ((activeJobsError || !activeJobs || activeJobs.length === 0) && userId) {
+      console.log("No jobs found with user_id field, trying userId field")
+      const { data: altData, error: altError } = await supabase
+        .from("jobs")
+        .select("id, status, updated_at, applied_at")
+        .eq("userId", userId)
+
+      if (!altError && altData && altData.length > 0) {
+        activeJobs = altData
+        activeJobsError = null
+      }
+    }
 
     if (!activeJobsError && activeJobs) {
       // Count active applications (status is 'applied', 'interview', or 'offer')
@@ -55,14 +70,14 @@ export async function getDashboardStats() {
 
       stats.interviewCount = activeJobs.filter((job) => job.status === "interview").length
 
-      // Calculate streak based on days when job status was updated to "applied"
-      const appliedJobs = activeJobs.filter((job) => job.status === "applied")
+      // Calculate streak based on days when jobs were applied to
+      const appliedJobs = activeJobs.filter((job) => job.status === "applied" && job.applied_at)
 
       if (appliedJobs.length > 0) {
-        // Get all dates when jobs were marked as applied
+        // Get all dates when jobs were applied to
         const applicationDates = appliedJobs
           .map((job) => {
-            const date = new Date(job.updated_at)
+            const date = new Date(job.applied_at)
             date.setHours(0, 0, 0, 0) // Normalize to start of day
             return date.toISOString().split("T")[0] // Format as YYYY-MM-DD
           })
@@ -103,8 +118,21 @@ export async function getDashboardStats() {
       console.error("Error fetching active jobs:", activeJobsError)
     }
 
-    // Get resumes count
-    const { data: resumes, error: resumesError } = await supabase.from("resumes").select("id").eq("user_id", userId)
+    // Get resumes count using the same dual-field approach
+    let { data: resumes, error: resumesError } = await supabase.from("resumes").select("id").eq("user_id", userId)
+
+    // Try userId field if user_id didn't work
+    if ((resumesError || !resumes || resumes.length === 0) && userId) {
+      const { data: altResumes, error: altResumesError } = await supabase
+        .from("resumes")
+        .select("id")
+        .eq("userId", userId)
+
+      if (!altResumesError && altResumes) {
+        resumes = altResumes
+        resumesError = null
+      }
+    }
 
     if (!resumesError && resumes) {
       stats.resumesCreated = resumes.length
@@ -112,11 +140,24 @@ export async function getDashboardStats() {
       console.error("Error fetching resumes:", resumesError)
     }
 
-    // Get cover letters count
-    const { data: coverLetters, error: coverLettersError } = await supabase
+    // Get cover letters count using the same dual-field approach
+    let { data: coverLetters, error: coverLettersError } = await supabase
       .from("cover_letters")
       .select("id")
       .eq("user_id", userId)
+
+    // Try userId field if user_id didn't work
+    if ((coverLettersError || !coverLetters || coverLetters.length === 0) && userId) {
+      const { data: altCoverLetters, error: altCoverLettersError } = await supabase
+        .from("cover_letters")
+        .select("id")
+        .eq("userId", userId)
+
+      if (!altCoverLettersError && altCoverLetters) {
+        coverLetters = altCoverLetters
+        coverLettersError = null
+      }
+    }
 
     if (!coverLettersError && coverLetters) {
       stats.coverLetters = coverLetters.length

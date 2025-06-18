@@ -3,9 +3,9 @@ import { SignUpForm } from "@/components/auth/signup-form"
 
 export default function SignUpPage() {
   return (
-    <div className="flex h-screen">
+    <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left side with gradient */}
-      <div className="hidden w-1/2 relative lg:block">
+      <div className="hidden lg:flex lg:w-1/2 relative">
         <div
           style={{
             position: "absolute",
@@ -35,19 +35,31 @@ export default function SignUpPage() {
         </div>
       </div>
 
-      {/* Right side with form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
-            <p className="text-sm text-muted-foreground">Enter your email below to create your account</p>
+      {/* Right side with form - Now properly scrollable */}
+      <div className="flex-1 lg:w-1/2 flex flex-col min-h-screen">
+        {/* Mobile header */}
+        <div className="lg:hidden p-4 border-b bg-white">
+          <Link href="/" className="flex items-center">
+            <span className="text-xl font-bold text-gray-900">JobCraft AI</span>
+          </Link>
+        </div>
+
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex items-start justify-center p-4 sm:p-6 lg:p-8 min-h-full">
+            <div className="w-full max-w-md space-y-6 py-4">
+              <div className="text-center space-y-2">
+                <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
+                <p className="text-sm text-muted-foreground">Choose your plan and get started today</p>
+              </div>
+              <SignUpForm />
+              <p className="text-center text-sm text-muted-foreground">
+                <Link href="/login" className="hover:text-brand underline underline-offset-4">
+                  Already have an account? Sign In
+                </Link>
+              </p>
+            </div>
           </div>
-          <SignUpForm />
-          <p className="text-center text-sm text-muted-foreground">
-            <Link href="/login" className="hover:text-brand underline underline-offset-4">
-              Already have an account? Sign In
-            </Link>
-          </p>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { headers } from "next/headers"
 import { stripe } from "@/lib/stripe"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { updateUserSubscription, getSubscriptionTierFromProduct } from "@/lib/subscription-service"
 
 export async function POST(request: Request) {
   const body = await request.text()
@@ -39,6 +40,9 @@ export async function POST(request: Request) {
       const productId = price.product as string
       const product = await stripe.products.retrieve(productId)
 
+      // Determine subscription tier from product name
+      const tier = getSubscriptionTierFromProduct(product.name)
+
       // Update or insert the subscription in our database
       const { error } = await supabase.from("subscriptions").upsert(
         {
@@ -65,19 +69,19 @@ export async function POST(request: Request) {
         console.error("Error updating subscription:", error)
       }
 
-      // Update the user's subscription tier
-      await supabase
-        .from("users")
-        .update({
-          subscription_tier: product.name.toLowerCase(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId)
+      // Update the user's subscription status and tier
+      await updateUserSubscription(userId, {
+        tier,
+        status: subscription.status === "active" ? "active" : subscription.status,
+        expiresAt: new Date(subscription.current_period_end * 1000),
+        stripeCustomerId: subscription.customer,
+      })
 
       break
     }
     case "customer.subscription.deleted": {
       const subscription = event.data.object as any
+      const userId = subscription.metadata.supabase_user_id
 
       // Update the subscription status in our database
       await supabase
@@ -88,16 +92,40 @@ export async function POST(request: Request) {
         })
         .eq("stripe_subscription_id", subscription.id)
 
-      // Reset the user's subscription tier to free
-      const userId = subscription.metadata.supabase_user_id
+      // Reset the user's subscription to free tier
       if (userId) {
-        await supabase
-          .from("users")
-          .update({
-            subscription_tier: "free",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", userId)
+        await updateUserSubscription(userId, {
+          tier: "free",
+          status: "active",
+          expiresAt: undefined,
+        })
+      }
+
+      break
+    }
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as any
+      const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
+      const userId = subscription.metadata.supabase_user_id
+
+      if (userId) {
+        await updateUserSubscription(userId, {
+          status: "past_due",
+        })
+      }
+
+      break
+    }
+    case "invoice.payment_succeeded": {
+      const invoice = event.data.object as any
+      const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
+      const userId = subscription.metadata.supabase_user_id
+
+      if (userId) {
+        await updateUserSubscription(userId, {
+          status: "active",
+          expiresAt: new Date(subscription.current_period_end * 1000),
+        })
       }
 
       break

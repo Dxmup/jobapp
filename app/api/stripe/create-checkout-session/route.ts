@@ -4,11 +4,19 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
   try {
+    // Check if Stripe is properly configured
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error("Stripe not configured: STRIPE_SECRET_KEY missing")
+      return NextResponse.json({ error: "Payment processing is currently unavailable" }, { status: 503 })
+    }
+
     const { priceId, returnUrl } = await request.json()
 
-    // Validate the price ID
-    if (!Object.values(STRIPE_PRICE_IDS).includes(priceId)) {
-      return NextResponse.json({ error: "Invalid price ID" }, { status: 400 })
+    // Validate the price ID with better error handling
+    const validPriceIds = Object.values(STRIPE_PRICE_IDS).filter(Boolean)
+    if (!validPriceIds.includes(priceId)) {
+      console.error("Invalid price ID:", priceId, "Valid IDs:", validPriceIds)
+      return NextResponse.json({ error: "Invalid subscription plan" }, { status: 400 })
     }
 
     // Get the current user

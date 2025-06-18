@@ -1,49 +1,16 @@
-/**
- * Direct Resumes API Route
- *
- * This API route provides direct access to the user's resumes by bypassing
- * Row Level Security (RLS) policies. It uses the Supabase service role key
- * to ensure reliable access to resume data even when RLS policies might
- * be misconfigured or causing issues.
- *
- * @route GET /api/direct-resumes
- */
-
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { createClient } from "@supabase/supabase-js"
-import type { Database } from "@/lib/types/database"
+import { requireAuthenticatedUserId } from "@/lib/auth-helpers"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
-/**
- * GET handler for the direct-resumes API route.
- *
- * Retrieves all resumes for the authenticated user directly from the database,
- * bypassing RLS policies.
- *
- * @returns NextResponse with the user's resumes or an error
- */
 export async function GET() {
   try {
-    // Get user ID from cookie
-    const cookieStore = cookies()
-    const userId = cookieStore.get("user_id")?.value
+    // Single source of truth for authentication
+    const userId = await requireAuthenticatedUserId()
+    const supabase = createServerSupabaseClient()
 
-    if (!userId) {
-      console.log("No user ID found in cookies")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    console.log(`Direct API: Fetching resumes for authenticated user: ${userId}`)
 
-    // Create a direct Supabase client with service role to bypass RLS
-    const supabaseUrl = process.env.SUPABASE_URL || ""
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error("Missing Supabase URL or service role key")
-    }
-
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey)
-
-    // Direct query to the resumes table
+    // Query resumes using admin client (bypasses RLS)
     const { data: resumes, error } = await supabase
       .from("resumes")
       .select("*")
@@ -51,20 +18,34 @@ export async function GET() {
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Error fetching resumes:", error)
-      return NextResponse.json({ error: "Failed to fetch resumes" }, { status: 500 })
+      console.error("Direct API: Database error fetching resumes:", error)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to fetch resumes from database",
+          details: error.message,
+        },
+        { status: 500 },
+      )
     }
 
-    console.log(`Direct API: Found ${resumes?.length || 0} resumes for user ${userId}`)
+    console.log(`Direct API: Successfully fetched ${resumes?.length || 0} resumes for user ${userId}`)
 
     return NextResponse.json({
       success: true,
       resumes: resumes || [],
+      count: resumes?.length || 0,
     })
   } catch (error) {
-    console.error("Error in direct-resumes API:", error)
+    console.error("Direct API: Unexpected error:", error)
+
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    }
+
     return NextResponse.json(
       {
+        success: false,
         error: "Internal server error",
         details: error instanceof Error ? error.message : "Unknown error",
       },
