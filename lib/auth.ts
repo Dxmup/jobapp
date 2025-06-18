@@ -33,11 +33,47 @@ export async function signIn(email, password) {
         .from("users")
         .select("*")
         .eq("auth_id", data.user.id)
-        .single()
+        .order("created_at", { ascending: false })
+        .limit(1)
 
       if (userError) {
         console.error("Error fetching user data:", userError)
-        // Return success but with minimal user data
+        // If no user record exists, create one
+        if (userError.code === "PGRST116") {
+          const { data: newUserData, error: createError } = await supabase
+            .from("users")
+            .insert({
+              auth_id: data.user.id,
+              email: data.user.email?.toLowerCase(),
+              name: data.user.user_metadata?.name || data.user.email?.split("@")[0],
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              has_baseline_resume: false,
+            })
+            .select()
+            .single()
+
+          if (createError) {
+            console.error("Error creating user record:", createError)
+            return {
+              success: true,
+              user: {
+                id: data.user.id,
+                email: data.user.email,
+                has_baseline_resume: false,
+              },
+              redirectUrl: "/dashboard",
+            }
+          }
+
+          return {
+            success: true,
+            user: newUserData,
+            redirectUrl: "/onboarding",
+          }
+        }
+
+        // Return success but with minimal user data for other errors
         return {
           success: true,
           user: {
@@ -49,11 +85,49 @@ export async function signIn(email, password) {
         }
       }
 
-      // Return with full user data
+      // If we got multiple rows, take the first one
+      const userRecord = Array.isArray(userData) ? userData[0] : userData
+
+      if (!userRecord) {
+        // No user record found, create one
+        const { data: newUserData, error: createError } = await supabase
+          .from("users")
+          .insert({
+            auth_id: data.user.id,
+            email: data.user.email?.toLowerCase(),
+            name: data.user.user_metadata?.name || data.user.email?.split("@")[0],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            has_baseline_resume: false,
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          console.error("Error creating user record:", createError)
+          return {
+            success: true,
+            user: {
+              id: data.user.id,
+              email: data.user.email,
+              has_baseline_resume: false,
+            },
+            redirectUrl: "/dashboard",
+          }
+        }
+
+        return {
+          success: true,
+          user: newUserData,
+          redirectUrl: "/onboarding",
+        }
+      }
+
+      // Return with user data
       return {
         success: true,
-        user: userData,
-        redirectUrl: userData.has_baseline_resume ? "/dashboard" : "/onboarding",
+        user: userRecord,
+        redirectUrl: userRecord.has_baseline_resume ? "/dashboard" : "/onboarding",
       }
     }
 
@@ -101,6 +175,18 @@ export async function signUp(email, password, name) {
 
     // Create user record in our users table
     if (data.user) {
+      // Check if user record already exists
+      const { data: existingUser } = await supabase.from("users").select("*").eq("auth_id", data.user.id).limit(1)
+
+      if (existingUser && existingUser.length > 0) {
+        // User record already exists, return it
+        return {
+          success: true,
+          user: existingUser[0],
+          redirectUrl: existingUser[0].has_baseline_resume ? "/dashboard" : "/onboarding",
+        }
+      }
+
       const { data: userData, error: userError } = await supabase
         .from("users")
         .insert({
