@@ -1,82 +1,94 @@
 "use client"
 
-import type React from "react"
-import { useState, useTransition } from "react"
+import { useState } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+
 import { Button } from "@/components/ui/button"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { login } from "@/app/actions/auth-actions"
-import { useRouter } from "next/navigation"
+import { signIn } from "@/lib/auth"
 
-export function LoginForm() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+const LoginSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+})
+
+export function SimpleLoginForm() {
   const [error, setError] = useState("")
-  const [isPending, startTransition] = useTransition()
-  const router = useRouter()
+  const [success, setSuccess] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  // Add this at the top of the component to prevent multiple submissions
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const form = useForm<z.infer<typeof LoginSchema>>({
+    resolver: zodResolver(LoginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  })
+
+  const onSubmit = async (values: z.infer<typeof LoginSchema>) => {
+    if (isSubmitting) return
+
+    setIsSubmitting(true)
     setError("")
+    setSuccess("")
 
-    const formData = new FormData()
-    formData.append("email", email)
-    formData.append("password", password)
+    try {
+      const result = await signIn(values.email, values.password)
 
-    startTransition(async () => {
-      try {
-        const result = await login(formData)
-
-        if (result.success) {
-          // Redirect based on user's onboarding status
-          if (result.redirectUrl) {
-            router.push(result.redirectUrl)
-          } else {
-            router.push("/dashboard")
-          }
-        } else {
-          setError(result.error || "Login failed")
-        }
-      } catch (err) {
-        setError("An unexpected error occurred")
-        console.error("Login error:", err)
+      if (result.success) {
+        setSuccess("Login successful! Redirecting...")
+        // Use window.location for immediate redirect
+        window.location.href = result.redirectUrl || "/dashboard"
+      } else {
+        setError(result.error || "Login failed")
       }
-    })
+    } catch (error) {
+      setError("An unexpected error occurred")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{error}</div>}
-
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="john.doe@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          disabled={isPending}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {error && <div className="text-red-500">{error}</div>}
+        {success && <div className="text-green-500">{success}</div>}
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="Email" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          placeholder="Enter your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          disabled={isPending}
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Password</FormLabel>
+              <FormControl>
+                <Input type="password" placeholder="Password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-
-      <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Signing in..." : "Sign In"}
-      </Button>
-    </form>
+        <Button disabled={isSubmitting} type="submit" className="w-full">
+          {isSubmitting ? "Signing in..." : "Sign in"}
+        </Button>
+      </form>
+    </Form>
   )
 }

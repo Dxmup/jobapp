@@ -47,6 +47,17 @@ export async function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname
     console.log(`Middleware processing: ${path}, Session: ${session ? "exists" : "none"}`)
 
+    // Skip middleware for auth pages to prevent loops
+    if (path === "/login" || path === "/signup") {
+      if (session) {
+        // If already authenticated, redirect to dashboard
+        console.log("Already authenticated, redirecting to dashboard")
+        return NextResponse.redirect(new URL("/dashboard", request.url))
+      }
+      // Allow access to auth pages when not authenticated
+      return response
+    }
+
     // Update cookies based on session
     if (session) {
       response.cookies.set("authenticated", "true", {
@@ -163,5 +174,7 @@ export const config = {
     "/admin/:path*",
     "/admin",
     "/admin/login",
+    "/login",
+    "/signup",
   ],
 }
