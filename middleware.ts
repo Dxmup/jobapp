@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createMiddlewareClient } from "@/lib/supabase/authClient"
+import { createServerClient } from "@supabase/ssr"
 
 async function checkAdminStatus(userId: string, supabase: any): Promise<boolean> {
   try {
-    // Get user from database
     const { data: user, error } = await supabase.from("users").select("email").eq("auth_id", userId).maybeSingle()
 
     if (error || !user?.email) {
-      console.log(`No user found for auth_id: ${userId}`)
       return false
     }
 
-    // Define admin emails
     const adminEmails = [
       "admin@careerai.com",
       "test@admin.com",
@@ -24,68 +21,67 @@ async function checkAdminStatus(userId: string, supabase: any): Promise<boolean>
       .filter(Boolean)
       .map((email) => email.toLowerCase())
 
-    const isAdmin = adminEmails.includes(user.email.toLowerCase())
-    console.log(`Admin check for ${user.email} (auth_id: ${userId}): ${isAdmin}`)
-
-    return isAdmin
+    return adminEmails.includes(user.email.toLowerCase())
   } catch (error) {
-    console.error("Error checking admin status in middleware:", error)
+    console.error("Error checking admin status:", error)
     return false
   }
 }
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
-  const supabase = createMiddlewareClient(request, response)
+  const path = request.nextUrl.pathname
+
+  // Create Supabase client for middleware
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          request.cookies.set({ name, value, ...options })
+          response.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: any) {
+          request.cookies.set({ name, value: "", ...options })
+          response.cookies.set({ name, value: "", ...options })
+        },
+      },
+    },
+  )
 
   try {
-    // Refresh session if needed
+    // Get session
     const {
       data: { session },
+      error,
     } = await supabase.auth.getSession()
 
-    const path = request.nextUrl.pathname
+    if (error) {
+      console.error("Middleware session error:", error)
+    }
+
     console.log(`Middleware processing: ${path}, Session: ${session ? "exists" : "none"}`)
+
+    if (session) {
+      console.log(`Session user: ${session.user.id}`)
+    }
 
     // Skip middleware for auth pages to prevent loops
     if (path === "/login" || path === "/signup") {
       if (session) {
-        // If already authenticated, redirect to dashboard
         console.log("Already authenticated, redirecting to dashboard")
         return NextResponse.redirect(new URL("/dashboard", request.url))
       }
-      // Allow access to auth pages when not authenticated
       return response
-    }
-
-    // Update cookies based on session
-    if (session) {
-      response.cookies.set("authenticated", "true", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 7,
-        path: "/",
-        sameSite: "lax",
-      })
-      response.cookies.set("user_id", session.user.id, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 7,
-        path: "/",
-        sameSite: "lax",
-      })
-    } else {
-      // Clear cookies if no session
-      response.cookies.set("authenticated", "", { maxAge: 0, path: "/" })
-      response.cookies.set("user_id", "", { maxAge: 0, path: "/" })
-      response.cookies.set("has_baseline_resume", "", { maxAge: 0, path: "/" })
-      response.cookies.set("is_admin", "", { maxAge: 0, path: "/" })
     }
 
     // Special case for admin login page
     if (path === "/admin/login") {
       if (session && (await checkAdminStatus(session.user.id, supabase))) {
-        console.log("Already authenticated admin, redirecting to admin dashboard")
         return NextResponse.redirect(new URL("/admin", request.url))
       }
       return response
@@ -109,18 +105,8 @@ export async function middleware(request: NextRequest) {
     if (session && path.startsWith("/admin") && !path.startsWith("/admin/login")) {
       const isAdmin = await checkAdminStatus(session.user.id, supabase)
       if (!isAdmin) {
-        console.log(`Non-admin user attempted to access admin route: ${path}`)
         return NextResponse.redirect(new URL("/dashboard", request.url))
       }
-
-      // Update admin cookie
-      response.cookies.set("is_admin", "true", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 7,
-        path: "/",
-        sameSite: "lax",
-      })
     }
 
     // Handle onboarding flow for authenticated users
@@ -133,28 +119,16 @@ export async function middleware(request: NextRequest) {
           .maybeSingle()
 
         if (profile) {
-          // Update baseline resume cookie
-          response.cookies.set("has_baseline_resume", String(profile.has_baseline_resume || false), {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            maxAge: 60 * 60 * 24 * 7,
-            path: "/",
-            sameSite: "lax",
-          })
-
           if (!profile.has_baseline_resume && !path.startsWith("/onboarding")) {
-            console.log("User needs onboarding, redirecting")
             return NextResponse.redirect(new URL("/onboarding", request.url))
           }
 
           if (profile.has_baseline_resume && path.startsWith("/onboarding")) {
-            console.log("User completed onboarding, redirecting to dashboard")
             return NextResponse.redirect(new URL("/dashboard", request.url))
           }
         }
       } catch (error) {
-        console.error("Error checking user profile in middleware:", error)
-        // Continue without redirect on error
+        console.error("Error checking user profile:", error)
       }
     }
 

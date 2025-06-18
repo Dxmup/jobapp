@@ -6,14 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { login } from "@/app/actions/auth-actions"
-import { useRouter } from "next/navigation"
 
 export function SimpleLoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isPending, startTransition] = useTransition()
-  const router = useRouter()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,8 +26,11 @@ export function SimpleLoginForm() {
         const result = await login(formData)
 
         if (result.success) {
-          // Use window.location for immediate redirect to avoid middleware conflicts
-          window.location.href = result.redirectUrl || "/dashboard"
+          console.log("Login successful, redirecting to:", result.redirectUrl)
+          // Add a small delay to ensure cookies are set
+          setTimeout(() => {
+            window.location.href = result.redirectUrl || "/dashboard"
+          }, 100)
         } else {
           setError(result.error || "Login failed")
         }
@@ -77,5 +78,4 @@ export function SimpleLoginForm() {
   )
 }
 
-// Export as LoginForm for backward compatibility
 export const LoginForm = SimpleLoginForm
