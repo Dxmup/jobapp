@@ -1,22 +1,15 @@
-import { createServerClient } from "@supabase/ssr"
-import type { NextRequest, NextResponse } from "next/server"
+// lib/supabase/middleware-client.ts
+import { createClient } from "@supabase/supabase-js"
+import type { Database } from "@/lib/database.types"
 
-export function createMiddlewareSupabaseClient(request: NextRequest, response: NextResponse) {
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value
-      },
-      set(name: string, value: string, options: any) {
-        // Set cookie on both request and response
-        request.cookies.set({ name, value, ...options })
-        response.cookies.set({ name, value, ...options })
-      },
-      remove(name: string, options: any) {
-        // Remove cookie from both request and response
-        request.cookies.set({ name, value: "", ...options })
-        response.cookies.set({ name, value: "", ...options })
-      },
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+export const createMiddlewareClient = () => {
+  return createClient<Database>(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
   })
 }
