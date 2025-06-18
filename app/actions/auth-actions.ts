@@ -15,17 +15,17 @@ export async function login(values: { email?: string; password?: string }) {
     }
   }
 
-  const result = await signIn(email, password)
+  console.log("[Action:login] Attempting signIn for:", email)
+  const result = await signIn(email, password) // signIn from lib/auth.ts
 
   if (result.success && result.user && result.session) {
-    console.log("Login action: signIn successful.")
-    console.log("DB User ID:", result.user.id)
-    console.log("Auth User ID (from session):", result.session.user.id)
-    if (result.user.auth_id) {
-      console.log("Auth User ID (from DB user.auth_id):", result.user.auth_id)
-    }
+    console.log("[Action:login] signIn successful.")
+    console.log("[Action:login] DB User ID:", result.user.id)
+    console.log("[Action:login] Auth User ID (from session):", result.session.user.id)
 
     const cookieStore = cookies()
+    // This cookie is for your app's logic, if still needed.
+    // Middleware should primarily trust supabase.auth.getSession().
     cookieStore.set("authenticated", "true", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -34,7 +34,7 @@ export async function login(values: { email?: string; password?: string }) {
       sameSite: "lax",
     })
 
-    // CRITICAL: Use the Supabase Auth ID from the session for the user_id cookie
+    // Store the Supabase Auth ID. This is crucial for consistency.
     cookieStore.set("user_id", result.session.user.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -42,13 +42,10 @@ export async function login(values: { email?: string; password?: string }) {
       path: "/",
       sameSite: "lax",
     })
-    console.log(`Login action: Set 'authenticated' and 'user_id' (${result.session.user.id}) cookies.`)
-  } else if (result.success && result.user) {
-    console.warn("Login action: signIn was successful but session object is missing in the result. This is unexpected.")
+    console.log(`[Action:login] Set 'authenticated' and 'user_id' (${result.session.user.id}) cookies.`)
   } else {
-    console.log("Login action: signIn failed or did not return expected user/session.", result.error)
+    console.error("[Action:login] signIn failed or did not return expected user/session. Error:", result.error)
   }
-
   return result
 }
 
@@ -188,24 +185,27 @@ export async function createUserAndLogin(userData: {
 }
 
 export async function logout() {
-  const result = await signOut() // This handles Supabase session logout
+  console.log("[Action:logout] Attempting signOut.")
+  const result = await signOut() // signOut from lib/auth.ts, handles Supabase session logout
 
-  // Clear custom cookies
+  // Clear ALL custom authentication-related cookies
   const cookieStore = cookies()
   cookieStore.set("authenticated", "", { maxAge: 0, path: "/" })
   cookieStore.set("user_id", "", { maxAge: 0, path: "/" })
+  cookieStore.set("has_baseline_resume", "", { maxAge: 0, path: "/" }) // If you use this
+  cookieStore.set("is_admin", "", { maxAge: 0, path: "/" }) // If you use this
   cookieStore.set("pending_subscription_tier", "", { maxAge: 0, path: "/" })
-  // any other custom cookies related to auth
 
   if (result.success) {
-    console.log("Logout successful, custom cookies cleared.")
+    console.log("[Action:logout] signOut successful from Supabase. Custom cookies cleared.")
   } else {
-    console.error("Logout action: signOut from Supabase failed.", result.error)
+    console.error("[Action:logout] signOut from Supabase failed. Error:", result.error)
   }
 
+  // Always redirect to login after logout attempt
   return {
-    success: result.success,
+    success: result.success, // Reflects Supabase signout status
     error: result.error,
-    redirectUrl: "/login", // Always redirect to login after logout
+    redirectUrl: "/login",
   }
 }
