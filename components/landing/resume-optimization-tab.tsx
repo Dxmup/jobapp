@@ -305,7 +305,7 @@ export function ResumeOptimizationTab({ onActionUsed, isDisabled }: ResumeOptimi
           See Your Resume Transformed
         </h3>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Watch AI turn a any resume into an interview magnet in seconds. Upload yours and see the difference
+          Watch JobCraft turn any resume into an interview magnet in seconds. Upload yours and see the difference
           immediately. Sign up for automated full results.
         </p>
       </div>
