@@ -33,7 +33,7 @@ export function LandingPricing() {
       features: [
         "Unlimited job applications",
         "Custom Interview questions",
-        "Phone interview preparation",
+        "2 hours Phone Interview preparation",
         "Offer Letter Review",
         "Priority support",
         "Advanced analytics",
@@ -52,10 +52,10 @@ export function LandingPricing() {
       features: [
         "Everything in Pro",
         "LinkedIn optimization",
-        "Plain language benefits explanation",
-        "1-on-1 career coaching",
-        "Custom AI training",
-        "White-glove service",
+        "5 Hours of Phone Interview Practice",
+        "Personalized Interview Answers",
+        "Proactive Questions for the Interviewer",
+        "Thank You letter generation",
       ],
       cta: "Contact Sales",
       popular: false,
