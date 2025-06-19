@@ -76,7 +76,7 @@ export function LandingFeatures() {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-4xl md:text-6xl font-black mb-6 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-              Supercharge Your Job Search
+              Transform Your Career Journey
               <motion.span
                 className="inline-block ml-4"
                 animate={{ rotate: [0, 15, -15, 0] }}
