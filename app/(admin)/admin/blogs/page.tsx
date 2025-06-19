@@ -58,6 +58,9 @@ export default function AdminBlogsPage() {
     meta_description: "",
   })
 
+  const [tableExists, setTableExists] = useState<boolean | null>(null)
+  const [setupError, setSetupError] = useState<string | null>(null)
+
   useEffect(() => {
     fetchBlogs()
   }, [])
@@ -68,9 +71,40 @@ export default function AdminBlogsPage() {
       if (response.ok) {
         const data = await response.json()
         setBlogs(data.blogs || [])
+        setTableExists(true)
+      } else if (response.status === 500) {
+        const errorData = await response.json()
+        if (errorData.error?.includes("does not exist") || errorData.error?.includes("relation")) {
+          setTableExists(false)
+        } else {
+          setSetupError(errorData.error || "Failed to fetch blogs")
+        }
       }
     } catch (error) {
       console.error("Error fetching blogs:", error)
+      setSetupError("Network error occurred")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const createBlogsTable = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/admin/create-blogs-table", {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        setTableExists(true)
+        await fetchBlogs()
+      } else {
+        const errorData = await response.json()
+        setSetupError(errorData.error || "Failed to create blogs table")
+      }
+    } catch (error) {
+      console.error("Error creating blogs table:", error)
+      setSetupError("Failed to create blogs table")
     } finally {
       setLoading(false)
     }
@@ -206,6 +240,66 @@ export default function AdminBlogsPage() {
           </div>
         </div>
         <div className="text-center py-12">Loading blogs...</div>
+      </div>
+    )
+  }
+
+  if (tableExists === false) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Blog Management</h1>
+            <p className="text-gray-600 mt-2">Create and manage blog content for SEO</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Blogs table not found</h3>
+              <p className="text-gray-500 mb-4">
+                The blogs table needs to be created before you can manage blog posts.
+              </p>
+              <Button
+                onClick={createBlogsTable}
+                disabled={loading}
+                className="bg-gradient-to-r from-blue-600 to-purple-600"
+              >
+                {loading ? "Creating..." : "Create Blogs Table"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (setupError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Blog Management</h1>
+            <p className="text-gray-600 mt-2">Create and manage blog content for SEO</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              <div className="text-red-500 mb-4">Error: {setupError}</div>
+              <Button
+                onClick={() => {
+                  setSetupError(null)
+                  fetchBlogs()
+                }}
+                variant="outline"
+              >
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
