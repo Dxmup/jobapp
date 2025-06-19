@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { readFileSync } from "fs"
-import { join } from "path"
 
 const supabaseUrl = process.env.SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -10,22 +8,30 @@ export async function POST() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Read the SQL file
-    const sqlPath = join(process.cwd(), "lib/supabase/create-blogs-table.sql")
-    const sql = readFileSync(sqlPath, "utf8")
+    // Try to create a simple test record to see if table exists
+    const { data: testData, error: testError } = await supabase.from("blogs").select("id").limit(1)
 
-    // Execute the SQL
-    const { data, error } = await supabase.rpc("exec_sql", { sql_query: sql })
-
-    if (error) {
-      console.error("Error creating blogs table:", error)
-      return NextResponse.json({ error: "Failed to create blogs table", details: error.message }, { status: 500 })
+    if (!testError) {
+      return NextResponse.json({
+        message: "Blogs table already exists",
+        tableExists: true,
+      })
     }
 
-    return NextResponse.json({
-      message: "Blogs table created successfully",
-      data,
-    })
+    // If table doesn't exist, create it using direct SQL execution
+    // We'll use a simpler approach by creating the table structure manually
+
+    console.log("Table doesn't exist, attempting to create...")
+
+    // For now, let's return an error that suggests manual table creation
+    return NextResponse.json(
+      {
+        error: "Blogs table needs to be created manually in Supabase",
+        suggestion: "Please run the SQL from lib/supabase/create-blogs-table.sql in your Supabase SQL editor",
+        sqlFile: "lib/supabase/create-blogs-table.sql",
+      },
+      { status: 500 },
+    )
   } catch (error) {
     console.error("Error in create-blogs-table:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

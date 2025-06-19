@@ -1,71 +1,54 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // First, let's check if the table exists
-    const { data: tables, error: tableError } = await supabase
-      .from("information_schema.tables")
-      .select("table_name")
-      .eq("table_schema", "public")
-      .eq("table_name", "blogs")
-
-    if (tableError) {
-      console.error("Error checking table existence:", tableError)
-    }
-
-    if (!tables || tables.length === 0) {
-      return NextResponse.json(
-        {
-          error: "Blogs table does not exist",
-          tableNotFound: true,
-        },
-        { status: 404 },
-      )
-    }
-
     const { data: blogs, error } = await supabase.from("blogs").select("*").order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Error fetching blogs:", error)
-      return NextResponse.json({ error: "Failed to fetch blogs", details: error.message }, { status: 500 })
+      // If table doesn't exist, return empty array with flag
+      if (error.code === "42P01" || error.message.includes("does not exist")) {
+        return NextResponse.json({ blogs: [], tableExists: false })
+      }
+      throw error
     }
 
-    return NextResponse.json({ blogs: blogs || [] })
+    return NextResponse.json({ blogs: blogs || [], tableExists: true })
   } catch (error) {
-    console.error("Error in blogs GET:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error fetching blogs:", error)
+    return NextResponse.json({ error: "Failed to fetch blogs", blogs: [], tableExists: false }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
 
-    // Validate required fields
-    if (!body.title || !body.slug || !body.content) {
-      return NextResponse.json(
-        { error: "Missing required fields: title, slug, and content are required" },
-        { status: 400 },
-      )
+    const blogData = {
+      title: body.title,
+      slug: body.slug,
+      content: body.content,
+      excerpt: body.excerpt || null,
+      author_name: body.author_name || null,
+      status: body.status || "draft",
+      tags: body.tags || [],
+      meta_title: body.meta_title || null,
+      meta_description: body.meta_description || null,
+      featured_image_url: body.featured_image_url || null,
+      published_at: body.status === "published" ? new Date().toISOString() : null,
     }
 
-    const { data: blog, error } = await supabase.from("blogs").insert([body]).select().single()
+    const { data: blog, error } = await supabase.from("blogs").insert([blogData]).select().single()
 
     if (error) {
-      console.error("Error creating blog:", error)
-      return NextResponse.json({ error: "Failed to create blog", details: error.message }, { status: 500 })
+      throw error
     }
 
     return NextResponse.json({ blog })
   } catch (error) {
-    console.error("Error in blogs POST:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error creating blog:", error)
+    return NextResponse.json({ error: "Failed to create blog" }, { status: 500 })
   }
 }
