@@ -72,17 +72,28 @@ export default function AdminBlogsPage() {
         const data = await response.json()
         setBlogs(data.blogs || [])
         setTableExists(true)
-      } else if (response.status === 500) {
+      } else {
         const errorData = await response.json()
-        if (errorData.error?.includes("does not exist") || errorData.error?.includes("relation")) {
+        console.log("Error response:", errorData) // Debug log
+
+        // Check if the error is about missing table
+        if (
+          errorData.error &&
+          (errorData.error.includes("does not exist") ||
+            errorData.error.includes("relation") ||
+            errorData.error.includes("public.blogs"))
+        ) {
           setTableExists(false)
+          setSetupError(null) // Clear any previous setup errors
         } else {
           setSetupError(errorData.error || "Failed to fetch blogs")
+          setTableExists(null)
         }
       }
     } catch (error) {
       console.error("Error fetching blogs:", error)
       setSetupError("Network error occurred")
+      setTableExists(null)
     } finally {
       setLoading(false)
     }
@@ -91,20 +102,31 @@ export default function AdminBlogsPage() {
   const createBlogsTable = async () => {
     try {
       setLoading(true)
+      setSetupError(null) // Clear any previous errors
+
       const response = await fetch("/api/admin/create-blogs-table", {
         method: "POST",
       })
 
       if (response.ok) {
+        const data = await response.json()
+        console.log("Table creation response:", data)
         setTableExists(true)
-        await fetchBlogs()
+        setSetupError(null)
+        // Wait a moment for the table to be fully created
+        setTimeout(() => {
+          fetchBlogs()
+        }, 1000)
       } else {
         const errorData = await response.json()
+        console.error("Table creation error:", errorData)
         setSetupError(errorData.error || "Failed to create blogs table")
+        setTableExists(false)
       }
     } catch (error) {
       console.error("Error creating blogs table:", error)
       setSetupError("Failed to create blogs table")
+      setTableExists(false)
     } finally {
       setLoading(false)
     }
