@@ -159,14 +159,6 @@ export function LandingPricing() {
             </ScrollReveal>
           ))}
         </div>
-
-        {/* Money back guarantee */}
-        <ScrollReveal className="text-center mt-16" delay={0.6}>
-          <div className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 px-6 py-3 rounded-full text-lg font-medium">
-            <Check className="h-5 w-5" />
-            30-day money-back guarantee
-          </div>
-        </ScrollReveal>
       </div>
     </section>
   )
