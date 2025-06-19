@@ -71,7 +71,7 @@ export default function ResumesPage() {
    * 3. List API endpoint
    * 4. Direct SQL query (last resort, debug mode only)
    *
-   * If all methods fail, it sets an error state with detailed information.
+   * Session refresh is attempted but not required for success.
    */
   const fetchResumes = async () => {
     setLoading(true)
@@ -91,6 +91,7 @@ export default function ResumesPage() {
           console.log(`Direct API success: Found ${data.resumes.length} resumes`)
           fetchedResumes = data.resumes
           success = true
+          setError(null) // Clear any previous errors immediately
         } else {
           errorMessages.push("Direct API returned no resumes")
         }
@@ -110,6 +111,7 @@ export default function ResumesPage() {
             console.log(`Original API success: Found ${data.resumes.length} resumes`)
             fetchedResumes = data.resumes
             success = true
+            setError(null) // Clear any previous errors immediately
           } else {
             errorMessages.push("Original API returned no resumes")
           }
@@ -130,6 +132,7 @@ export default function ResumesPage() {
             console.log(`List API success: Found ${data.resumes.length} resumes`)
             fetchedResumes = data.resumes
             success = true
+            setError(null) // Clear any previous errors immediately
           } else {
             errorMessages.push("List API returned no resumes")
           }
@@ -163,6 +166,7 @@ export default function ResumesPage() {
               console.log(`SQL query success: Found ${data.data.length} resumes`)
               fetchedResumes = data.data
               success = true
+              setError(null) // Clear any previous errors immediately
             } else {
               errorMessages.push("SQL query returned no resumes")
             }
@@ -192,8 +196,14 @@ export default function ResumesPage() {
       // Set the resumes or error state
       if (success) {
         setResumes(fetchedResumes)
-      } else {
+        setError(null) // Clear any previous errors
+      } else if (fetchedResumes.length === 0) {
+        // Only show error if we have no resumes AND all methods failed
         setError(`Failed to fetch resumes. Tried multiple methods: ${errorMessages.join("; ")}`)
+      } else {
+        // We have some resumes, so clear error even if some methods failed
+        setResumes(fetchedResumes)
+        setError(null)
       }
     } catch (error) {
       console.error("Error fetching resumes:", error)
@@ -268,12 +278,27 @@ export default function ResumesPage() {
         </div>
       </div>
 
-      {/* Error alert */}
+      {/* Error alert - Only show for actual data fetching failures */}
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>Error Loading Resumes</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                toast({
+                  title: "Retrying...",
+                  description: "Attempting to fetch resumes again",
+                })
+                fetchResumes()
+              }}
+            >
+              Try Again
+            </Button>
+          </div>
         </Alert>
       )}
 
@@ -324,7 +349,7 @@ export default function ResumesPage() {
                   </CardContent>
                   <CardFooter className="flex justify-between pt-3">
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/dashboard/resumes/${resume.id}`}>View</Link>
+                      <Link href={`/dashboard/resumes/view/${resume.id}`}>View</Link>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/dashboard/resumes/customize?resumeId=${resume.id}`}>Customize</Link>
@@ -356,7 +381,7 @@ export default function ResumesPage() {
                     </CardContent>
                     <CardFooter className="flex justify-between pt-3">
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard/resumes/${resume.id}`}>View</Link>
+                        <Link href={`/dashboard/resumes/view/${resume.id}`}>View</Link>
                       </Button>
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/dashboard/resumes/customize?resumeId=${resume.id}`}>Customize</Link>
