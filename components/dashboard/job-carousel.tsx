@@ -25,7 +25,8 @@ interface JobCarouselProps {
 const JOBS_PER_PAGE = 3
 
 function getCurrentPageJobs(jobs: Job[], currentPage: number): Job[] {
-  if (!Array.isArray(jobs)) {
+  // Add safety check for jobs array
+  if (!jobs || !Array.isArray(jobs)) {
     return []
   }
 
@@ -35,10 +36,11 @@ function getCurrentPageJobs(jobs: Job[], currentPage: number): Job[] {
 }
 
 export function JobCarousel({ jobs = [] }: JobCarouselProps) {
+  // Ensure jobs is always an array
+  const safeJobs = jobs || []
   const [currentPage, setCurrentPage] = useState(0)
 
   // Ensure jobs is always an array
-  const safeJobs = Array.isArray(jobs) ? jobs : []
   const totalPages = Math.ceil(safeJobs.length / JOBS_PER_PAGE)
   const currentJobs = getCurrentPageJobs(safeJobs, currentPage)
 
