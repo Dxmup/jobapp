@@ -72,19 +72,15 @@ export default function AdminBlogsPage() {
         const data = await response.json()
         setBlogs(data.blogs || [])
         setTableExists(true)
+        setSetupError(null)
       } else {
         const errorData = await response.json()
         console.log("Error response:", errorData) // Debug log
 
-        // Check if the error is about missing table
-        if (
-          errorData.error &&
-          (errorData.error.includes("does not exist") ||
-            errorData.error.includes("relation") ||
-            errorData.error.includes("public.blogs"))
-        ) {
+        // Check if the error indicates missing table
+        if (response.status === 404 || errorData.tableNotFound) {
           setTableExists(false)
-          setSetupError(null) // Clear any previous setup errors
+          setSetupError(null)
         } else {
           setSetupError(errorData.error || "Failed to fetch blogs")
           setTableExists(null)
