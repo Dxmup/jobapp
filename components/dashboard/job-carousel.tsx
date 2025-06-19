@@ -1,14 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { ChevronLeft, ChevronRight, FileText, Mail, MessageSquare, Building, MapPin, Calendar } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
-import { cn } from "@/lib/utils"
+import { ChevronLeft, ChevronRight, FileText, Mail, MessageSquare, MapPin, Calendar, Plus } from "lucide-react"
+import Link from "next/link"
 
 interface Job {
   id: string
@@ -17,296 +14,249 @@ interface Job {
   location?: string
   status: string
   created_at: string
-  updated_at: string
 }
 
 export function JobCarousel() {
   const [jobs, setJobs] = useState<Job[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const router = useRouter()
-  const { toast } = useToast()
+  const [currentPage, setCurrentPage] = useState(0)
 
-  const itemsPerPage = 3
+  const jobsPerPage = 3
+  const totalPages = Math.ceil(jobs.length / jobsPerPage)
 
   useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const response = await fetch("/api/jobs")
+        if (response.ok) {
+          const data = await response.json()
+          setJobs(data.jobs || [])
+        } else {
+          setError("Failed to fetch jobs")
+        }
+      } catch (error) {
+        console.error("Error fetching jobs:", error)
+        setError("Failed to fetch jobs")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
     fetchJobs()
   }, [])
 
-  const fetchJobs = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch("/api/jobs")
-      if (!response.ok) {
-        throw new Error("Failed to fetch jobs")
-      }
-      const data = await response.json()
-      setJobs(data.jobs || [])
-    } catch (err) {
-      console.error("Error fetching jobs:", err)
-      setError(err instanceof Error ? err.message : "Failed to load jobs")
-    } finally {
-      setLoading(false)
+  const getCurrentPageJobs = () => {
+    const startIndex = currentPage * jobsPerPage
+    return jobs.slice(startIndex, startIndex + jobsPerPage)
+  }
+
+  const nextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1)
     }
   }
 
-  const getStatusBadgeClass = (status: string) => {
-    const statusLower = status.toLowerCase()
-    switch (statusLower) {
-      case "interviewing":
-      case "interview":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
+  const prevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
       case "applied":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
-      case "drafting":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+        return "bg-blue-500/10 text-blue-600 border-blue-500/20"
+      case "interviewing":
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
       case "offer":
-      case "offer received":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+        return "bg-green-500/10 text-green-600 border-green-500/20"
       case "rejected":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-      case "saved":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+        return "bg-red-500/10 text-red-600 border-red-500/20"
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+        return "bg-gray-500/10 text-gray-600 border-gray-500/20"
     }
   }
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A"
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-  }
-
-  const handleNavigation = (jobId: string, type: "resumes" | "cover-letters" | "interview") => {
-    switch (type) {
-      case "resumes":
-        router.push(`/jobs/${jobId}/optimize-resume`)
-        break
-      case "cover-letters":
-        router.push(`/jobs/${jobId}/generate-cover-letter`)
-        break
-      case "interview":
-        router.push(`/dashboard/interview-prep/${jobId}`)
-        break
-    }
-  }
-
-  const nextSlide = () => {
-    if (currentIndex < Math.ceil(jobs.length / itemsPerPage) - 1) {
-      setCurrentIndex(currentIndex + 1)
-    }
-  }
-
-  const prevSlide = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1)
-    }
-  }
-
-  const visibleJobs = jobs.slice(currentIndex * itemsPerPage, (currentIndex + 1) * itemsPerPage)
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Your Job Applications</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array(3)
-            .fill(0)
-            .map((_, index) => (
-              <Card key={index} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <Skeleton className="h-5 w-3/4" />
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </div>
-                  <Skeleton className="h-4 w-1/2" />
-                </CardHeader>
-                <CardContent className="pb-2">
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-2/3" />
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="flex gap-2 w-full">
-                    <Skeleton className="h-8 flex-1" />
-                    <Skeleton className="h-8 flex-1" />
-                    <Skeleton className="h-8 flex-1" />
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
-        </div>
-      </div>
-    )
+  if (isLoading) {
+    return <JobCarouselSkeleton />
   }
 
   if (error) {
     return (
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold">Your Job Applications</h2>
-        <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950">
-          <CardContent className="p-6">
-            <p className="text-red-600 dark:text-red-400">{error}</p>
-            <Button className="mt-4" onClick={fetchJobs}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-0 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm">
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <p className="text-muted-foreground mb-4">Failed to load jobs</p>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Try Again
+          </Button>
+        </CardContent>
+      </Card>
     )
   }
 
   if (jobs.length === 0) {
     return (
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold">Your Job Applications</h2>
-        <Card className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
-          <CardContent className="p-6 text-center">
-            <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-2">No Job Applications Yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Get started by adding your first job application to track your progress.
-            </p>
-            <Button onClick={() => router.push("/dashboard/jobs/new")}>Add Job Application</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-0 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm">
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center mb-4">
+            <Plus className="w-8 h-8 text-white" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No job applications yet</h3>
+          <p className="text-muted-foreground mb-4 text-center">
+            Start tracking your job applications to see them here
+          </p>
+          <Button asChild>
+            <Link href="/dashboard/jobs/new">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Your First Job
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
     )
   }
 
-  const totalPages = Math.ceil(jobs.length / itemsPerPage)
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Your Job Applications</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            {currentIndex + 1} of {totalPages}
-          </span>
-          <div className="flex gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={prevSlide}
-              disabled={currentIndex === 0}
-              className="h-8 w-8 p-0"
+      <div className="relative">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {getCurrentPageJobs().map((job) => (
+            <Card
+              key={job.id}
+              className="group relative overflow-hidden border-0 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm hover:from-white/10 hover:to-white/5 transition-all duration-300"
             >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={nextSlide}
-              disabled={currentIndex >= totalPages - 1}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {visibleJobs.map((job) => {
-          const statusLower = job.status.toLowerCase()
-          let displayStatus = job.status
-          if (statusLower === "interviewing" || statusLower === "interview") {
-            displayStatus = "Interview"
-          } else if (statusLower === "offer") {
-            displayStatus = "Offer Received"
-          } else {
-            displayStatus = statusLower.charAt(0).toUpperCase() + statusLower.slice(1)
-          }
-
-          return (
-            <Card key={job.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg line-clamp-2" title={job.title}>
-                    {job.title}
-                  </CardTitle>
-                  <Badge className={cn("text-xs", getStatusBadgeClass(job.status))}>{displayStatus}</Badge>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1 flex-1">
+                    <CardTitle className="text-lg line-clamp-1">{job.title}</CardTitle>
+                    <p className="text-sm text-muted-foreground font-medium">{job.company}</p>
+                    {job.location && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="w-3 h-3" />
+                        {job.location}
+                      </div>
+                    )}
+                  </div>
+                  <Badge className={`${getStatusColor(job.status)} border`}>{job.status}</Badge>
                 </div>
-                <CardDescription className="line-clamp-1" title={job.company}>
-                  {job.company}
-                </CardDescription>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="w-3 h-3" />
+                  Added {new Date(job.created_at).toLocaleDateString()}
+                </div>
               </CardHeader>
-
-              <CardContent className="pb-2">
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  {job.location && (
-                    <div className="flex items-center">
-                      <MapPin className="mr-1 h-3.5 w-3.5" />
-                      <span className="line-clamp-1">{job.location}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center">
-                    <Building className="mr-1 h-3.5 w-3.5" />
-                    <span className="line-clamp-1">{job.company}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Calendar className="mr-1 h-3.5 w-3.5" />
-                    <span>Added {formatDate(job.created_at)}</span>
-                  </div>
+              <CardContent className="pt-0">
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs bg-white/5 border-white/10 hover:bg-white/10"
+                    asChild
+                  >
+                    <Link href={`/jobs/${job.id}/optimize-resume`}>
+                      <FileText className="w-3 h-3 mr-1" />
+                      Resume
+                    </Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs bg-white/5 border-white/10 hover:bg-white/10"
+                    asChild
+                  >
+                    <Link href={`/jobs/${job.id}/generate-cover-letter`}>
+                      <Mail className="w-3 h-3 mr-1" />
+                      Cover
+                    </Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs bg-white/5 border-white/10 hover:bg-white/10"
+                    asChild
+                  >
+                    <Link href={`/dashboard/interview-prep/${job.id}`}>
+                      <MessageSquare className="w-3 h-3 mr-1" />
+                      Interview
+                    </Link>
+                  </Button>
                 </div>
               </CardContent>
-
-              <CardFooter className="pt-2">
-                <div className="flex gap-2 w-full">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleNavigation(job.id, "resumes")}
-                    className="flex-1 text-xs"
-                  >
-                    <FileText className="mr-1 h-3 w-3" />
-                    Resume
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleNavigation(job.id, "cover-letters")}
-                    className="flex-1 text-xs"
-                  >
-                    <Mail className="mr-1 h-3 w-3" />
-                    Cover Letter
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleNavigation(job.id, "interview")}
-                    className="flex-1 text-xs"
-                  >
-                    <MessageSquare className="mr-1 h-3 w-3" />
-                    Interview
-                  </Button>
-                </div>
-              </CardFooter>
             </Card>
-          )
-        })}
+          ))}
+        </div>
+
+        {/* Navigation Arrows */}
+        {totalPages > 1 && (
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-white/10 border-white/20 hover:bg-white/20"
+              onClick={prevPage}
+              disabled={currentPage === 0}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 bg-white/10 border-white/20 hover:bg-white/20"
+              onClick={nextPage}
+              disabled={currentPage === totalPages - 1}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </>
+        )}
       </div>
 
-      {/* Pagination dots */}
+      {/* Pagination Dots */}
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          {Array.from({ length: totalPages }, (_, index) => (
+        <div className="flex justify-center gap-2">
+          {Array.from({ length: totalPages }).map((_, index) => (
             <button
               key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={cn(
-                "w-2 h-2 rounded-full transition-colors",
-                index === currentIndex ? "bg-primary" : "bg-muted-foreground/30 hover:bg-muted-foreground/50",
-              )}
+              className={`w-2 h-2 rounded-full transition-colors ${
+                index === currentPage ? "bg-gradient-to-r from-purple-500 to-cyan-500" : "bg-white/20 hover:bg-white/40"
+              }`}
+              onClick={() => setCurrentPage(index)}
             />
           ))}
         </div>
       )}
+
+      {/* Page Indicator */}
+      {totalPages > 1 && (
+        <div className="text-center text-sm text-muted-foreground">
+          Page {currentPage + 1} of {totalPages} • {jobs.length} total jobs
+        </div>
+      )}
+    </div>
+  )
+}
+
+function JobCarouselSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Card key={i} className="border-0 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <div className="space-y-2">
+              <div className="h-5 bg-white/10 rounded animate-pulse" />
+              <div className="h-4 bg-white/10 rounded w-2/3 animate-pulse" />
+              <div className="h-3 bg-white/10 rounded w-1/2 animate-pulse" />
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 3 }).map((_, j) => (
+                <div key={j} className="h-8 bg-white/10 rounded animate-pulse" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }
