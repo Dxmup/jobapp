@@ -87,7 +87,7 @@ export function LandingFeaturesOptimized() {
               <Card
                 className={`h-full bg-gradient-to-br ${feature.bgGradient} border-0 shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden relative transform hover:-translate-y-2 hover:scale-105`}
               >
-                <CardContent className="p-8 relative z-10">
+                <CardContent className="p-6 relative z-10">
                   {/* Icon with gradient */}
                   <div
                     className={`mb-6 p-4 rounded-2xl bg-gradient-to-r ${feature.gradient} text-white w-fit transition-transform duration-300 shadow-lg ${hoveredIndex === index ? "scale-110" : ""}`}
