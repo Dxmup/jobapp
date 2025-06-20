@@ -4,20 +4,19 @@ import type React from "react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
 import { JobFolderList } from "@/components/dashboard/job-folder-list"
 import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
+import { Search, Plus, Briefcase, TrendingUp, Clock, Target } from "lucide-react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { pulseAnimationCSS, clearStoredItem, getStoredItem, applyTemporaryPulse } from "@/lib/animation-utils"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { NewJobForm } from "@/components/jobs/new-job-form"
 import { getDashboardStats } from "@/app/actions/dashboard-actions"
+import { Badge } from "@/components/ui/badge"
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState([])
@@ -34,8 +33,13 @@ export default function JobsPage() {
   const [pulsedJobs, setPulsedJobs] = useState<Set<string>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [hasJobs, setHasJobs] = useState(true)
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    interviewing: 0,
+    offers: 0,
+  })
   const router = useRouter()
-  // Add a ref to track if we're currently updating a status
   const isUpdatingStatusRef = useRef(false)
 
   const searchParams = useSearchParams()
@@ -44,7 +48,6 @@ export default function JobsPage() {
   // Function to fetch jobs - extracted for reuse
   const fetchJobs = useCallback(
     async (showLoadingState = true) => {
-      // Don't fetch if we're currently updating a status
       if (isUpdatingStatusRef.current) {
         console.log("Skipping fetch because status update is in progress")
         return
@@ -55,12 +58,10 @@ export default function JobsPage() {
           setLoading(true)
         }
 
-        // Add cache-busting parameter to prevent caching
         const timestamp = Date.now()
         lastFetchTimestampRef.current = timestamp
 
         const response = await fetch(`/api/jobs?t=${timestamp}`, {
-          // Add cache control headers
           headers: {
             "Cache-Control": "no-cache, no-store, must-revalidate",
             Pragma: "no-cache",
@@ -73,15 +74,21 @@ export default function JobsPage() {
         }
 
         const data = await response.json()
-        // Check if data is an array or if it has a data/jobs property
         const jobsArray = Array.isArray(data) ? data : data.data || data.jobs || []
 
-        // Only update if this is still the latest fetch
         if (timestamp === lastFetchTimestampRef.current) {
-          // Ensure we're setting an array to the state
           setJobs(Array.isArray(jobsArray) ? jobsArray : [])
 
-          // Check if we need to highlight a job from URL parameter
+          // Calculate stats
+          const total = jobsArray.length
+          const active = jobsArray.filter((job) =>
+            ["applied", "interviewing", "offer"].includes(job.status?.toLowerCase()),
+          ).length
+          const interviewing = jobsArray.filter((job) => job.status?.toLowerCase() === "interviewing").length
+          const offers = jobsArray.filter((job) => job.status?.toLowerCase() === "offer").length
+
+          setStats({ total, active, interviewing, offers })
+
           if (highlightId) {
             console.log("Highlighting job from URL parameter:", highlightId)
             setTimeout(() => {
@@ -117,15 +124,11 @@ export default function JobsPage() {
 
   // Check for newly created job
   const checkForNewJob = useCallback(() => {
-    // First check localStorage
     const storedJobId = getStoredItem("newJobId") || getStoredItem("highlightJobId")
     const storedJobTitle = getStoredItem("newJobTitle")
-    const timestamp = getStoredItem("newJobTimestamp")
 
-    // If not in localStorage, check sessionStorage as backup
     const sessionJobId = sessionStorage.getItem("newJobId")
     const sessionJobTitle = sessionStorage.getItem("newJobTitle")
-    const sessionTimestamp = sessionStorage.getItem("newJobTimestamp")
 
     const jobId = storedJobId || sessionJobId
     const jobTitle = storedJobTitle || sessionJobTitle || "New job application"
@@ -134,25 +137,20 @@ export default function JobsPage() {
       console.log("New job detected:", jobId)
       setNewJobId(jobId)
 
-      // Add the new job ID to the set of pulsed jobs
       setPulsedJobs((prev) => new Set(prev).add(jobId))
 
-      // Show success toast
       toast({
         title: "Job Application Created",
         description: `"${jobTitle}" has been created successfully.`,
       })
 
-      // Clear the storage items
       clearStoredItem(["newJobId", "newJobTitle", "newJobTimestamp", "highlightJobId"])
       sessionStorage.removeItem("newJobId")
       sessionStorage.removeItem("newJobTitle")
       sessionStorage.removeItem("newJobTimestamp")
 
-      // Fetch the latest jobs without showing loading state
       fetchJobs(false)
 
-      // Scroll to the new job after a short delay
       setTimeout(() => {
         const element = document.getElementById(`job-card-${jobId}`)
         if (element) {
@@ -163,42 +161,34 @@ export default function JobsPage() {
     }
   }, [toast, fetchJobs])
 
-  // Check for new job on mount and when refreshTrigger changes
   useEffect(() => {
     checkForNewJob()
   }, [checkForNewJob])
 
-  // Listen for the custom jobCreated event
   useEffect(() => {
     const handleJobCreated = (event: CustomEvent) => {
       console.log("Job created event received:", event.detail)
-      // Increment the refresh trigger to force a re-fetch
       setRefreshTrigger((prev) => prev + 1)
 
-      // Set the new job ID
       if (event.detail && event.detail.id) {
         setNewJobId(event.detail.id)
         setPulsedJobs((prev) => new Set(prev).add(event.detail.id))
       }
     }
 
-    // Add event listener
     window.addEventListener("jobCreated", handleJobCreated as EventListener)
 
-    // Clean up
     return () => {
       window.removeEventListener("jobCreated", handleJobCreated as EventListener)
     }
   }, [])
 
-  // Listen for status change events
   useEffect(() => {
     const handleStatusChanged = (event: CustomEvent) => {
       console.log("Job status changed event received:", event.detail)
 
       const { jobId, newStatus } = event.detail
 
-      // Update the job in our local state
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job.id === jobId ? { ...job, status: newStatus, updated_at: new Date().toISOString() } : job,
@@ -216,7 +206,6 @@ export default function JobsPage() {
   useEffect(() => {
     if (highlightId) {
       console.log("Highlighting job from URL parameter:", highlightId)
-      // Apply pulse animation to the highlighted job
       setTimeout(() => {
         const element = document.getElementById(`job-card-${highlightId}`)
         if (element) {
@@ -263,14 +252,12 @@ export default function JobsPage() {
       return 0
     })
 
-  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return "N/A"
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
   }
 
-  // Helper function to get status badge styling
   const getStatusBadgeClass = (status) => {
     const statusLower = status.toLowerCase()
     switch (statusLower) {
@@ -293,44 +280,35 @@ export default function JobsPage() {
     }
   }
 
-  // Completely rewritten status update function
   const handleStatusClick = async (jobId: string, currentStatus: string, e: React.MouseEvent) => {
-    // Prevent event bubbling
     e.preventDefault()
     e.stopPropagation()
 
-    // Set the updating flag to prevent fetches during update
     isUpdatingStatusRef.current = true
 
     console.log("Status clicked for job:", jobId, "Current status:", currentStatus)
 
-    // Define the status cycle with normalized values
     const statusCycle = ["saved", "drafting", "applied", "interviewing", "offer", "rejected"]
 
-    // Normalize the current status
     let normalizedStatus = currentStatus.toLowerCase()
     if (normalizedStatus === "interview") normalizedStatus = "interviewing"
     if (normalizedStatus === "offer received") normalizedStatus = "offer"
 
-    // Find the current status index
     let currentIndex = statusCycle.indexOf(normalizedStatus)
     if (currentIndex === -1) currentIndex = 0
 
-    // Get the next status
     const nextIndex = (currentIndex + 1) % statusCycle.length
     const nextStatus = statusCycle[nextIndex]
 
     console.log(`Updating status from ${normalizedStatus} to ${nextStatus}`)
 
     try {
-      // Update the local state immediately for better UX
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job.id === jobId ? { ...job, status: nextStatus, updated_at: new Date().toISOString() } : job,
         ),
       )
 
-      // Make the API call
       const response = await fetch(`/api/jobs/${jobId}`, {
         method: "PUT",
         headers: {
@@ -343,11 +321,9 @@ export default function JobsPage() {
         throw new Error(`Failed to update job status: ${response.statusText}`)
       }
 
-      // Get the response data to confirm the update
       const data = await response.json()
       console.log("Status update response:", data)
 
-      // Format the next status for display
       const displayStatus =
         nextStatus === "interviewing"
           ? "Interview"
@@ -355,13 +331,11 @@ export default function JobsPage() {
             ? "Offer Received"
             : nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1)
 
-      // Show success toast
       toast({
         title: "Status Updated",
         description: `Job status changed to ${displayStatus}`,
       })
 
-      // Dispatch a custom event to notify other components
       const event = new CustomEvent("jobStatusChanged", {
         detail: { jobId, newStatus: nextStatus },
       })
@@ -374,217 +348,290 @@ export default function JobsPage() {
         variant: "destructive",
       })
 
-      // Revert the local state change on error
       setJobs((prevJobs) => [...prevJobs])
     } finally {
-      // Clear the updating flag after a short delay
       setTimeout(() => {
         isUpdatingStatusRef.current = false
       }, 1000)
     }
   }
 
-  // Function to handle dialog close and refresh
   const handleJobCreationSuccess = () => {
     setIsDialogOpen(false)
-    // Force refresh after a short delay
     setTimeout(() => {
       setRefreshTrigger((prev) => prev + 1)
     }, 500)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       <style jsx global>
         {pulseAnimationCSS}
       </style>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Job Applications</h1>
-          <p className="text-muted-foreground">Manage and track all your job applications in one place.</p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            {hasJobs ? "Add a Job to Track" : "Let's add the job you're interested in!"}
-          </Button>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Add a Job to Track</DialogTitle>
-            </DialogHeader>
-            <NewJobForm onSuccess={handleJobCreationSuccess} />
-          </DialogContent>
-        </Dialog>
-      </div>
-      <Separator />
 
-      <div className="flex items-center space-x-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search applications..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <select
-          className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="all">All Statuses</option>
-          <option value="saved">Saved</option>
-          <option value="drafting">Drafting</option>
-          <option value="applied">Applied</option>
-          <option value="interviewing">Interviewing</option>
-          <option value="offer">Offer Received</option>
-          <option value="rejected">Rejected</option>
-        </select>
-        <select
-          className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-        >
-          <option value="newest">Newest First</option>
-          <option value="oldest">Oldest First</option>
-          <option value="company-asc">Company (A-Z)</option>
-          <option value="company-desc">Company (Z-A)</option>
-        </select>
-      </div>
+      {/* Hero Section */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative px-6 py-16">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                    <Briefcase className="h-6 w-6" />
+                  </div>
+                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Job Applications</h1>
+                </div>
+                <p className="text-lg text-white/90 max-w-2xl">
+                  Manage and track all your job applications in one place. Stay organized and never miss an opportunity.
+                </p>
+              </div>
 
-      <Tabs defaultValue="grid" className="w-full">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="grid">Grid View</TabsTrigger>
-            <TabsTrigger value="list">List View</TabsTrigger>
-          </TabsList>
-
-          <div className="text-sm text-muted-foreground">
-            Showing {filteredJobs.length} of {jobs.length} applications
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-white/80" />
+                    <span className="text-sm text-white/80">Total</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-white/80" />
+                    <span className="text-sm text-white/80">Active</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.active}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-white/80" />
+                    <span className="text-sm text-white/80">Interviews</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.interviewing}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Briefcase className="h-4 w-4 text-white/80" />
+                    <span className="text-sm text-white/80">Offers</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.offers}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        <TabsContent value="grid" className="mt-6">
-          <JobFolderList
-            jobs={filteredJobs}
-            loading={loading}
-            error={error}
-            newJobId={newJobId}
-            onStatusChange={(jobId, newStatus) => {
-              // Update the job in our local state
-              setJobs((prevJobs) =>
-                prevJobs.map((job) =>
-                  job.id === jobId ? { ...job, status: newStatus, updated_at: new Date().toISOString() } : job,
-                ),
-              )
-            }}
-          />
-        </TabsContent>
-
-        <TabsContent value="list" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Job Applications</CardTitle>
-              <CardDescription>A detailed list view of all your job applications.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <div className="grid grid-cols-5 p-4 font-medium border-b">
-                  <div>Job Title</div>
-                  <div>Company</div>
-                  <div>Status</div>
-                  <div>Created</div>
-                  <div>Last Activity</div>
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        {/* Action Bar */}
+        <div className="mb-8">
+          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search applications..."
+                    className="pl-10 bg-white/50 border-white/20"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
                 </div>
 
-                {loading ? (
-                  // Loading skeleton
-                  Array(5)
-                    .fill(0)
-                    .map((_, index) => (
-                      <div key={index} className="grid grid-cols-5 p-4 border-b">
-                        <div>
-                          <Skeleton className="h-5 w-32" />
-                        </div>
-                        <div>
-                          <Skeleton className="h-5 w-24" />
-                        </div>
-                        <div>
-                          <Skeleton className="h-5 w-20" />
-                        </div>
-                        <div>
-                          <Skeleton className="h-5 w-20" />
-                        </div>
-                        <div>
-                          <Skeleton className="h-5 w-20" />
-                        </div>
-                      </div>
-                    ))
-                ) : filteredJobs.length === 0 ? (
-                  // Empty state
-                  <div className="p-8 text-center text-muted-foreground">
-                    No job applications found. Try adjusting your filters or create a new application.
-                  </div>
-                ) : (
-                  // Job list
-                  filteredJobs.map((job) => {
-                    const isNewJob = job.id === newJobId
-                    const shouldPulse = isNewJob && pulsedJobs.has(job.id)
+                <div className="flex flex-wrap gap-3">
+                  <select
+                    className="h-10 rounded-lg border border-white/20 bg-white/50 px-3 py-2 text-sm backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="saved">Saved</option>
+                    <option value="drafting">Drafting</option>
+                    <option value="applied">Applied</option>
+                    <option value="interviewing">Interviewing</option>
+                    <option value="offer">Offer Received</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
 
-                    // Normalize status for display
-                    const statusLower = job.status.toLowerCase()
-                    let displayStatus = job.status
-                    if (statusLower === "interviewing" || statusLower === "interview") {
-                      displayStatus = "Interview"
-                    } else if (statusLower === "offer") {
-                      displayStatus = "Offer Received"
-                    } else {
-                      displayStatus = statusLower.charAt(0).toUpperCase() + statusLower.slice(1)
-                    }
+                  <select
+                    className="h-10 rounded-lg border border-white/20 bg-white/50 px-3 py-2 text-sm backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="company-asc">Company (A-Z)</option>
+                    <option value="company-desc">Company (Z-A)</option>
+                  </select>
 
-                    return (
-                      <div
-                        id={`job-card-${job.id}`}
-                        key={job.id}
-                        className={`grid grid-cols-5 p-4 border-b hover:bg-muted/50 ${shouldPulse ? "animate-pulse-border border-blue-500" : ""}`}
-                        ref={isNewJob ? newJobRef : null}
-                        onAnimationEnd={() => {
-                          // When animation ends, remove this job from the pulsed jobs set
-                          if (shouldPulse) {
-                            setPulsedJobs((prev) => {
-                              const newSet = new Set(prev)
-                              newSet.delete(job.id)
-                              return newSet
-                            })
-                          }
-                        }}
-                      >
-                        <div className="font-medium">{job.title}</div>
-                        <div>{job.company}</div>
-                        <div>
-                          {/* Direct button instead of a component to eliminate any potential issues */}
-                          <button
-                            type="button"
-                            onClick={(e) => handleStatusClick(job.id, job.status, e)}
-                            className={`relative z-20 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity ${getStatusBadgeClass(job.status)}`}
-                            style={{ pointerEvents: "auto" }}
-                          >
-                            {displayStatus}
-                          </button>
-                        </div>
-                        <div>{formatDate(job.created_at)}</div>
-                        <div>{formatDate(job.updated_at)}</div>
-                      </div>
-                    )
-                  })
-                )}
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <Button
+                      onClick={() => setIsDialogOpen(true)}
+                      className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      {hasJobs ? "Add a Job to Track" : "Let's add the job you're interested in!"}
+                    </Button>
+                    <DialogContent className="sm:max-w-[600px]">
+                      <DialogHeader>
+                        <DialogTitle>Add a Job to Track</DialogTitle>
+                      </DialogHeader>
+                      <NewJobForm onSuccess={handleJobCreationSuccess} />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Showing {filteredJobs.length} of {jobs.length} applications
+                </span>
+                <Badge variant="outline" className="bg-white/50">
+                  {filteredJobs.length} results
+                </Badge>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+
+        {/* Content Tabs */}
+        <Tabs defaultValue="grid" className="w-full">
+          <div className="mb-6">
+            <TabsList className="bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg">
+              <TabsTrigger
+                value="grid"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+              >
+                Grid View
+              </TabsTrigger>
+              <TabsTrigger
+                value="list"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+              >
+                List View
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="grid" className="mt-6">
+            <JobFolderList
+              jobs={filteredJobs}
+              loading={loading}
+              error={error}
+              newJobId={newJobId}
+              onStatusChange={(jobId, newStatus) => {
+                setJobs((prevJobs) =>
+                  prevJobs.map((job) =>
+                    job.id === jobId ? { ...job, status: newStatus, updated_at: new Date().toISOString() } : job,
+                  ),
+                )
+              }}
+            />
+          </TabsContent>
+
+          <TabsContent value="list" className="mt-6">
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
+                <CardTitle className="text-xl text-gray-800">Job Applications</CardTitle>
+                <CardDescription className="text-gray-600">
+                  A detailed list view of all your job applications.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-hidden">
+                  <div className="grid grid-cols-5 p-4 font-medium border-b bg-gray-50/50 text-gray-700">
+                    <div>Job Title</div>
+                    <div>Company</div>
+                    <div>Status</div>
+                    <div>Created</div>
+                    <div>Last Activity</div>
+                  </div>
+
+                  {loading ? (
+                    Array(5)
+                      .fill(0)
+                      .map((_, index) => (
+                        <div key={index} className="grid grid-cols-5 p-4 border-b">
+                          <div>
+                            <Skeleton className="h-5 w-32" />
+                          </div>
+                          <div>
+                            <Skeleton className="h-5 w-24" />
+                          </div>
+                          <div>
+                            <Skeleton className="h-5 w-20" />
+                          </div>
+                          <div>
+                            <Skeleton className="h-5 w-20" />
+                          </div>
+                          <div>
+                            <Skeleton className="h-5 w-20" />
+                          </div>
+                        </div>
+                      ))
+                  ) : filteredJobs.length === 0 ? (
+                    <div className="p-12 text-center text-muted-foreground">
+                      <Briefcase className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <h3 className="text-lg font-medium mb-2">No job applications found</h3>
+                      <p className="text-sm">Try adjusting your filters or create a new application.</p>
+                    </div>
+                  ) : (
+                    filteredJobs.map((job) => {
+                      const isNewJob = job.id === newJobId
+                      const shouldPulse = isNewJob && pulsedJobs.has(job.id)
+
+                      const statusLower = job.status.toLowerCase()
+                      let displayStatus = job.status
+                      if (statusLower === "interviewing" || statusLower === "interview") {
+                        displayStatus = "Interview"
+                      } else if (statusLower === "offer") {
+                        displayStatus = "Offer Received"
+                      } else {
+                        displayStatus = statusLower.charAt(0).toUpperCase() + statusLower.slice(1)
+                      }
+
+                      return (
+                        <div
+                          id={`job-card-${job.id}`}
+                          key={job.id}
+                          className={`grid grid-cols-5 p-4 border-b hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-indigo-50/50 transition-all duration-200 ${shouldPulse ? "animate-pulse-border border-purple-500" : ""}`}
+                          ref={isNewJob ? newJobRef : null}
+                          onAnimationEnd={() => {
+                            if (shouldPulse) {
+                              setPulsedJobs((prev) => {
+                                const newSet = new Set(prev)
+                                newSet.delete(job.id)
+                                return newSet
+                              })
+                            }
+                          }}
+                        >
+                          <div className="font-medium text-gray-900">{job.title}</div>
+                          <div className="text-gray-700">{job.company}</div>
+                          <div>
+                            <button
+                              type="button"
+                              onClick={(e) => handleStatusClick(job.id, job.status, e)}
+                              className={`relative z-20 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:opacity-80 transition-all duration-200 ${getStatusBadgeClass(job.status)}`}
+                              style={{ pointerEvents: "auto" }}
+                            >
+                              {displayStatus}
+                            </button>
+                          </div>
+                          <div className="text-gray-600">{formatDate(job.created_at)}</div>
+                          <div className="text-gray-600">{formatDate(job.updated_at)}</div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }

@@ -154,6 +154,24 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
             </CardContent>
           </Card>
 
+          {/* Live AI Interview Button - Temporarily hidden */}
+          {/* 
+<Card className="bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+  <CardContent className="flex flex-col md:flex-row items-center justify-between p-6">
+    <div className="mb-4 md:mb-0">
+      <h3 className="text-xl font-bold text-emerald-800">🎙️ Live AI Interview (Beta)</h3>
+      <p className="text-emerald-700">
+        Experience a real-time conversation with an AI interviewer. This is the most realistic interview
+        practice available.
+      </p>
+    </div>
+    <div className="flex-shrink-0">
+      <LiveInterview job={job} resume={resumeId} questions={initialQuestions} />
+    </div>
+  </CardContent>
+</Card>
+*/}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
               <Suspense fallback={<InterviewQuestionsLoading />}>

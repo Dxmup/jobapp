@@ -16,9 +16,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, FileText, Plus, RefreshCw, AlertCircle, Bug } from "lucide-react"
+import { Loader2, FileText, Plus, RefreshCw, AlertCircle, Bug, Sparkles, TrendingUp, Clock, Target } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import { Badge } from "@/components/ui/badge"
 
 /**
  * Resume interface representing the structure of a resume object
@@ -51,6 +52,14 @@ export default function ResumesPage() {
   const [debugInfo, setDebugInfo] = useState<any>(null)
   const [usersWithResumes, setUsersWithResumes] = useState<any[]>([])
 
+  // Stats state
+  const [stats, setStats] = useState({
+    total: 0,
+    recent: 0,
+    aiGenerated: 0,
+    jobSpecific: 0,
+  })
+
   // Toast notifications
   const { toast } = useToast()
 
@@ -64,14 +73,6 @@ export default function ResumesPage() {
 
   /**
    * Fetches resumes using multiple fallback methods to ensure reliability.
-   *
-   * This function tries several API endpoints in sequence:
-   * 1. Direct API (most reliable, bypasses RLS)
-   * 2. Original API endpoint
-   * 3. List API endpoint
-   * 4. Direct SQL query (last resort, debug mode only)
-   *
-   * If all methods fail, it sets an error state with detailed information.
    */
   const fetchResumes = async () => {
     setLoading(true)
@@ -91,6 +92,7 @@ export default function ResumesPage() {
           console.log(`Direct API success: Found ${data.resumes.length} resumes`)
           fetchedResumes = data.resumes
           success = true
+          setError(null)
         } else {
           errorMessages.push("Direct API returned no resumes")
         }
@@ -110,6 +112,7 @@ export default function ResumesPage() {
             console.log(`Original API success: Found ${data.resumes.length} resumes`)
             fetchedResumes = data.resumes
             success = true
+            setError(null)
           } else {
             errorMessages.push("Original API returned no resumes")
           }
@@ -130,6 +133,7 @@ export default function ResumesPage() {
             console.log(`List API success: Found ${data.resumes.length} resumes`)
             fetchedResumes = data.resumes
             success = true
+            setError(null)
           } else {
             errorMessages.push("List API returned no resumes")
           }
@@ -139,40 +143,21 @@ export default function ResumesPage() {
         }
       }
 
-      // Method 4: If all APIs failed and we're in debug mode, try a direct SQL query as last resort
-      if (!success && showDebug) {
-        console.log("Trying direct SQL query...")
-        // Get user ID from cookie
-        const userId = document.cookie
-          .split("; ")
-          .find((row) => row.startsWith("user_id="))
-          ?.split("=")[1]
+      // Calculate stats
+      if (success && fetchedResumes.length > 0) {
+        const total = fetchedResumes.length
+        const recent = fetchedResumes.filter((resume) => {
+          const createdDate = new Date(resume.created_at)
+          const weekAgo = new Date()
+          weekAgo.setDate(weekAgo.getDate() - 7)
+          return createdDate > weekAgo
+        }).length
+        const aiGenerated = fetchedResumes.filter(
+          (resume) => resume.name?.toLowerCase().includes("ai") || resume.name?.toLowerCase().includes("optimized"),
+        ).length
+        const jobSpecific = fetchedResumes.filter((resume) => resume.job_title || resume.company).length
 
-        if (userId) {
-          const queryResponse = await fetch("/api/debug/direct-query", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              query: `SELECT * FROM resumes WHERE user_id = '${userId}' ORDER BY created_at DESC`,
-            }),
-          })
-
-          if (queryResponse.ok) {
-            const data = await queryResponse.json()
-            if (data.data && data.data.length > 0) {
-              console.log(`SQL query success: Found ${data.data.length} resumes`)
-              fetchedResumes = data.data
-              success = true
-            } else {
-              errorMessages.push("SQL query returned no resumes")
-            }
-          } else {
-            const errorData = await queryResponse.json()
-            errorMessages.push(`SQL query error: ${errorData.error || queryResponse.statusText}`)
-          }
-        } else {
-          errorMessages.push("No user ID found in cookies for SQL query")
-        }
+        setStats({ total, recent, aiGenerated, jobSpecific })
       }
 
       // If we're in debug mode, fetch additional debug info
@@ -192,8 +177,12 @@ export default function ResumesPage() {
       // Set the resumes or error state
       if (success) {
         setResumes(fetchedResumes)
-      } else {
+        setError(null)
+      } else if (fetchedResumes.length === 0) {
         setError(`Failed to fetch resumes. Tried multiple methods: ${errorMessages.join("; ")}`)
+      } else {
+        setResumes(fetchedResumes)
+        setError(null)
       }
     } catch (error) {
       console.error("Error fetching resumes:", error)
@@ -212,10 +201,6 @@ export default function ResumesPage() {
 
   /**
    * Transfers ownership of a resume to the current user.
-   *
-   * This function is used in debug mode to fix resume ownership issues.
-   *
-   * @param resumeId - The ID of the resume to transfer
    */
   const handleTransferResume = async (resumeId: string) => {
     try {
@@ -250,247 +235,422 @@ export default function ResumesPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header with title and actions */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">My Resumes</h1>
-        <div className="flex gap-2">
-          <Button asChild>
-            <Link href="/dashboard/build-resume">
-              <Plus className="mr-2 h-4 w-4" />
-              New Resume
-            </Link>
-          </Button>
-          <Button variant="outline" onClick={fetchResumes} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Refresh
-          </Button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative px-6 py-16">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">My Resumes</h1>
+                </div>
+                <p className="text-lg text-white/90 max-w-2xl">
+                  Create, customize, and manage your professional resumes. AI-powered optimization for every job
+                  application.
+                </p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-white/80" />
+                    <span className="text-sm text-white/80">Total</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-white/80" />
+                    <span className="text-sm text-white/80">Recent</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.recent}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-white/80" />
+                    <span className="text-sm text-white/80">AI-Generated</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.aiGenerated}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-white/80" />
+                    <span className="text-sm text-white/80">Job-Specific</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.jobSpecific}</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Error alert */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        {/* Action Bar */}
+        <div className="mb-8">
+          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <Button
+                    asChild
+                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg"
+                  >
+                    <Link href="/dashboard/build-resume">
+                      <Plus className="mr-2 h-4 w-4" />
+                      New Resume
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={fetchResumes}
+                    disabled={loading}
+                    className="bg-white/50 border-white/20"
+                  >
+                    {loading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
 
-      {/* Loading state */}
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2 text-lg">Loading resumes...</span>
+                <div className="text-sm text-muted-foreground">
+                  <Badge variant="outline" className="bg-white/50">
+                    {resumes.length} resumes
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      ) : resumes.length === 0 ? (
-        // Empty state
-        <div className="text-center py-12">
-          <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h2 className="mt-4 text-xl font-semibold">No resumes found</h2>
-          <p className="mt-2 text-muted-foreground">
-            You haven&apos;t created any resumes yet. Get started by creating your first resume.
-          </p>
-          <Button className="mt-4" asChild>
-            <Link href="/dashboard/build-resume">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Resume
-            </Link>
-          </Button>
-        </div>
-      ) : (
-        // Resume list with tabs
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList>
-            <TabsTrigger value="all">All Resumes</TabsTrigger>
-            <TabsTrigger value="recent">Recently Updated</TabsTrigger>
-          </TabsList>
 
-          {/* All resumes tab */}
-          <TabsContent value="all" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {resumes.map((resume) => (
-                <Card key={resume.id} className="overflow-hidden">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="truncate">{resume.name}</CardTitle>
-                    <CardDescription>
-                      {new Date(resume.updated_at).toLocaleDateString()}
-                      {resume.job_title && ` • ${resume.job_title}`}
-                      {resume.company && ` at ${resume.company}`}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="h-32 overflow-hidden text-sm opacity-70">
-                    <div className="line-clamp-6">{resume.content}</div>
-                  </CardContent>
-                  <CardFooter className="flex justify-between pt-3">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/dashboard/resumes/${resume.id}`}>View</Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/dashboard/resumes/customize?resumeId=${resume.id}`}>Customize</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
+        {/* Error alert */}
+        {error && (
+          <div className="mb-8">
+            <Alert variant="destructive" className="bg-red-50/80 backdrop-blur-sm border-red-200">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error Loading Resumes</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    toast({
+                      title: "Retrying...",
+                      description: "Attempting to fetch resumes again",
+                    })
+                    fetchResumes()
+                  }}
+                  className="bg-white/50"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </Alert>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-purple-600 mx-auto mb-4" />
+              <span className="text-lg text-gray-600">Loading resumes...</span>
             </div>
-          </TabsContent>
+          </div>
+        ) : resumes.length === 0 ? (
+          // Empty state
+          <div className="text-center py-16">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 shadow-lg border border-white/20 max-w-md mx-auto">
+              <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-full p-4 w-16 h-16 mx-auto mb-6">
+                <FileText className="h-8 w-8 text-purple-600" />
+              </div>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">No resumes found</h2>
+              <p className="text-gray-600 mb-6">
+                You haven&apos;t created any resumes yet. Get started by creating your first resume.
+              </p>
+              <Button
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg"
+                asChild
+              >
+                <Link href="/dashboard/build-resume">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Resume
+                </Link>
+              </Button>
+            </div>
+          </div>
+        ) : (
+          // Resume list with tabs
+          <Tabs defaultValue="all" className="w-full">
+            <div className="mb-6">
+              <TabsList className="bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg">
+                <TabsTrigger
+                  value="all"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+                >
+                  All Resumes
+                </TabsTrigger>
+                <TabsTrigger
+                  value="recent"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+                >
+                  Recently Updated
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          {/* Recently updated tab */}
-          <TabsContent value="recent" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...resumes]
-                .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-                .slice(0, 6)
-                .map((resume) => (
-                  <Card key={resume.id} className="overflow-hidden">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="truncate">{resume.name}</CardTitle>
-                      <CardDescription>
-                        {new Date(resume.updated_at).toLocaleDateString()}
-                        {resume.job_title && ` • ${resume.job_title}`}
-                        {resume.company && ` at ${resume.company}`}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-32 overflow-hidden text-sm opacity-70">
+            {/* All resumes tab */}
+            <TabsContent value="all" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {resumes.map((resume) => (
+                  <Card
+                    key={resume.id}
+                    className="overflow-hidden border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group"
+                  >
+                    <div className="relative">
+                      <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
+                      <CardHeader className="pb-3 pt-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="truncate text-lg group-hover:text-purple-600 transition-colors">
+                              {resume.name}
+                            </CardTitle>
+                            <CardDescription className="mt-1">
+                              {new Date(resume.updated_at).toLocaleDateString()}
+                              {resume.job_title && ` • ${resume.job_title}`}
+                              {resume.company && ` at ${resume.company}`}
+                            </CardDescription>
+                          </div>
+                          <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-full p-2">
+                            <FileText className="h-4 w-4 text-purple-600" />
+                          </div>
+                        </div>
+                      </CardHeader>
+                    </div>
+                    <CardContent className="h-32 overflow-hidden text-sm opacity-70 px-6">
                       <div className="line-clamp-6">{resume.content}</div>
                     </CardContent>
-                    <CardFooter className="flex justify-between pt-3">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard/resumes/${resume.id}`}>View</Link>
+                    <CardFooter className="flex justify-between pt-3 px-6 pb-6 bg-gradient-to-r from-gray-50/50 to-purple-50/50">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="bg-white/50 border-white/20 hover:bg-white/80"
+                      >
+                        <Link href={`/dashboard/resumes/view/${resume.id}`}>View</Link>
                       </Button>
-                      <Button variant="outline" size="sm" asChild>
+                      <Button
+                        size="sm"
+                        asChild
+                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                      >
                         <Link href={`/dashboard/resumes/customize?resumeId=${resume.id}`}>Customize</Link>
                       </Button>
                     </CardFooter>
                   </Card>
                 ))}
+              </div>
+            </TabsContent>
+
+            {/* Recently updated tab */}
+            <TabsContent value="recent" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...resumes]
+                  .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+                  .slice(0, 6)
+                  .map((resume) => (
+                    <Card
+                      key={resume.id}
+                      className="overflow-hidden border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group"
+                    >
+                      <div className="relative">
+                        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
+                        <CardHeader className="pb-3 pt-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <CardTitle className="truncate text-lg group-hover:text-purple-600 transition-colors">
+                                {resume.name}
+                              </CardTitle>
+                              <CardDescription className="mt-1">
+                                {new Date(resume.updated_at).toLocaleDateString()}
+                                {resume.job_title && ` • ${resume.job_title}`}
+                                {resume.company && ` at ${resume.company}`}
+                              </CardDescription>
+                            </div>
+                            <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-full p-2">
+                              <FileText className="h-4 w-4 text-purple-600" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                      </div>
+                      <CardContent className="h-32 overflow-hidden text-sm opacity-70 px-6">
+                        <div className="line-clamp-6">{resume.content}</div>
+                      </CardContent>
+                      <CardFooter className="flex justify-between pt-3 px-6 pb-6 bg-gradient-to-r from-gray-50/50 to-purple-50/50">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          className="bg-white/50 border-white/20 hover:bg-white/80"
+                        >
+                          <Link href={`/dashboard/resumes/view/${resume.id}`}>View</Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          asChild
+                          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                        >
+                          <Link href={`/dashboard/resumes/customize?resumeId=${resume.id}`}>Customize</Link>
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
+
+        {/* Debug UI - Only shown in development mode */}
+        {showDebug && (
+          <div className="mt-12 border-t pt-6">
+            <div className="flex items-center mb-4">
+              <Bug className="mr-2 h-5 w-5 text-amber-500" />
+              <h2 className="text-xl font-bold">Debug Tools</h2>
             </div>
-          </TabsContent>
-        </Tabs>
-      )}
 
-      {/* Debug UI - Only shown in development mode */}
-      {showDebug && (
-        <div className="mt-12 border-t pt-6">
-          <div className="flex items-center mb-4">
-            <Bug className="mr-2 h-5 w-5 text-amber-500" />
-            <h2 className="text-xl font-bold">Debug Tools</h2>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Debug info card */}
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle>Resume Debug Info</CardTitle>
+                  <CardDescription>Diagnostic information about your resumes</CardDescription>
+                </CardHeader>
+                <CardContent className="max-h-96 overflow-auto">
+                  <pre className="text-xs whitespace-pre-wrap bg-gray-50/50 p-4 rounded-md">
+                    {JSON.stringify(debugInfo, null, 2)}
+                  </pre>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" onClick={fetchResumes} className="w-full bg-white/50">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh Debug Info
+                  </Button>
+                </CardFooter>
+              </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Debug info card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Resume Debug Info</CardTitle>
-                <CardDescription>Diagnostic information about your resumes</CardDescription>
-              </CardHeader>
-              <CardContent className="max-h-96 overflow-auto">
-                <pre className="text-xs whitespace-pre-wrap bg-muted p-4 rounded-md">
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" onClick={fetchResumes} className="w-full">
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh Debug Info
-                </Button>
-              </CardFooter>
-            </Card>
+              {/* Users with resumes card */}
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle>Users with Resumes</CardTitle>
+                  <CardDescription>Transfer resumes from other users to your account</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {usersWithResumes.length > 0 ? (
+                      usersWithResumes.map((user: any) => (
+                        <div
+                          key={user.user_id}
+                          className="flex justify-between items-center p-3 bg-gray-50/50 rounded-md"
+                        >
+                          <div>
+                            <p className="font-medium">{user.user_id}</p>
+                            <p className="text-sm text-muted-foreground">{user.resume_count} resumes</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              toast({
+                                title: "Fetching resumes",
+                                description: `Fetching resumes for user ${user.user_id}...`,
+                              })
+                              fetch(`/api/debug/user-resumes?userId=${user.user_id}`)
+                                .then((res) => res.json())
+                                .then((data) => {
+                                  setDebugInfo(data)
+                                  toast({
+                                    title: "Resumes fetched",
+                                    description: `Found ${data.resumeCount} resumes for user ${user.user_id}`,
+                                  })
+                                })
+                            }}
+                            className="bg-white/50"
+                          >
+                            View Resumes
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">No other users with resumes found</p>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      fetch("/api/debug/all-resumes")
+                        .then((res) => res.json())
+                        .then((data) => {
+                          setUsersWithResumes(data.usersWithResumes || [])
+                          toast({
+                            title: "Users refreshed",
+                            description: `Found ${data.usersWithResumes?.length || 0} users with resumes`,
+                          })
+                        })
+                    }}
+                    className="w-full bg-white/50"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh Users
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
 
-            {/* Users with resumes card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Users with Resumes</CardTitle>
-                <CardDescription>Transfer resumes from other users to your account</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {usersWithResumes.length > 0 ? (
-                    usersWithResumes.map((user: any) => (
-                      <div key={user.user_id} className="flex justify-between items-center p-3 bg-muted rounded-md">
+            {/* Resume transfer card */}
+            {debugInfo && debugInfo.resumes && debugInfo.resumes.length > 0 && (
+              <Card className="mt-6 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle>Resume Transfer</CardTitle>
+                  <CardDescription>Transfer resumes to your account</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4 max-h-96 overflow-auto">
+                    {debugInfo.resumes.map((resume: any) => (
+                      <div key={resume.id} className="flex justify-between items-center p-3 bg-gray-50/50 rounded-md">
                         <div>
-                          <p className="font-medium">{user.user_id}</p>
-                          <p className="text-sm text-muted-foreground">{user.resume_count} resumes</p>
+                          <p className="font-medium">{resume.name}</p>
+                          <p className="text-sm text-muted-foreground">ID: {resume.id}</p>
+                          <p className="text-sm text-muted-foreground">User: {resume.user_id}</p>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            toast({
-                              title: "Fetching resumes",
-                              description: `Fetching resumes for user ${user.user_id}...`,
-                            })
-                            // Fetch resumes for this user
-                            fetch(`/api/debug/user-resumes?userId=${user.user_id}`)
-                              .then((res) => res.json())
-                              .then((data) => {
-                                setDebugInfo(data)
-                                toast({
-                                  title: "Resumes fetched",
-                                  description: `Found ${data.resumeCount} resumes for user ${user.user_id}`,
-                                })
-                              })
-                          }}
+                          onClick={() => handleTransferResume(resume.id)}
+                          className="bg-white/50"
                         >
-                          View Resumes
+                          Transfer to Me
                         </Button>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-muted-foreground">No other users with resumes found</p>
-                  )}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    fetch("/api/debug/all-resumes")
-                      .then((res) => res.json())
-                      .then((data) => {
-                        setUsersWithResumes(data.usersWithResumes || [])
-                        toast({
-                          title: "Users refreshed",
-                          description: `Found ${data.usersWithResumes?.length || 0} users with resumes`,
-                        })
-                      })
-                  }}
-                  className="w-full"
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh Users
-                </Button>
-              </CardFooter>
-            </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
-
-          {/* Resume transfer card - Only shown when debug info includes resumes */}
-          {debugInfo && debugInfo.resumes && debugInfo.resumes.length > 0 && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Resume Transfer</CardTitle>
-                <CardDescription>Transfer resumes to your account</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-h-96 overflow-auto">
-                  {debugInfo.resumes.map((resume: any) => (
-                    <div key={resume.id} className="flex justify-between items-center p-3 bg-muted rounded-md">
-                      <div>
-                        <p className="font-medium">{resume.name}</p>
-                        <p className="text-sm text-muted-foreground">ID: {resume.id}</p>
-                        <p className="text-sm text-muted-foreground">User: {resume.user_id}</p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => handleTransferResume(resume.id)}>
-                        Transfer to Me
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
