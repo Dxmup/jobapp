@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Phone, PhoneCall, Mic, Volume2, Clock, Zap, AlertCircle, CheckCircle, Loader2, PhoneOff } from "lucide-react"
 import { LiveInterviewClient, type LiveInterviewConfig } from "@/lib/live-interview-client"
+import { SimpleMockInterview } from "@/components/interview-prep/simple-mock-interview"
 
 interface LiveInterviewProps {
   job: any
@@ -36,13 +37,10 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
   const [remainingTime, setRemainingTime] = useState(15 * 60 * 1000) // 15 minutes
   const [isAudioActive, setIsAudioActive] = useState(false)
   const [selectedVoice, setSelectedVoice] = useState<LiveInterviewConfig["voice"]>("Kore")
+  const [useFallback, setUseFallback] = useState(false)
 
   const clientRef = useRef<LiveInterviewClient | null>(null)
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Check if we have enough questions and required data
-  const hasEnoughQuestions = questions.technical.length > 0 || questions.behavioral.length > 0
-  const canStartInterview = hasEnoughQuestions && job && interviewState === "ready"
 
   // Randomly assign voice on component mount
   useEffect(() => {
@@ -50,6 +48,14 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     const randomVoice = voices[Math.floor(Math.random() * voices.length)]
     setSelectedVoice(randomVoice)
   }, [])
+
+  if (useFallback) {
+    return <SimpleMockInterview job={job} resume={resume} questions={questions} />
+  }
+
+  // Check if we have enough questions and required data
+  const hasEnoughQuestions = questions.technical.length > 0 || questions.behavioral.length > 0
+  const canStartInterview = hasEnoughQuestions && job && interviewState === "ready"
 
   // Start the live interview
   const startLiveInterview = async () => {
@@ -82,6 +88,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
             console.error("❌ Live interview error:", error)
             setError(error)
             setInterviewState("error")
+            setUseFallback(true)
           },
           onTimeWarning: (remainingMinutes) => {
             console.log(`⏰ Time warning: ${remainingMinutes} minutes remaining`)
@@ -124,6 +131,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       console.error("❌ Failed to start live interview:", error)
       setError(`Failed to start interview: ${error.message}`)
       setInterviewState("error")
+      setUseFallback(true)
     }
   }
 
@@ -158,6 +166,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     setDuration(0)
     setRemainingTime(15 * 60 * 1000)
     setIsAudioActive(false)
+    setUseFallback(false)
     clientRef.current = null
 
     if (durationTimerRef.current) {
@@ -384,6 +393,10 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 Start New Interview
               </Button>
             )}
+
+            <Button onClick={() => setUseFallback(true)} variant="outline" size="lg">
+              Use Text Interview
+            </Button>
           </div>
         </CardContent>
       </Card>
