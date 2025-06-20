@@ -37,6 +37,7 @@ export default function CustomizeResumePage({ params }: { params: { id: string }
   useEffect(() => {
     async function fetchJobDetails() {
       try {
+        console.log("Fetching job details for job ID:", jobId)
         const response = await fetch(`/api/jobs/${jobId}`)
 
         if (!response.ok) {
@@ -48,6 +49,7 @@ export default function CustomizeResumePage({ params }: { params: { id: string }
         if (data.job) {
           setJob(data.job)
           setJobDescription(data.job.description || "")
+          console.log("Job details loaded:", data.job)
         }
       } catch (error) {
         console.error("Error fetching job details:", error)
@@ -60,16 +62,19 @@ export default function CustomizeResumePage({ params }: { params: { id: string }
   // Fetch resume content when a resume is selected
   async function fetchResumeContent(resumeId: string) {
     try {
+      console.log("Fetching resume content for resume ID:", resumeId)
       const response = await fetch(`/api/resumes/${resumeId}`)
 
       if (!response.ok) {
-        throw new Error("Failed to fetch resume content")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to fetch resume content")
       }
 
       const data = await response.json()
 
       if (data.success && data.resume) {
         setBaselineResume(data.resume.content)
+        console.log("Resume content loaded successfully")
       } else {
         throw new Error(data.error || "Failed to fetch resume content")
       }
@@ -85,6 +90,7 @@ export default function CustomizeResumePage({ params }: { params: { id: string }
 
   // Handle resume selection change
   const handleResumeChange = async (resumeId: string) => {
+    console.log("Resume selected:", resumeId)
     setBaseResumeId(resumeId)
     await fetchResumeContent(resumeId)
   }
@@ -248,12 +254,18 @@ export default function CustomizeResumePage({ params }: { params: { id: string }
         throw new Error(errorData.error || "Failed to save resume")
       }
 
-      toast({
-        title: "Resume saved!",
-        description: "Your customized resume has been saved successfully.",
-      })
+      const data = await response.json()
 
-      router.push(`/jobs/${jobId}`)
+      if (data.success) {
+        toast({
+          title: "Resume saved!",
+          description: "Your customized resume has been saved successfully.",
+        })
+
+        router.push(`/jobs/${jobId}`)
+      } else {
+        throw new Error(data.error || "Failed to save resume")
+      }
     } catch (error) {
       console.error("Error saving resume:", error)
       toast({
