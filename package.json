@@ -10,8 +10,9 @@
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
-    "@google/genai": "^0.21.0",
+    "@google/genai": "latest",
     "@hookform/resolvers": "latest",
+    "@modelcontextprotocol/sdk": "latest",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "^1.0.3",
