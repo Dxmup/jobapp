@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { GeminiStreamService } from "@/lib/gemini-stream-service"
+import { GeminiStreamService } from "@/lib/native-gemini-stream-service"
 
 export async function POST(request: NextRequest) {
   try {
