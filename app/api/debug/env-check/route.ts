@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const googleApiKey = process.env.GOOGLE_AI_API_KEY
 
@@ -9,16 +9,15 @@ export async function GET() {
       hasGoogleApiKey: !!googleApiKey,
       keyLength: googleApiKey ? googleApiKey.length : 0,
       keyPrefix: googleApiKey ? googleApiKey.substring(0, 8) + "..." : "not found",
-      allEnvKeys: Object.keys(process.env).filter(
-        (key) => key.includes("GOOGLE") || key.includes("API") || key.includes("KEY"),
-      ),
+      timestamp: new Date().toISOString(),
     })
   } catch (error: any) {
+    console.error("Env check error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
-        stack: error.stack,
+        error: error?.message || "Unknown error occurred",
+        timestamp: new Date().toISOString(),
       },
       { status: 500 },
     )
