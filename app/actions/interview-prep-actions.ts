@@ -16,18 +16,6 @@ async function getCurrentUserId(): Promise<string> {
       error: sessionError,
     } = await supabase.auth.getSession()
 
-    // Log session information for debugging
-    console.log(
-      "Session info:",
-      session
-        ? {
-            sessionId: session.id,
-            userId: session.user?.id,
-            hasUser: !!session.user,
-          }
-        : "No session",
-    )
-
     if (sessionError) {
       console.error("Session error:", sessionError)
     }
@@ -40,12 +28,8 @@ async function getCurrentUserId(): Promise<string> {
     // Fallback to cookie
     const userId = cookieStore.get("user_id")?.value
 
-    // Log cookie information for debugging
-    console.log("Cookie user_id:", userId || "Not found")
-
     if (!userId) {
       console.log("No user ID found, redirecting to login")
-      // If no user ID is found, redirect to login
       redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
     }
 
@@ -770,6 +754,15 @@ export async function getUserJobs(): Promise<{
     const supabase = createServerSupabaseClient()
     const userId = await getCurrentUserId()
 
+    // Add rate limiting
+    const rateLimit = checkRateLimit(userId, "getUserJobs", 5, 60000) // 5 requests per minute
+    if (!rateLimit.success) {
+      return {
+        success: false,
+        error: `Rate limit exceeded. Try again in ${Math.ceil((rateLimit.resetTime - Date.now()) / 1000)} seconds.`,
+      }
+    }
+
     console.log(`Getting all jobs for user: ${userId}`)
 
     // Try with user_id field first
@@ -856,4 +849,42 @@ export async function getUserResumes(): Promise<{
       error: `Failed to fetch resumes: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
+}
+
+// Define the rate limit check function
+interface RateLimitResult {
+  success: boolean
+  resetTime?: number
+}
+
+const rateLimits: { [key: string]: { count: number; lastReset: number } } = {}
+
+function checkRateLimit(
+  userId: string,
+  actionName: string,
+  maxRequests: number,
+  resetInterval: number,
+): RateLimitResult {
+  const key = `${userId}:${actionName}`
+  const now = Date.now()
+
+  if (!rateLimits[key]) {
+    rateLimits[key] = { count: 1, lastReset: now }
+    return { success: true }
+  }
+
+  const { count, lastReset } = rateLimits[key]
+
+  if (now - lastReset > resetInterval) {
+    rateLimits[key] = { count: 1, lastReset: now }
+    return { success: true }
+  }
+
+  if (count >= maxRequests) {
+    const resetTime = lastReset + resetInterval
+    return { success: false, resetTime: resetTime }
+  }
+
+  rateLimits[key].count++
+  return { success: true }
 }

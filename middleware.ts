@@ -43,6 +43,11 @@ export async function middleware(request: NextRequest) {
   const isAdminCookie = request.cookies.get("is_admin")?.value === "true"
   const path = request.nextUrl.pathname
 
+  // Skip middleware for API routes to prevent loops
+  if (path.startsWith("/api/")) {
+    return NextResponse.next()
+  }
+
   console.log(`Middleware processing path: ${path}`)
   console.log(`Authentication status: ${isAuthenticated ? "authenticated" : "not authenticated"}`)
   console.log(`Admin cookie: ${isAdminCookie ? "admin" : "not admin"}`)
@@ -144,12 +149,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
     "/dashboard/:path*",
     "/jobs/:path*",
     "/onboarding/:path*",
-    "/onboarding",
     "/admin/:path*",
-    "/admin",
-    "/admin/login",
   ],
 }

@@ -4,8 +4,8 @@ const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
 export function checkRateLimit(
   identifier: string,
   action: string,
-  maxRequests = 3,
-  windowMs: number = 10 * 60 * 1000, // 10 minutes
+  maxRequests = 10, // Increased from 3 to 10
+  windowMs: number = 5 * 60 * 1000, // Reduced from 10 to 5 minutes
 ): { success: boolean; remaining: number; resetTime: number } {
   const key = `${identifier}:${action}`
   const now = Date.now()
@@ -24,6 +24,7 @@ export function checkRateLimit(
   // Check if limit exceeded
   if (entry.count >= maxRequests) {
     rateLimitMap.set(key, entry)
+    console.log(`Rate limit exceeded for ${key}: ${entry.count}/${maxRequests}`)
     return {
       success: false,
       remaining: 0,
@@ -40,4 +41,11 @@ export function checkRateLimit(
     remaining: maxRequests - entry.count,
     resetTime: entry.resetTime,
   }
+}
+
+// Add a function to clear rate limits for debugging
+export function clearRateLimit(identifier: string, action: string) {
+  const key = `${identifier}:${action}`
+  rateLimitMap.delete(key)
+  console.log(`Cleared rate limit for ${key}`)
 }
