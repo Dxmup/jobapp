@@ -2,7 +2,8 @@ import { Suspense } from "react"
 import { notFound } from "next/navigation"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { getInterviewQuestions } from "@/app/actions/interview-prep-actions"
-import { MockInterview } from "@/components/interview-prep/mock-interview"
+import { SimpleMockInterview } from "@/components/interview-prep/simple-mock-interview"
+import { Loader2 } from "lucide-react"
 import { cookies } from "next/headers"
 
 interface MockInterviewPageProps {
@@ -73,9 +74,22 @@ export default async function MockInterviewPage({ params, searchParams }: MockIn
   const questions = questionsResult.success ? questionsResult.questions : { technical: [], behavioral: [] }
 
   return (
-    <div className="container py-6">
-      <Suspense fallback={<div>Loading mock interview...</div>}>
-        <MockInterview job={job} resume={resume} questions={questions} />
+    <div className="container mx-auto py-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Mock Phone Interview</h1>
+        <p className="text-muted-foreground">
+          Practice your interview skills with AI-generated voice questions for {job.title} at {job.company}
+        </p>
+      </div>
+
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading interview...
+          </div>
+        }
+      >
+        <SimpleMockInterview job={job} resume={resume} questions={questions} />
       </Suspense>
     </div>
   )
