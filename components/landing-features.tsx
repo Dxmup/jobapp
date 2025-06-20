@@ -13,7 +13,6 @@ export function LandingFeatures() {
         "Upload your resume and our AI will optimize it for each job application, highlighting relevant skills and experience.",
       gradient: "from-blue-500 to-cyan-500",
       bgGradient: "from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20",
-      video: "/videos/resume-revision.webm",
     },
     {
       icon: <FileEdit className="h-12 w-12" />,
@@ -22,7 +21,6 @@ export function LandingFeatures() {
         "Generate tailored cover letters in seconds. Adjust tone, length, and formality to match the company culture.",
       gradient: "from-green-500 to-emerald-500",
       bgGradient: "from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20",
-      video: "/videos/cover-letter-demo.webm",
     },
     {
       icon: <BarChart className="h-12 w-12" />,
@@ -30,7 +28,6 @@ export function LandingFeatures() {
       description: "Be ready for any question your interviewer might ask with unlimited job specific questions.",
       gradient: "from-purple-500 to-pink-500",
       bgGradient: "from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20",
-      video: "/videos/interview-questions.webm",
     },
     {
       icon: <FolderKanban className="h-12 w-12" />,
@@ -107,7 +104,7 @@ export function LandingFeatures() {
               <Card
                 className={`h-full bg-gradient-to-br ${feature.bgGradient} border-0 shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden relative`}
               >
-                <CardContent className="p-8 relative z-10">
+                <CardContent className="p-6 h-full flex flex-col relative z-10">
                   {/* Icon with gradient */}
                   <div
                     className={`mb-6 p-4 rounded-2xl bg-gradient-to-r ${feature.gradient} text-white w-fit group-hover:scale-110 transition-transform duration-300 shadow-lg`}
@@ -120,15 +117,6 @@ export function LandingFeatures() {
                   </h3>
 
                   <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-lg">{feature.description}</p>
-
-                  {/* Video preview for supported features */}
-                  {feature.video && (
-                    <div className="mt-6 rounded-lg overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <video className="w-full h-32 object-cover rounded-lg" autoPlay muted loop playsInline>
-                        <source src={feature.video} type="video/webm" />
-                      </video>
-                    </div>
-                  )}
                 </CardContent>
 
                 {/* Hover effect overlay */}
