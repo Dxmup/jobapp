@@ -146,16 +146,18 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
             // Brief pause before next question
             setInterviewState("connecting")
           },
+          onAudioGenerationStarted: () => {
+            console.log("🔊 Audio generation started...")
+            setInterviewState("generating_audio")
+          },
         },
       )
 
       clientRef.current = client
       setInterviewClient(client)
 
-      // Check if we're generating audio
-      if (client.isGeneratingAudio()) {
-        setInterviewState("generating_audio")
-      }
+      // Set generating audio state immediately
+      setInterviewState("generating_audio")
 
       // Start the interview
       await client.startInterview()
