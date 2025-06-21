@@ -1,9 +1,8 @@
-import { Suspense } from "react"
-import { notFound } from "next/navigation"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getInterviewQuestions } from "@/app/actions/interview-prep-actions"
-import { cookies } from "next/headers"
-import { PreloadedMockInterview } from "@/components/interview-prep/preloaded-mock-interview"
+import { auth } from "@clerk/nextjs"
+import { redirect } from "next/navigation"
+import type React from "react"
+import { db } from "@/lib/db"
+import { PreloadedMockInterview } from "./_components/preloaded-mock-interview"
 
 interface MockInterviewPageProps {
   params: {
@@ -16,104 +15,52 @@ interface MockInterviewPageProps {
   }
 }
 
-export default async function MockInterviewPage({ params, searchParams }: MockInterviewPageProps) {
-  const { jobId } = params
-  const { resumeId, preload, interviewType } = searchParams
-  const shouldPreload = preload === "true"
+const MockInterviewPage: React.FC<MockInterviewPageProps> = async ({ params: { jobId }, searchParams }) => {
+  const { userId } = auth()
 
-  // Verify job exists and belongs to the user
-  const supabase = createServerSupabaseClient()
-  const { data: session } = await supabase.auth.getSession()
-
-  // Get the user ID from session or cookie
-  const userId = session?.user?.id
-  const cookieStore = cookies()
-  const cookieUserId = cookieStore.get("user_id")?.value
-
-  // Use session user ID first, then fall back to cookie
-  const currentUserId = userId || cookieUserId
-
-  console.log(`Looking for job ${jobId} for user ${currentUserId}`)
-
-  // Try to get the job with both user_id and userId fields
-  let job = null
-
-  if (currentUserId) {
-    // Try with user_id field first
-    const { data: jobData, error: error1 } = await supabase
-      .from("jobs")
-      .select("*")
-      .eq("id", jobId)
-      .eq("user_id", currentUserId)
-      .single()
-
-    if (!error1 && jobData) {
-      job = jobData
-      console.log(`Found job with user_id: ${jobData.title}`)
-    } else {
-      console.log(`No job found with user_id, trying userId field`)
-      // Try with userId field
-      const { data: altJobData, error: error2 } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("id", jobId)
-        .eq("userId", currentUserId)
-        .single()
-
-      if (!error2 && altJobData) {
-        job = altJobData
-        console.log(`Found job with userId: ${altJobData.title}`)
-      }
-    }
+  if (!userId) {
+    return redirect("/")
   }
+
+  const { resumeId, preload, interviewType = "first-interview" } = searchParams
+
+  if (!jobId) {
+    return redirect("/dashboard")
+  }
+
+  const job = await db.job.findUnique({
+    where: {
+      id: jobId,
+      userId,
+    },
+  })
 
   if (!job) {
-    console.log(`Job not found, redirecting to not found page`)
-    return notFound()
+    return redirect("/dashboard")
   }
 
-  // Get resume data if resumeId is provided
-  let resume = null
-  if (resumeId && currentUserId) {
-    const { data: resumeData } = await supabase
-      .from("resumes")
-      .select("*")
-      .eq("id", resumeId)
-      .eq("user_id", currentUserId)
-      .single()
-
-    if (resumeData) {
-      resume = resumeData
-      console.log(`Found resume: ${resumeData.name}`)
-    }
+  if (!resumeId) {
+    return redirect(`/dashboard/interview-prep/${jobId}`)
   }
 
-  // Preload interview questions if requested
-  let preloadedQuestions = null
-  if (shouldPreload) {
-    console.log("🚀 Preloading interview questions...")
-    const questionsResult = await getInterviewQuestions(jobId, resumeId)
-    if (questionsResult.success && questionsResult.questions) {
-      preloadedQuestions = questionsResult.questions
-      console.log(
-        `✅ Preloaded ${preloadedQuestions.technical.length} technical + ${preloadedQuestions.behavioral.length} behavioral questions`,
-      )
-    } else {
-      console.warn("⚠️ Failed to preload questions:", questionsResult.error)
-    }
+  const resume = await db.resume.findUnique({
+    where: {
+      id: resumeId,
+      userId,
+    },
+  })
+
+  if (!resume) {
+    return redirect(`/dashboard/interview-prep/${jobId}`)
   }
+
+  const shouldPreload = preload === "true"
 
   return (
-    <div className="container py-6">
-      <Suspense fallback={<div>Loading mock interview...</div>}>
-        <PreloadedMockInterview
-          job={job}
-          resume={resume}
-          preloadedQuestions={preloadedQuestions}
-          shouldPreload={shouldPreload}
-          interviewType={interviewType || "first-interview"}
-        />
-      </Suspense>
+    <div className="p-4">
+      <PreloadedMockInterview job={job} resume={resume} shouldPreload={shouldPreload} interviewType={interviewType} />
     </div>
   )
 }
+
+export default MockInterviewPage

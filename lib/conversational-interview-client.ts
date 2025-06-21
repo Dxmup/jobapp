@@ -7,7 +7,7 @@ export interface ConversationalInterviewConfig {
   silenceThreshold: number // Audio level threshold for silence detection
   silenceDuration: number // Duration of silence before considering user finished (ms)
   queueSize: number // Number of questions to keep in queue
-  interviewType: "phone-screener" | "first-interview" // Add this line
+  interviewType?: "phone-screener" | "in-depth"
 }
 
 export interface ConversationalInterviewCallbacks {
@@ -550,7 +550,7 @@ Ask: "How do you typically handle workplace disagreements?"
 
 Remember: Save detailed behavioral questions and technical deep-dives for later interview rounds. Focus on screening basics: qualifications, genuine interest, communication skills, and availability.
 `
-    return `ROLE: You are ${this.interviewerName}, a professional phone interviewer conducting a screening interview for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
+    return `ROLE: You are ${this.interviewerName}, a professional phone interviewer conducting a screening interview for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "our company"}.
 
 INSTRUCTION: Ask this interview question naturally and professionally. Speak as if you're genuinely interested in hearing the candidate's response.
 ${this.config.interviewType === "phone-screener" ? phoneScreenerInstructions : ""}

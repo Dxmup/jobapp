@@ -138,6 +138,28 @@ export default function InterviewPrepPage() {
               </div>
             </div>
 
+            {/* New: Interview Type Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="interview-type" className="text-purple-800 font-medium">
+                Interview Type
+              </Label>
+              <RadioGroup
+                id="interview-type"
+                value={interviewType}
+                onValueChange={(value: "phone-screener" | "first-interview") => setInterviewType(value)}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="phone-screener" id="phone-screener" />
+                  <Label htmlFor="phone-screener">Phone Screener (15 min)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="first-interview" id="first-interview" />
+                  <Label htmlFor="first-interview">First Interview (30 min)</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="space-y-3">
               {selectedJob && (
                 <div className="bg-white/50 p-3 rounded-lg border border-purple-200">
@@ -147,28 +169,6 @@ export default function InterviewPrepPage() {
                   </p>
                 </div>
               )}
-
-              {/* New: Interview Type Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="interview-type" className="text-purple-800 font-medium">
-                  Interview Type
-                </Label>
-                <RadioGroup
-                  id="interview-type"
-                  value={interviewType}
-                  onValueChange={(value: "phone-screener" | "first-interview") => setInterviewType(value)}
-                  className="flex space-x-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="phone-screener" id="phone-screener" />
-                    <Label htmlFor="phone-screener">Phone Screener (15 min)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="first-interview" id="first-interview" />
-                    <Label htmlFor="first-interview">First Interview (30 min)</Label>
-                  </div>
-                </RadioGroup>
-              </div>
 
               <Button
                 onClick={handleMockInterviewClick}

@@ -32,12 +32,6 @@ interface LiveInterviewProps {
     technical: string[]
     behavioral: string[]
   }
-  interviewConfig: ConversationalInterviewConfig // Added from PreloadedMockInterview
-  interviewType: "phone-screener" | "first-interview" // Added from PreloadedMockInterview
-  isLoadingQuestions: boolean // Added for preloading status
-  loadingQuestionsProgress: number // Added for preloading status
-  questionsLoadingError: string | null // Added for preloading status
-  onRetryLoadQuestions: () => void // Added for retrying preloading
 }
 
 type InterviewState =
@@ -54,27 +48,17 @@ type InterviewState =
   | "completed"
   | "error"
 
-export function LiveInterview({
-  job,
-  resume,
-  questions,
-  interviewConfig,
-  interviewType,
-  isLoadingQuestions,
-  loadingQuestionsProgress,
-  questionsLoadingError,
-  onRetryLoadQuestions,
-}: LiveInterviewProps) {
+export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
   const [interviewState, setInterviewState] = useState<InterviewState>("ready")
   const [interviewClient, setInterviewClient] = useState<ConversationalInterviewClient | null>(null)
-  const [error, setError] = useState<string | null>(questionsLoadingError) // Initialize with preloading error
+  const [error, setError] = useState<string | null>(null)
   const [duration, setDuration] = useState(0)
-  const [remainingTime, setRemainingTime] = useState(interviewConfig.maxDuration) // Use config
+  const [remainingTime, setRemainingTime] = useState(15 * 60 * 1000) // 15 minutes
   const [currentQuestion, setCurrentQuestion] = useState<string>("")
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [totalQuestions, setTotalQuestions] = useState(0)
   const [queueStatus, setQueueStatus] = useState({ queued: 0, ready: 0, generating: 0 })
-  const [selectedVoice, setSelectedVoice] = useState<ConversationalInterviewConfig["voice"]>(interviewConfig.voice) // Use config
+  const [selectedVoice, setSelectedVoice] = useState<ConversationalInterviewConfig["voice"]>("Kore")
   const [memoryStatus, setMemoryStatus] = useState({ queueSize: 0, audioDataSize: 0, estimatedMemoryMB: 0 })
 
   const clientRef = useRef<ConversationalInterviewClient | null>(null)
@@ -82,12 +66,14 @@ export function LiveInterview({
 
   // Check if we have enough questions and required data
   const hasEnoughQuestions = questions.technical.length > 0 || questions.behavioral.length > 0
-  const canStartInterview = hasEnoughQuestions && job && interviewState === "ready" && !isLoadingQuestions
+  const canStartInterview = hasEnoughQuestions && job && interviewState === "ready"
 
-  // Update error state if preloading error changes
+  // Randomly assign voice on component mount
   useEffect(() => {
-    setError(questionsLoadingError)
-  }, [questionsLoadingError])
+    const voices: ConversationalInterviewConfig["voice"][] = ["Puck", "Charon", "Kore", "Fenrir", "Aoede"]
+    const randomVoice = voices[Math.floor(Math.random() * voices.length)]
+    setSelectedVoice(randomVoice)
+  }, [])
 
   // Start the conversational interview
   const startConversationalInterview = async () => {
@@ -108,14 +94,21 @@ export function LiveInterview({
         experience: resume?.experience,
       }
 
-      // Create interview client using the passed config
+      // Create interview client
       const client = await ConversationalInterviewClient.create(
         job.id,
         resume?.id,
         questions,
         jobContext,
         resumeContext,
-        interviewConfig, // Use the passed interviewConfig
+        {
+          voice: selectedVoice,
+          maxDuration: 15 * 60 * 1000, // 15 minutes
+          timeWarningAt: 12 * 60 * 1000, // 12 minutes
+          silenceThreshold: 30, // Audio level threshold for silence detection
+          silenceDuration: 750, // 0.75 seconds of silence
+          queueSize: 3, // Keep 3 questions in queue
+        },
         {
           onConnected: () => {
             console.log("✅ Connected to conversational interview")
@@ -239,7 +232,7 @@ export function LiveInterview({
     setInterviewState("ready")
     setError(null)
     setDuration(0)
-    setRemainingTime(interviewConfig.maxDuration) // Reset to configured max duration
+    setRemainingTime(15 * 60 * 1000)
     setCurrentQuestion("")
     setCurrentQuestionIndex(0)
     setTotalQuestions(0)
@@ -307,12 +300,6 @@ export function LiveInterview({
   }
 
   const getStateDisplay = () => {
-    if (isLoadingQuestions) {
-      return `Loading questions (${loadingQuestionsProgress}%)...`
-    }
-    if (questionsLoadingError) {
-      return "Error loading questions."
-    }
     switch (interviewState) {
       case "ready":
         return "Ready to start conversational interview"
@@ -344,12 +331,6 @@ export function LiveInterview({
   }
 
   const getStateIcon = () => {
-    if (isLoadingQuestions) {
-      return <Loader2 className="h-4 w-4 animate-spin" />
-    }
-    if (questionsLoadingError) {
-      return <AlertCircle className="h-4 w-4 text-red-500" />
-    }
     switch (interviewState) {
       case "ready":
         return <Phone className="h-4 w-4" />
@@ -383,9 +364,9 @@ export function LiveInterview({
   )
   const isConnecting = ["connecting", "connected", "initializing"].includes(interviewState)
   const isCompleted = interviewState === "completed"
-  const hasError = interviewState === "error" || questionsLoadingError !== null
+  const hasError = interviewState === "error"
 
-  const progress = duration > 0 ? (duration / interviewConfig.maxDuration) * 100 : 0
+  const progress = duration > 0 ? (duration / (15 * 60 * 1000)) * 100 : 0
   const questionProgress = totalQuestions > 0 ? (currentQuestionIndex / totalQuestions) * 100 : 0
 
   return (
@@ -394,14 +375,14 @@ export function LiveInterview({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Professional {interviewType === "phone-screener" ? "Phone Screener" : "First Interview"}</span>
+            <span>Professional Phone Interview</span>
             <div className="flex gap-2">
               <Badge variant="outline" className="flex items-center gap-1">
                 <Zap className="h-3 w-3" />
                 {interviewClient?.getInterviewerName() || "Alex"} ({selectedVoice} Voice)
               </Badge>
-              <Badge variant="outline">Queue: {interviewConfig.queueSize} questions</Badge>
-              <Badge variant="outline">{interviewConfig.maxDuration / (60 * 1000)} min max</Badge>
+              <Badge variant="outline">Queue: 3 questions</Badge>
+              <Badge variant="outline">15 min max</Badge>
               {isInterviewActive && (
                 <Badge variant="default" className="flex items-center gap-1">
                   <PhoneCall className="h-3 w-3" />
@@ -414,7 +395,7 @@ export function LiveInterview({
         <CardContent>
           <div className="space-y-4">
             {/* Warning if not enough questions */}
-            {!hasEnoughQuestions && !isLoadingQuestions && !questionsLoadingError && (
+            {!hasEnoughQuestions && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Not enough questions</AlertTitle>
@@ -426,9 +407,7 @@ export function LiveInterview({
 
             {/* Interview Context */}
             <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-medium text-blue-900">
-                Professional {interviewType === "phone-screener" ? "Phone Screener" : "First Interview"}
-              </h3>
+              <h3 className="font-medium text-blue-900">Professional Phone Interview</h3>
               <div className="mt-2 text-sm text-blue-800">
                 <p>
                   <strong>Interviewer:</strong> {interviewClient?.getInterviewerName() || "Alex"} from {job.company}
@@ -444,10 +423,7 @@ export function LiveInterview({
                   {questions.behavioral.length} behavioral
                 </p>
                 <p>
-                  <strong>Format:</strong>{" "}
-                  {interviewType === "phone-screener"
-                    ? "Brief phone screening with introduction and closing"
-                    : "In-depth interview with introduction and closing"}
+                  <strong>Format:</strong> Professional phone screening with introduction and closing
                 </p>
               </div>
             </div>
@@ -485,14 +461,14 @@ export function LiveInterview({
                   </div>
                   <div className="text-xs text-green-500 mt-1">
                     Memory: {memoryStatus.audioDataSize} audio clips • ~{memoryStatus.estimatedMemoryMB}MB used • Queue:{" "}
-                    {queueStatus.queued}/{interviewConfig.queueSize}
+                    {queueStatus.queued}/3
                   </div>
                 </div>
               </div>
             )}
 
             {/* Progress Bars */}
-            {(isInterviewActive || isCompleted || isLoadingQuestions) && (
+            {(isInterviewActive || isCompleted) && (
               <div className="space-y-3">
                 <div>
                   <div className="flex justify-between text-sm text-muted-foreground mb-2">
@@ -561,13 +537,6 @@ export function LiveInterview({
               </Button>
             )}
 
-            {isLoadingQuestions && (
-              <Button disabled size="lg">
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Loading Questions...
-              </Button>
-            )}
-
             {isConnecting && (
               <Button disabled size="lg">
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -586,13 +555,6 @@ export function LiveInterview({
               <Button onClick={restartInterview} size="lg">
                 <Phone className="h-4 w-4 mr-2" />
                 Start New Interview
-              </Button>
-            )}
-
-            {questionsLoadingError && (
-              <Button onClick={onRetryLoadQuestions} size="lg" variant="outline">
-                <Loader2 className="h-4 w-4 mr-2" />
-                Retry Loading Questions
               </Button>
             )}
           </div>
@@ -624,8 +586,7 @@ export function LiveInterview({
           <CardContent>
             <div className="space-y-4">
               <p className="text-green-700">
-                Excellent work! You've completed a professional{" "}
-                {interviewType === "phone-screener" ? "phone screener" : "first interview"} with{" "}
+                Excellent work! You've completed a professional phone interview with{" "}
                 {interviewClient?.getInterviewerName() || "Alex"} from {job.company} for the {job.title} position.
               </p>
               <div className="flex gap-4 text-sm text-green-600">
@@ -640,14 +601,13 @@ export function LiveInterview({
                   {selectedVoice})
                 </div>
                 <div>
-                  <span className="font-medium">Format:</span>{" "}
-                  {interviewType === "phone-screener" ? "Phone Screener" : "First Interview"}
+                  <span className="font-medium">Format:</span> Professional Phone Screening
                 </div>
               </div>
               <div className="bg-green-100 p-3 rounded-lg">
                 <p className="text-sm text-green-800">
-                  <strong>What's Next:</strong> This was a realistic interview simulation with proper introduction and
-                  closing. In real interviews, remember to speak clearly, ask clarifying questions, and maintain
+                  <strong>What's Next:</strong> This was a realistic phone interview simulation with proper introduction
+                  and closing. In real interviews, remember to speak clearly, ask clarifying questions, and maintain
                   professional enthusiasm throughout.
                 </p>
               </div>
@@ -657,12 +617,10 @@ export function LiveInterview({
       )}
 
       {/* Instructions */}
-      {interviewState === "ready" && hasEnoughQuestions && !isLoadingQuestions && !questionsLoadingError && (
+      {interviewState === "ready" && hasEnoughQuestions && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-800">
-              How Professional {interviewType === "phone-screener" ? "Phone Screener" : "First Interview"} Works
-            </CardTitle>
+            <CardTitle className="text-blue-800">How Professional Phone Interview Works</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 text-sm text-blue-700">
