@@ -4,8 +4,17 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
+// Add a flag to prevent recursive calls
+let isGettingUserId = false
+
 // Helper function to get the current user ID - with improved debugging
 async function getCurrentUserId(): Promise<string> {
+  if (isGettingUserId) {
+    throw new Error("Recursive getCurrentUserId call detected")
+  }
+
+  isGettingUserId = true
+
   try {
     const supabase = createServerSupabaseClient()
     const cookieStore = cookies()
@@ -50,18 +59,18 @@ async function getCurrentUserId(): Promise<string> {
     }
 
     return userId
-  } catch (error) {
-    console.error("Error getting current user ID:", error)
-    // Try to get from cookie as last resort
-    const cookieStore = cookies()
-    const userId = cookieStore.get("user_id")?.value
-
-    if (!userId) {
-      redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
-    }
-
-    return userId
+  } finally {
+    isGettingUserId = false
   }
+}
+
+// Add timeout wrapper for API calls
+async function withTimeout<T>(promise: Promise<T>, timeoutMs = 10000): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error("Request timeout")), timeoutMs)
+  })
+
+  return Promise.race([promise, timeoutPromise])
 }
 
 // Function to get job details including associated resume and cover letter
@@ -426,30 +435,34 @@ export async function generateInterviewQuestions(
     const apiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent"
     console.log(`🌐 Making API call to: ${apiUrl}`)
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": process.env.GOOGLE_AI_API_KEY || "",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: isRefresh ? 0.8 : 0.7, // Higher temperature for refreshed questions to get more variety
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192,
+    // Wrap the Gemini API call with timeout
+    const response = await withTimeout(
+      fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": process.env.GOOGLE_AI_API_KEY || "",
         },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: isRefresh ? 0.8 : 0.7, // Higher temperature for refreshed questions to get more variety
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+          },
+        }),
       }),
-    })
+      15000, // 15 second timeout
+    )
 
     console.log(`📡 Gemini API response status: ${response.status} ${response.statusText}`)
 

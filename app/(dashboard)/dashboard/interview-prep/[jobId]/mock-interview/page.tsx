@@ -53,7 +53,8 @@ export default async function MockInterviewPage({ params, searchParams }: MockIn
     }
   }
 
-  if (!job) {
+  if (!job || !currentUserId) {
+    console.error("Missing required data - job or user ID")
     return notFound()
   }
 
@@ -69,8 +70,15 @@ export default async function MockInterviewPage({ params, searchParams }: MockIn
     resume = resumeData
   }
 
-  // Get interview questions
-  const questionsResult = await getInterviewQuestions(jobId, resumeId)
+  // Get interview questions with error handling
+  let questionsResult
+  try {
+    questionsResult = await getInterviewQuestions(jobId, resumeId)
+  } catch (error) {
+    console.error("Error getting interview questions:", error)
+    questionsResult = { success: true, questions: { technical: [], behavioral: [] } }
+  }
+
   const questions = questionsResult.success ? questionsResult.questions : { technical: [], behavioral: [] }
 
   return (
