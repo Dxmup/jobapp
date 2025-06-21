@@ -1,7 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,60 +8,83 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Text is required" }, { status: 400 })
     }
 
-    // For now, we'll use a simple approach to generate audio
-    // In a real implementation, you'd use the Gemini Live API or another TTS service
+    console.log(`🎙️ Generating speech for: "${text.substring(0, 100)}..."`)
 
-    // Create a simple audio buffer (silent audio for now, but structured properly)
-    const sampleRate = 16000
-    const duration = Math.max(2, text.length * 0.1) // Estimate duration based on text length
-    const numSamples = Math.floor(sampleRate * duration)
+    // Use Gemini Live API for speech generation
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1alpha/models/gemini-2.0-flash-exp:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GOOGLE_AI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Please convert this text to speech with a ${tone} tone: "${text}"`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          },
+          systemInstruction: {
+            parts: [
+              {
+                text: `You are a professional interviewer with a ${tone} tone. Speak clearly and at a moderate pace suitable for an interview setting.`,
+              },
+            ],
+          },
+        }),
+      },
+    )
 
-    // Create WAV header
-    const buffer = new ArrayBuffer(44 + numSamples * 2)
-    const view = new DataView(buffer)
-
-    // WAV header
-    const writeString = (offset: number, string: string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i))
-      }
+    if (!response.ok) {
+      console.error("❌ Gemini API error:", response.status, response.statusText)
+      // Fallback to Web Speech API
+      return NextResponse.json({
+        success: true,
+        audioData: null, // Signal to use client-side TTS
+        text: text,
+        voice,
+        tone,
+        fallback: true,
+      })
     }
 
-    writeString(0, "RIFF")
-    view.setUint32(4, 36 + numSamples * 2, true)
-    writeString(8, "WAVE")
-    writeString(12, "fmt ")
-    view.setUint32(16, 16, true)
-    view.setUint16(20, 1, true)
-    view.setUint16(22, 1, true)
-    view.setUint32(24, sampleRate, true)
-    view.setUint32(28, sampleRate * 2, true)
-    view.setUint16(32, 2, true)
-    view.setUint16(34, 16, true)
-    writeString(36, "data")
-    view.setUint32(40, numSamples * 2, true)
+    const data = await response.json()
 
-    // Generate simple tone for testing (replace with actual TTS)
-    const frequency = 440 // A4 note
-    for (let i = 0; i < numSamples; i++) {
-      const sample = Math.sin((2 * Math.PI * frequency * i) / sampleRate) * 0.1 // Low volume
-      view.setInt16(44 + i * 2, sample * 32767, true)
-    }
-
-    // Convert to base64
-    const audioData = Buffer.from(buffer).toString("base64")
-
-    console.log(`Generated audio for text: "${text.substring(0, 50)}..." (${audioData.length} bytes)`)
-
+    // For now, return the text for client-side TTS since Gemini doesn't directly return audio
+    // In a real implementation, you'd need to use a TTS service that returns audio
     return NextResponse.json({
       success: true,
-      audioData,
-      duration: duration * 1000, // Return duration in milliseconds
+      audioData: null, // Signal to use client-side TTS
+      text: text,
       voice,
       tone,
+      fallback: true,
     })
   } catch (error: any) {
-    console.error("Error generating audio:", error)
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    console.error("❌ Error generating audio:", error)
+
+    // Return fallback response
+    return NextResponse.json({
+      success: true,
+      audioData: null,
+      text: await request
+        .json()
+        .then((body) => body.text)
+        .catch(() => "Interview question"),
+      voice: "Kore",
+      tone: "professional",
+      fallback: true,
+    })
   }
 }

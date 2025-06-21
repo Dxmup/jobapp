@@ -27,6 +27,7 @@ export class LiveInterviewClient {
   private currentQuestionIndex = 0
   private timeoutId: NodeJS.Timeout | null = null
   private stream: MediaStream | null = null
+  private speechSynthesis: SpeechSynthesis | null = null
 
   private constructor(
     jobId: string,
@@ -40,6 +41,7 @@ export class LiveInterviewClient {
     this.questions = questions
     this.config = config
     this.callbacks = callbacks
+    this.speechSynthesis = window.speechSynthesis
   }
 
   static async create(
@@ -62,6 +64,11 @@ export class LiveInterviewClient {
       // Request microphone access
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       this.mediaRecorder = new MediaRecorder(this.stream)
+
+      // Test speech synthesis availability
+      if (!this.speechSynthesis) {
+        throw new Error("Speech synthesis not supported in this browser")
+      }
 
       console.log("✅ LiveInterviewClient initialized successfully")
       this.callbacks.onConnected()
@@ -133,12 +140,10 @@ export class LiveInterviewClient {
         }),
       })
 
-      // Check if response is ok
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // Check content type
       const contentType = response.headers.get("content-type")
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text()
@@ -148,19 +153,26 @@ export class LiveInterviewClient {
 
       const data = await response.json()
 
-      if (data.success && data.audioData) {
-        console.log("🔊 Playing audio for question...")
-        // Play the audio
-        await this.playAudio(data.audioData)
-        this.callbacks.onAudioReceived(data.audioData)
+      if (data.success) {
+        if (data.audioData) {
+          // Use provided audio data
+          console.log("🔊 Playing generated audio...")
+          await this.playAudio(data.audioData)
+        } else {
+          // Use Web Speech API as fallback
+          console.log("🔊 Using Web Speech API for audio...")
+          await this.speakText(data.text || question)
+        }
 
-        // Wait for user response (simulate listening period)
+        this.callbacks.onAudioReceived(data.audioData || "speech-synthesis")
+
+        // Wait for user response
         setTimeout(() => {
           this.currentQuestionIndex++
           if (this.active) {
             this.askNextQuestion()
           }
-        }, 15000) // 15 seconds to answer
+        }, 20000) // 20 seconds to answer
       } else {
         throw new Error(data.error || "Failed to generate audio")
       }
@@ -170,14 +182,59 @@ export class LiveInterviewClient {
     }
   }
 
+  private async speakText(text: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.speechSynthesis) {
+        reject(new Error("Speech synthesis not available"))
+        return
+      }
+
+      // Cancel any ongoing speech
+      this.speechSynthesis.cancel()
+
+      const utterance = new SpeechSynthesisUtterance(text)
+
+      // Configure voice settings
+      const voices = this.speechSynthesis.getVoices()
+      const preferredVoice =
+        voices.find(
+          (voice) =>
+            voice.name.toLowerCase().includes("female") ||
+            voice.name.toLowerCase().includes("karen") ||
+            voice.name.toLowerCase().includes("samantha"),
+        ) ||
+        voices.find((voice) => voice.lang.startsWith("en")) ||
+        voices[0]
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice
+      }
+
+      utterance.rate = 0.9 // Slightly slower for clarity
+      utterance.pitch = 1.0
+      utterance.volume = 0.8
+
+      utterance.onend = () => {
+        console.log("✅ Speech synthesis completed")
+        resolve()
+      }
+
+      utterance.onerror = (event) => {
+        console.error("❌ Speech synthesis error:", event.error)
+        reject(new Error(`Speech synthesis failed: ${event.error}`))
+      }
+
+      console.log(`🗣️ Speaking: "${text.substring(0, 50)}..."`)
+      this.speechSynthesis.speak(utterance)
+    })
+  }
+
   private async playAudio(audioData: string): Promise<void> {
     try {
-      // Convert base64 to blob
       const audioBuffer = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
       const audioBlob = new Blob([audioBuffer], { type: "audio/wav" })
       const audioUrl = URL.createObjectURL(audioBlob)
 
-      // Create and play audio
       const audio = new Audio(audioUrl)
 
       return new Promise((resolve, reject) => {
@@ -208,6 +265,11 @@ export class LiveInterviewClient {
   endInterview(): void {
     console.log("🔚 Ending interview...")
     this.active = false
+
+    // Stop any ongoing speech
+    if (this.speechSynthesis) {
+      this.speechSynthesis.cancel()
+    }
 
     if (this.timeoutId) {
       clearTimeout(this.timeoutId)
