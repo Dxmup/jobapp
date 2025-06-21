@@ -2,10 +2,9 @@ import { Suspense } from "react"
 import { notFound } from "next/navigation"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { getInterviewQuestions } from "@/app/actions/interview-prep-actions"
-import { SimpleMockInterview } from "@/components/interview-prep/simple-mock-interview"
+import { LiveInterview } from "@/components/interview-prep/live-interview"
 import { Loader2 } from "lucide-react"
 import { cookies } from "next/headers"
-import { TTSTest } from "@/components/interview-prep/tts-test"
 
 interface MockInterviewPageProps {
   params: {
@@ -83,10 +82,6 @@ export default async function MockInterviewPage({ params, searchParams }: MockIn
         </p>
       </div>
 
-      <div className="mb-6">
-        <TTSTest />
-      </div>
-
       <Suspense
         fallback={
           <div className="flex items-center justify-center py-12">
@@ -94,7 +89,7 @@ export default async function MockInterviewPage({ params, searchParams }: MockIn
           </div>
         }
       >
-        <SimpleMockInterview job={job} resume={resume} questions={questions} />
+        <LiveInterview job={job} resume={resume} questions={questions} />
       </Suspense>
     </div>
   )

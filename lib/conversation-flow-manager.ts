@@ -215,33 +215,24 @@ export class ConversationFlowManager {
 
   private async preloadQuestions(): Promise<void> {
     try {
-      // Wait for voices to be loaded
-      if (speechSynthesis.getVoices().length === 0) {
-        await new Promise((resolve) => {
-          speechSynthesis.onvoiceschanged = resolve
-          // Fallback timeout
-          setTimeout(resolve, 1000)
-        })
-      }
-
-      // Generate audio for each question
+      // Simulate audio generation and preloading
       for (let i = 0; i < this.questions.length; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 300)) // Stagger processing
+        await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate processing time
 
-        const question = this.questions[i]
+        // Create a simple mock audio element
         const audio = new Audio()
         audio.preload = "auto"
 
-        // Generate TTS audio for the question
-        await this.createQuestionAudio(audio, question.text)
+        // Create a simple silent audio using Web Audio API instead of data URL
+        await this.createSilentAudio(audio, 3) // 3 seconds of silence
 
         // Set up audio event listeners
         audio.addEventListener("loadedmetadata", () => {
-          this.callbacks.onAudioProgress(0, audio.duration || 0)
+          this.callbacks.onAudioProgress(0, audio.duration)
         })
 
         audio.addEventListener("timeupdate", () => {
-          this.callbacks.onAudioProgress(audio.currentTime || 0, audio.duration || 0)
+          this.callbacks.onAudioProgress(audio.currentTime, audio.duration)
         })
 
         audio.addEventListener("ended", () => {
@@ -255,176 +246,76 @@ export class ConversationFlowManager {
     }
   }
 
-  private async createQuestionAudio(audioElement: HTMLAudioElement, questionText: string): Promise<void> {
+  private async createSilentAudio(audioElement: HTMLAudioElement, duration: number): Promise<void> {
     try {
-      // Check if speech synthesis is available
-      if (!("speechSynthesis" in window)) {
-        throw new Error("Speech synthesis not supported")
+      // Create a simple silent audio buffer
+      const sampleRate = 44100
+      const numChannels = 1
+      const length = sampleRate * duration
+
+      // Create audio context if needed
+      if (!this.audioContext) {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
       }
 
-      // Create speech synthesis utterance
-      const utterance = new SpeechSynthesisUtterance(questionText)
+      // Create buffer
+      const buffer = this.audioContext.createBuffer(numChannels, length, sampleRate)
 
-      // Configure voice settings based on personality
-      utterance.rate = 0.9 // Slightly slower for clarity
-      utterance.pitch = 1.0
-      utterance.volume = 0.8
-
-      // Try to select an appropriate voice
-      const voices = speechSynthesis.getVoices()
-      if (voices.length > 0) {
-        // Prefer English voices
-        const englishVoices = voices.filter((voice) => voice.lang.startsWith("en"))
-        if (englishVoices.length > 0) {
-          // Select voice based on personality
-          const voiceIndex = this.selectVoiceByPersonality(englishVoices)
-          utterance.voice = englishVoices[voiceIndex]
+      // Fill with silence (zeros)
+      for (let channel = 0; channel < numChannels; channel++) {
+        const channelData = buffer.getChannelData(channel)
+        for (let i = 0; i < length; i++) {
+          channelData[i] = 0
         }
       }
 
-      // Create audio using MediaRecorder to capture speech synthesis
-      await this.synthesizeToAudio(utterance, audioElement)
+      // Convert buffer to blob and set as audio source
+      const blob = await this.audioBufferToBlob(buffer)
+      audioElement.src = URL.createObjectURL(blob)
     } catch (error: any) {
-      console.warn("TTS failed, using fallback:", error.message)
-      // Fallback to text display with silent audio
-      await this.createFallbackAudio(audioElement, questionText, 4)
+      // Fallback: use a minimal data URL for silence
+      audioElement.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAAAQBcAAEAfAAABAAgAZGF0YQAAAAA="
     }
   }
 
-  private selectVoiceByPersonality(voices: SpeechSynthesisVoice[]): number {
-    // Select voice based on assigned personality
-    const { voice, tone } = this.personality
+  private async audioBufferToBlob(buffer: AudioBuffer): Promise<Blob> {
+    return new Promise((resolve) => {
+      const length = buffer.length
+      const arrayBuffer = new ArrayBuffer(44 + length * 2)
+      const view = new DataView(arrayBuffer)
 
-    if (voice === "Professional" || tone === "Formal") {
-      // Prefer more formal-sounding voices
-      const formalVoice = voices.find(
-        (v) =>
-          v.name.includes("Microsoft") ||
-          v.name.includes("Google") ||
-          v.name.includes("Alex") ||
-          v.name.includes("Daniel"),
-      )
-      if (formalVoice) return voices.indexOf(formalVoice)
-    }
-
-    if (voice === "Friendly" || tone === "Conversational") {
-      // Prefer warmer-sounding voices
-      const friendlyVoice = voices.find(
-        (v) =>
-          v.name.includes("Samantha") ||
-          v.name.includes("Karen") ||
-          v.name.includes("Zira") ||
-          v.name.includes("Susan"),
-      )
-      if (friendlyVoice) return voices.indexOf(friendlyVoice)
-    }
-
-    // Default to first available voice
-    return 0
-  }
-
-  private async synthesizeToAudio(utterance: SpeechSynthesisUtterance, audioElement: HTMLAudioElement): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        // Create a temporary audio context for recording
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-        const destination = audioContext.createMediaStreamDestination()
-
-        // Set up speech synthesis
-        utterance.onstart = () => {
-          console.log("🎙️ Speech synthesis started")
+      // WAV header
+      const writeString = (offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i))
         }
-
-        utterance.onend = () => {
-          console.log("✅ Speech synthesis completed")
-          resolve()
-        }
-
-        utterance.onerror = (event) => {
-          console.error("❌ Speech synthesis error:", event.error)
-          reject(new Error(`Speech synthesis failed: ${event.error}`))
-        }
-
-        // For now, we'll use a simpler approach - just speak and use timing
-        speechSynthesis.speak(utterance)
-
-        // Estimate duration and create a placeholder audio
-        const estimatedDuration = this.estimateSpeechDuration(utterance.text)
-        this.createTimedAudio(audioElement, estimatedDuration)
-      } catch (error) {
-        reject(error)
       }
+
+      writeString(0, "RIFF")
+      view.setUint32(4, 36 + length * 2, true)
+      writeString(8, "WAVE")
+      writeString(12, "fmt ")
+      view.setUint32(16, 16, true)
+      view.setUint16(20, 1, true)
+      view.setUint16(22, 1, true)
+      view.setUint32(24, buffer.sampleRate, true)
+      view.setUint32(28, buffer.sampleRate * 2, true)
+      view.setUint16(32, 2, true)
+      view.setUint16(34, 16, true)
+      writeString(36, "data")
+      view.setUint32(40, length * 2, true)
+
+      // Convert float samples to 16-bit PCM
+      const channelData = buffer.getChannelData(0)
+      let offset = 44
+      for (let i = 0; i < length; i++) {
+        const sample = Math.max(-1, Math.min(1, channelData[i]))
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
+        offset += 2
+      }
+
+      resolve(new Blob([arrayBuffer], { type: "audio/wav" }))
     })
-  }
-
-  private estimateSpeechDuration(text: string): number {
-    // Estimate speech duration based on text length and speech rate
-    const wordsPerMinute = 150 // Average speaking rate
-    const words = text.split(" ").length
-    const minutes = words / wordsPerMinute
-    const seconds = minutes * 60
-    return Math.max(3, Math.ceil(seconds)) // Minimum 3 seconds
-  }
-
-  private createTimedAudio(audioElement: HTMLAudioElement, duration: number): void {
-    // Create a simple timed audio element that tracks progress
-    let startTime: number
-    let currentTime = 0
-    let isPlaying = false
-
-    // Override play method
-    const originalPlay = audioElement.play.bind(audioElement)
-    audioElement.play = () => {
-      return new Promise((resolve) => {
-        isPlaying = true
-        startTime = Date.now()
-
-        const updateProgress = () => {
-          if (!isPlaying) return
-
-          currentTime = (Date.now() - startTime) / 1000
-
-          // Dispatch timeupdate event
-          const event = new Event("timeupdate")
-          audioElement.dispatchEvent(event)
-
-          if (currentTime >= duration) {
-            isPlaying = false
-            currentTime = duration
-
-            // Dispatch ended event
-            const endedEvent = new Event("ended")
-            audioElement.dispatchEvent(endedEvent)
-            resolve()
-          } else {
-            requestAnimationFrame(updateProgress)
-          }
-        }
-
-        updateProgress()
-      })
-    }
-
-    // Set duration property
-    Object.defineProperty(audioElement, "duration", {
-      get: () => duration,
-    })
-
-    // Set currentTime property
-    Object.defineProperty(audioElement, "currentTime", {
-      get: () => currentTime,
-    })
-  }
-
-  private async createFallbackAudio(audioElement: HTMLAudioElement, text: string, duration: number): Promise<void> {
-    // Create a fallback that shows the question text and plays silent audio
-    console.log("📝 Fallback mode - Question text:", text)
-
-    // Store the question text for display
-    audioElement.setAttribute("data-question-text", text)
-
-    // Create timed silent audio
-    this.createTimedAudio(audioElement, duration)
   }
 
   private async initializeAudio(): Promise<void> {
