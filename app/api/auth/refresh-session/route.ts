@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function POST() {
   try {
@@ -10,9 +9,8 @@ export async function POST() {
 
     console.log("Session refresh attempt:", { userId, isAuthenticated })
 
-    // If we have cookie-based auth, that's sufficient
     if (userId && isAuthenticated) {
-      console.log("Cookie-based authentication is valid, no refresh needed")
+      console.log("Cookie-based authentication is valid")
       return NextResponse.json({
         success: true,
         message: "Session is valid (cookie-based authentication)",
@@ -22,58 +20,7 @@ export async function POST() {
       })
     }
 
-    // Try to get Supabase session as fallback
-    const supabase = createServerSupabaseClient()
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession()
-
-    if (error) {
-      console.error("Supabase session error:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "No active session found",
-          error: error.message,
-          authenticated: false,
-        },
-        { status: 401 },
-      )
-    }
-
-    if (session?.user) {
-      console.log("Supabase session found, updating cookies")
-
-      // Update cookies with Supabase session data
-      const response = NextResponse.json({
-        success: true,
-        message: "Session refreshed from Supabase",
-        authenticated: true,
-        userId: session.user.id,
-        authMethod: "supabase",
-      })
-
-      // Set cookies
-      response.cookies.set("user_id", session.user.id, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-      })
-
-      response.cookies.set("authenticated", "true", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-      })
-
-      return response
-    }
-
-    // No valid session found
-    console.log("No valid session found in either cookies or Supabase")
+    console.log("No valid authentication found in cookies")
     return NextResponse.json(
       {
         success: false,

@@ -1,8 +1,7 @@
 "use server"
 
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
+import { getCurrentUserId } from "@/lib/auth-cookie"
 
 // Simple in-memory cache for request deduplication
 const requestCache = new Map<string, { data: any; timestamp: number }>()
@@ -19,24 +18,6 @@ function getCachedResult<T>(key: string): T | null {
 
 function setCachedResult<T>(key: string, data: T): void {
   requestCache.set(key, { data, timestamp: Date.now() })
-}
-
-// Helper function to get the current user ID - simplified for cookie-based auth
-async function getCurrentUserId(): Promise<string> {
-  try {
-    const cookieStore = cookies()
-    const userId = cookieStore.get("user_id")?.value
-
-    if (!userId) {
-      console.log("No user ID found in cookies, redirecting to login")
-      redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
-    }
-
-    return userId
-  } catch (error) {
-    console.error("Error getting current user ID:", error)
-    redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
-  }
 }
 
 // Function to get job details including associated resume and cover letter

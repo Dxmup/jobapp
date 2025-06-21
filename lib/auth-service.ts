@@ -1,6 +1,6 @@
-import { cookies } from "next/headers"
 import type { Role, Permission, User, AuditLog } from "@/types/auth"
 import { createServerSupabaseClient } from "./supabase/server"
+import { getCurrentUserIdOptional } from "@/lib/auth-cookie"
 
 // Mock permissions - keeping these for the role-based system
 const permissions: Record<string, Permission> = {
@@ -274,8 +274,7 @@ export async function logAuditEvent(
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const cookieStore = cookies()
-  const userId = cookieStore.get("user_id")?.value
+  const userId = await getCurrentUserIdOptional()
 
   if (!userId) {
     return null
