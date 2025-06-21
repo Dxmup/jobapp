@@ -20,12 +20,13 @@ export class LiveInterviewClient {
   private questions: any
   private config: LiveInterviewConfig
   private callbacks: LiveInterviewCallbacks
-  private isActive = false
+  private active = false
   private startTime = 0
   private audioContext: AudioContext | null = null
   private mediaRecorder: MediaRecorder | null = null
   private currentQuestionIndex = 0
   private timeoutId: NodeJS.Timeout | null = null
+  private stream: MediaStream | null = null
 
   private constructor(
     jobId: string,
@@ -59,24 +60,28 @@ export class LiveInterviewClient {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
 
       // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      this.mediaRecorder = new MediaRecorder(stream)
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      this.mediaRecorder = new MediaRecorder(this.stream)
 
+      console.log("✅ LiveInterviewClient initialized successfully")
       this.callbacks.onConnected()
     } catch (error: any) {
+      console.error("❌ Failed to initialize LiveInterviewClient:", error)
       this.callbacks.onError(`Failed to initialize: ${error.message}`)
     }
   }
 
   async startInterview(): Promise<void> {
     try {
-      this.isActive = true
+      this.active = true
       this.startTime = Date.now()
       this.currentQuestionIndex = 0
 
+      console.log("🎙️ Starting live interview...")
+
       // Set up time warning
       setTimeout(() => {
-        if (this.isActive) {
+        if (this.active) {
           const remainingMinutes = Math.ceil((this.config.maxDuration - this.config.timeWarningAt) / 60000)
           this.callbacks.onTimeWarning(remainingMinutes)
         }
@@ -84,7 +89,7 @@ export class LiveInterviewClient {
 
       // Set up time limit
       this.timeoutId = setTimeout(() => {
-        if (this.isActive) {
+        if (this.active) {
           this.callbacks.onTimeUp()
           this.endInterview()
         }
@@ -93,6 +98,7 @@ export class LiveInterviewClient {
       // Start with first question
       await this.askNextQuestion()
     } catch (error: any) {
+      console.error("❌ Failed to start interview:", error)
       this.callbacks.onError(`Failed to start interview: ${error.message}`)
     }
   }
@@ -102,18 +108,24 @@ export class LiveInterviewClient {
       const allQuestions = [...this.questions.technical, ...this.questions.behavioral]
 
       if (this.currentQuestionIndex >= allQuestions.length) {
+        console.log("🎉 All questions completed")
         this.callbacks.onInterviewComplete()
         this.endInterview()
         return
       }
 
       const question = allQuestions[this.currentQuestionIndex]
-      console.log(`Asking question ${this.currentQuestionIndex + 1}: ${question}`)
+      console.log(
+        `❓ Asking question ${this.currentQuestionIndex + 1}/${allQuestions.length}: ${question.substring(0, 100)}...`,
+      )
 
-      // Generate audio for the question using the existing API
+      // Generate audio for the question
       const response = await fetch("/api/interview/generate-real-audio", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify({
           text: question,
           voice: this.config.voice,
@@ -121,9 +133,23 @@ export class LiveInterviewClient {
         }),
       })
 
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      // Check content type
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("❌ Non-JSON response:", text.substring(0, 200))
+        throw new Error("Server returned non-JSON response")
+      }
+
       const data = await response.json()
 
       if (data.success && data.audioData) {
+        console.log("🔊 Playing audio for question...")
         // Play the audio
         await this.playAudio(data.audioData)
         this.callbacks.onAudioReceived(data.audioData)
@@ -131,7 +157,7 @@ export class LiveInterviewClient {
         // Wait for user response (simulate listening period)
         setTimeout(() => {
           this.currentQuestionIndex++
-          if (this.isActive) {
+          if (this.active) {
             this.askNextQuestion()
           }
         }, 15000) // 15 seconds to answer
@@ -139,6 +165,7 @@ export class LiveInterviewClient {
         throw new Error(data.error || "Failed to generate audio")
       }
     } catch (error: any) {
+      console.error("❌ Failed to ask question:", error)
       this.callbacks.onError(`Failed to ask question: ${error.message}`)
     }
   }
@@ -156,23 +183,31 @@ export class LiveInterviewClient {
       return new Promise((resolve, reject) => {
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl)
+          console.log("✅ Audio playback completed")
           resolve()
         }
 
         audio.onerror = (e) => {
           URL.revokeObjectURL(audioUrl)
+          console.error("❌ Audio playback failed:", e)
           reject(new Error("Audio playback failed"))
         }
 
-        audio.play().catch(reject)
+        audio.play().catch((playError) => {
+          URL.revokeObjectURL(audioUrl)
+          console.error("❌ Audio play() failed:", playError)
+          reject(playError)
+        })
       })
     } catch (error: any) {
+      console.error("❌ Failed to play audio:", error)
       throw new Error(`Failed to play audio: ${error.message}`)
     }
   }
 
   endInterview(): void {
-    this.isActive = false
+    console.log("🔚 Ending interview...")
+    this.active = false
 
     if (this.timeoutId) {
       clearTimeout(this.timeoutId)
@@ -183,6 +218,11 @@ export class LiveInterviewClient {
       this.mediaRecorder.stop()
     }
 
+    if (this.stream) {
+      this.stream.getTracks().forEach((track) => track.stop())
+      this.stream = null
+    }
+
     if (this.audioContext && this.audioContext.state !== "closed") {
       this.audioContext.close()
     }
@@ -191,15 +231,15 @@ export class LiveInterviewClient {
   }
 
   isActive(): boolean {
-    return this.isActive
+    return this.active
   }
 
   getInterviewDuration(): number {
-    return this.isActive ? Date.now() - this.startTime : 0
+    return this.active ? Date.now() - this.startTime : 0
   }
 
   getRemainingTime(): number {
-    if (!this.isActive) return 0
+    if (!this.active) return 0
     const elapsed = Date.now() - this.startTime
     return Math.max(0, this.config.maxDuration - elapsed)
   }
