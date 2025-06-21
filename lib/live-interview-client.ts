@@ -78,7 +78,7 @@ export class LiveInterviewClient {
       this.startTime = Date.now()
       this.currentQuestionIndex = 0
 
-      console.log("🎙️ Starting live interview...")
+      console.log("🎙️ Starting live interview with Gemini Live API...")
 
       // Set up time warning
       setTimeout(() => {
@@ -126,77 +126,48 @@ export class LiveInterviewClient {
         this.callbacks.onQuestionDisplayed(question, questionNumber, totalQuestions)
       }
 
-      try {
-        // Try Live API first
-        const response = await fetch("/api/interview/generate-real-audio", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            text: question,
-            voice: this.config.voice,
-            tone: "professional",
-          }),
-        })
+      // Generate audio using Gemini Live API
+      const response = await fetch("/api/interview/generate-real-audio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          text: question,
+          voice: this.config.voice,
+          tone: "professional",
+        }),
+      })
 
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.audioData) {
-            console.log("🔊 Playing Live API generated audio...")
-            await this.playLiveAPIAudio(data.audioData)
-            this.callbacks.onAudioReceived(data.audioData)
-          } else {
-            throw new Error(data.error || "No audio data received from Live API")
-          }
-        } else {
-          throw new Error(`Live API failed: ${response.status}`)
-        }
-      } catch (liveApiError: any) {
-        console.warn("⚠️ Live API failed, trying fallback:", liveApiError.message)
-
-        // Try fallback API
-        try {
-          const fallbackResponse = await fetch("/api/interview/generate-audio-fallback", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              text: question,
-              voice: this.config.voice,
-              tone: "professional",
-            }),
-          })
-
-          if (fallbackResponse.ok) {
-            const fallbackData = await fallbackResponse.json()
-            if (fallbackData.success) {
-              console.log("📝 Using text-only fallback - question will be displayed")
-              this.callbacks.onAudioReceived("text-fallback")
-            } else {
-              throw new Error(fallbackData.error || "Fallback API failed")
-            }
-          } else {
-            throw new Error(`Fallback API failed: ${fallbackResponse.status}`)
-          }
-        } catch (fallbackError: any) {
-          console.error("❌ Both Live API and fallback failed:", fallbackError.message)
-          // Continue with next question instead of failing completely
-          console.log("📝 Continuing with text-only display")
-          this.callbacks.onAudioReceived("error-fallback")
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // Wait for user response
-      setTimeout(() => {
-        this.currentQuestionIndex++
-        if (this.active) {
-          this.askNextQuestion()
-        }
-      }, 30000) // 30 seconds to answer
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("❌ Non-JSON response:", text.substring(0, 200))
+        throw new Error("Server returned non-JSON response")
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.audioData) {
+        console.log("🔊 Playing Gemini Live API generated audio...")
+        await this.playLiveAPIAudio(data.audioData)
+        this.callbacks.onAudioReceived(data.audioData)
+
+        // Wait for user response
+        setTimeout(() => {
+          this.currentQuestionIndex++
+          if (this.active) {
+            this.askNextQuestion()
+          }
+        }, 30000) // 30 seconds to answer
+      } else {
+        throw new Error(data.error || "Failed to generate audio with Live API")
+      }
     } catch (error: any) {
       console.error("❌ Failed to ask question:", error)
       this.callbacks.onError(`Failed to ask question: ${error.message}`)
@@ -222,9 +193,7 @@ export class LiveInterviewClient {
 
       // Convert 16-bit PCM to float32
       for (let i = 0; i < numSamples; i++) {
-        const byte1 = audioBuffer[i * 2]
-        const byte2 = audioBuffer[i * 2 + 1]
-        const sample = ((byte2 << 8) | byte1) / 32768.0 // Convert to signed 16-bit then normalize
+        const sample = (audioBuffer[i * 2] | (audioBuffer[i * 2 + 1] << 8)) / 32768.0
         channelData[i] = sample
       }
 
