@@ -114,8 +114,8 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
 
   // Build the mock interview URL with job ID and resume ID
   const mockInterviewUrl = resumeId
-    ? `/dashboard/interview-prep/${jobId}/mock-interview?resumeId=${resumeId}`
-    : `/dashboard/interview-prep/${jobId}/mock-interview`
+    ? `/dashboard/interview-prep/${jobId}/mock-interview?resumeId=${resumeId}&preload=true`
+    : `/dashboard/interview-prep/${jobId}/mock-interview?preload=true`
 
   return (
     <div className="container py-6 space-y-8">
@@ -143,6 +143,9 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
                 <p className="text-purple-700">
                   Simulate a real phone interview with our AI interviewer based on this job description
                   {resumeId ? " and your resume" : ""}.
+                </p>
+                <p className="text-sm text-purple-600 mt-1">
+                  ✨ Questions will be pre-loaded for faster interview start
                 </p>
               </div>
               <Link href={mockInterviewUrl}>

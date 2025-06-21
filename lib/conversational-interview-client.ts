@@ -32,6 +32,7 @@ interface QueuedQuestion {
   audioFormatInfo?: AudioFormatInfo
   index: number
   isGenerating?: boolean
+  abortController?: AbortController
 }
 
 // Add this constant for interviewer names
@@ -62,7 +63,8 @@ export class ConversationalInterviewClient {
   private voiceActivityMonitor: NodeJS.Timeout | null = null
   private generatingAudioCount = 0
   private totalAudioMemoryMB = 0
-  private interviewerName: string // Add this property
+  private interviewerName: string
+  private activeRequests: Set<AbortController> = new Set()
 
   private constructor(
     jobId: string,
@@ -274,13 +276,29 @@ export class ConversationalInterviewClient {
       questionToGenerate.isGenerating = true
       this.generatingAudioCount++
 
+      // Create abort controller for this request
+      const abortController = new AbortController()
+      questionToGenerate.abortController = abortController
+      this.activeRequests.add(abortController)
+
       console.log(
         `🎵 Generating audio for question ${questionToGenerate.index + 1}: "${questionToGenerate.text.substring(0, 50)}..."`,
       )
 
       this.callbacks.onAudioGenerationProgress(this.generatingAudioCount, this.config.queueSize)
 
-      const audioData = await this.generateQuestionAudio(questionToGenerate.text, questionToGenerate.index === 0)
+      const audioData = await this.generateQuestionAudio(
+        questionToGenerate.text,
+        questionToGenerate.index === 0,
+        abortController,
+      )
+
+      // Check if request was aborted
+      if (abortController.signal.aborted) {
+        console.log(`🚫 Audio generation aborted for question ${questionToGenerate.index + 1}`)
+        return
+      }
+
       questionToGenerate.audioData = audioData
       questionToGenerate.isGenerating = false
 
@@ -308,6 +326,9 @@ export class ConversationalInterviewClient {
         `✅ Audio generated for question ${questionToGenerate.index + 1} (${formatInfo.estimatedDuration}s, ${formatInfo.sizeInMB}MB)`,
       )
 
+      // Remove from active requests
+      this.activeRequests.delete(abortController)
+
       // Continue generating audio for other questions in the background
       setTimeout(() => {
         if (this.active) {
@@ -317,6 +338,11 @@ export class ConversationalInterviewClient {
     } catch (error: any) {
       console.error(`❌ Failed to generate audio for question ${questionToGenerate.index + 1}:`, error)
       questionToGenerate.isGenerating = false
+
+      // Remove from active requests
+      if (questionToGenerate.abortController) {
+        this.activeRequests.delete(questionToGenerate.abortController)
+      }
 
       // Continue with other questions even if one fails
       setTimeout(() => {
@@ -368,8 +394,18 @@ export class ConversationalInterviewClient {
             `🎵 Generating audio on-demand for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
           )
           try {
-            currentQuestion.audioData = await this.generateQuestionAudio(currentQuestion.text, isIntroduction)
+            const abortController = new AbortController()
+            currentQuestion.abortController = abortController
+            this.activeRequests.add(abortController)
+
+            currentQuestion.audioData = await this.generateQuestionAudio(
+              currentQuestion.text,
+              isIntroduction,
+              abortController,
+            )
             currentQuestion.isGenerating = false
+
+            this.activeRequests.delete(abortController)
           } catch (error) {
             console.error(
               `❌ Failed to generate audio for ${isIntroduction ? "introduction" : "question"} ${questionNumber}:`,
@@ -421,7 +457,11 @@ export class ConversationalInterviewClient {
     }
   }
 
-  private async generateQuestionAudio(questionText: string, isIntroduction = false): Promise<string> {
+  private async generateQuestionAudio(
+    questionText: string,
+    isIntroduction = false,
+    abortController?: AbortController,
+  ): Promise<string> {
     const prompt = isIntroduction
       ? this.createIntroductionPrompt(questionText)
       : this.createQuestionPrompt(questionText)
@@ -439,6 +479,7 @@ export class ConversationalInterviewClient {
         jobContext: this.jobContext,
         resumeContext: this.resumeContext,
       }),
+      signal: abortController?.signal,
     })
 
     if (!response.ok) {
@@ -511,7 +552,12 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
 
     try {
       console.log("🎬 Playing closing statement...")
-      const audioData = await this.generateQuestionAudio(closingPrompt, false)
+      const abortController = new AbortController()
+      this.activeRequests.add(abortController)
+
+      const audioData = await this.generateQuestionAudio(closingPrompt, false, abortController)
+
+      this.activeRequests.delete(abortController)
 
       this.isPlayingQuestion = true
       await this.playAudioData(audioData)
@@ -727,6 +773,17 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
     this.isListeningForResponse = false
     this.isPlayingQuestion = false
 
+    // Cancel all active API requests
+    console.log(`🚫 Cancelling ${this.activeRequests.size} active API requests...`)
+    this.activeRequests.forEach((controller) => {
+      try {
+        controller.abort()
+      } catch (error) {
+        console.warn("Error aborting request:", error)
+      }
+    })
+    this.activeRequests.clear()
+
     // Clear all timers
     if (this.timeoutId) {
       clearTimeout(this.timeoutId)
@@ -793,6 +850,13 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
       }
       if (question.audioFormatInfo) {
         question.audioFormatInfo = undefined
+      }
+      if (question.abortController) {
+        try {
+          question.abortController.abort()
+        } catch (error) {
+          // Ignore abort errors during cleanup
+        }
       }
     })
     this.questionQueue = []
