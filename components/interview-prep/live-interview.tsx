@@ -107,7 +107,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
           timeWarningAt: 12 * 60 * 1000, // 12 minutes
           silenceThreshold: 30, // Audio level threshold for silence detection
           silenceDuration: 750, // 0.75 seconds of silence
-          queueSize: 8, // Keep 8 questions in queue
+          queueSize: 3, // Keep 3 questions in queue
         },
         {
           onConnected: () => {
@@ -216,9 +216,18 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
 
   // Restart interview
   const restartInterview = () => {
+    console.log("🔄 Restarting interview...")
+
     if (clientRef.current) {
-      clientRef.current.endInterview()
+      clientRef.current.forceCleanup()
     }
+
+    if (durationTimerRef.current) {
+      clearInterval(durationTimerRef.current)
+      durationTimerRef.current = null
+    }
+
+    // Reset all state
     setInterviewClient(null)
     setInterviewState("ready")
     setError(null)
@@ -228,12 +237,20 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     setCurrentQuestionIndex(0)
     setTotalQuestions(0)
     setQueueStatus({ queued: 0, ready: 0, generating: 0 })
+    setMemoryStatus({ queueSize: 0, audioDataSize: 0, estimatedMemoryMB: 0 })
+
     clientRef.current = null
 
-    if (durationTimerRef.current) {
-      clearInterval(durationTimerRef.current)
-      durationTimerRef.current = null
+    // Force garbage collection
+    if (typeof window !== "undefined" && "gc" in window) {
+      try {
+        ;(window as any).gc()
+      } catch (error) {
+        // Ignore if gc is not available
+      }
     }
+
+    console.log("✅ Interview restart completed")
   }
 
   // Cleanup on unmount
@@ -245,6 +262,33 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       if (durationTimerRef.current) {
         clearInterval(durationTimerRef.current)
       }
+    }
+  }, [])
+
+  // Add this useEffect after the existing ones
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && clientRef.current && clientRef.current.isActive()) {
+        console.log("👁️ Page hidden, pausing interview...")
+        // Don't end the interview, but log that it's still running
+      }
+    }
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (clientRef.current && clientRef.current.isActive()) {
+        console.log("🚪 Page unloading, cleaning up interview...")
+        clientRef.current.forceCleanup()
+        e.preventDefault()
+        e.returnValue = ""
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("beforeunload", handleBeforeUnload)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("beforeunload", handleBeforeUnload)
     }
   }, [])
 
@@ -337,7 +381,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 <Zap className="h-3 w-3" />
                 {interviewClient?.getInterviewerName() || "Alex"} ({selectedVoice} Voice)
               </Badge>
-              <Badge variant="outline">Queue: 8 questions</Badge>
+              <Badge variant="outline">Queue: 3 questions</Badge>
               <Badge variant="outline">15 min max</Badge>
               {isInterviewActive && (
                 <Badge variant="default" className="flex items-center gap-1">
@@ -416,7 +460,8 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                     queue
                   </div>
                   <div className="text-xs text-green-500 mt-1">
-                    Memory: {memoryStatus.audioDataSize} audio clips • ~{memoryStatus.estimatedMemoryMB}MB used
+                    Memory: {memoryStatus.audioDataSize} audio clips • ~{memoryStatus.estimatedMemoryMB}MB used • Queue:{" "}
+                    {queueStatus.queued}/3
                   </div>
                 </div>
               </div>

@@ -622,11 +622,18 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
     }, 1000) // 1 second pause between questions
   }
 
+  forceCleanup(): void {
+    console.log("🧹 Force cleaning up interview client...")
+    this.endInterview()
+  }
+
   endInterview(): void {
     console.log("🔚 Ending conversational interview...")
     this.active = false
     this.isListeningForResponse = false
+    this.isPlayingQuestion = false
 
+    // Clear all timers
     if (this.timeoutId) {
       clearTimeout(this.timeoutId)
       this.timeoutId = null
@@ -642,24 +649,83 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
       this.voiceActivityMonitor = null
     }
 
-    if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
-      this.mediaRecorder.stop()
+    // Stop media recorder
+    if (this.mediaRecorder) {
+      try {
+        if (this.mediaRecorder.state === "recording") {
+          this.mediaRecorder.stop()
+        }
+      } catch (error) {
+        console.warn("Error stopping media recorder:", error)
+      }
+      this.mediaRecorder = null
     }
 
+    // Disconnect audio nodes
     if (this.microphoneSource) {
-      this.microphoneSource.disconnect()
+      try {
+        this.microphoneSource.disconnect()
+      } catch (error) {
+        console.warn("Error disconnecting microphone source:", error)
+      }
       this.microphoneSource = null
     }
 
+    if (this.audioAnalyzer) {
+      try {
+        this.audioAnalyzer.disconnect()
+      } catch (error) {
+        console.warn("Error disconnecting audio analyzer:", error)
+      }
+      this.audioAnalyzer = null
+    }
+
+    // Stop all media stream tracks
     if (this.stream) {
-      this.stream.getTracks().forEach((track) => track.stop())
+      this.stream.getTracks().forEach((track) => {
+        try {
+          track.stop()
+        } catch (error) {
+          console.warn("Error stopping track:", error)
+        }
+      })
       this.stream = null
     }
 
-    if (this.audioContext && this.audioContext.state !== "closed") {
-      this.audioContext.close()
+    // Clear audio queue and free memory
+    this.questionQueue.forEach((question) => {
+      if (question.audioData) {
+        question.audioData = undefined
+      }
+      if (question.audioFormatInfo) {
+        question.audioFormatInfo = undefined
+      }
+    })
+    this.questionQueue = []
+    this.totalAudioMemoryMB = 0
+
+    // Close audio context
+    if (this.audioContext) {
+      try {
+        if (this.audioContext.state !== "closed") {
+          this.audioContext.close()
+        }
+      } catch (error) {
+        console.warn("Error closing audio context:", error)
+      }
+      this.audioContext = null
     }
 
+    // Force garbage collection hint
+    if (typeof window !== "undefined" && "gc" in window) {
+      try {
+        ;(window as any).gc()
+      } catch (error) {
+        // Ignore if gc is not available
+      }
+    }
+
+    console.log("✅ Interview cleanup completed")
     this.callbacks.onDisconnected()
   }
 
