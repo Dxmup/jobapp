@@ -335,7 +335,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
             <div className="flex gap-2">
               <Badge variant="outline" className="flex items-center gap-1">
                 <Zap className="h-3 w-3" />
-                Alex ({selectedVoice} Voice)
+                {interviewClient?.getInterviewerName() || "Alex"} ({selectedVoice} Voice)
               </Badge>
               <Badge variant="outline">Queue: 8 questions</Badge>
               <Badge variant="outline">15 min max</Badge>
@@ -366,7 +366,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
               <h3 className="font-medium text-blue-900">Professional Phone Interview</h3>
               <div className="mt-2 text-sm text-blue-800">
                 <p>
-                  <strong>Interviewer:</strong> Alex from {job.company}
+                  <strong>Interviewer:</strong> {interviewClient?.getInterviewerName() || "Alex"} from {job.company}
                 </p>
                 <p>
                   <strong>Position:</strong> {job.title}
@@ -541,8 +541,8 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
           <CardContent>
             <div className="space-y-4">
               <p className="text-green-700">
-                Excellent work! You've completed a professional phone interview with Alex from {job.company} for the{" "}
-                {job.title} position.
+                Excellent work! You've completed a professional phone interview with{" "}
+                {interviewClient?.getInterviewerName() || "Alex"} from {job.company} for the {job.title} position.
               </p>
               <div className="flex gap-4 text-sm text-green-600">
                 <div>
@@ -552,7 +552,8 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                   <span className="font-medium">Questions:</span> {currentQuestionIndex}/{totalQuestions}
                 </div>
                 <div>
-                  <span className="font-medium">Interviewer:</span> Alex ({selectedVoice})
+                  <span className="font-medium">Interviewer:</span> {interviewClient?.getInterviewerName() || "Alex"} (
+                  {selectedVoice})
                 </div>
                 <div>
                   <span className="font-medium">Format:</span> Professional Phone Screening
@@ -582,7 +583,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   1
                 </div>
-                <p>Alex will introduce themselves and explain the interview process</p>
+                <p>The interviewer will introduce themselves and explain the interview process</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">

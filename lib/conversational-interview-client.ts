@@ -34,6 +34,9 @@ interface QueuedQuestion {
   isGenerating?: boolean
 }
 
+// Add this constant for interviewer names
+const INTERVIEWER_NAMES = ["Alex", "Jordan", "Taylor", "Casey", "Morgan", "Jamie", "Riley", "Avery", "Cameron"]
+
 export class ConversationalInterviewClient {
   private jobId: string
   private resumeId?: string
@@ -59,6 +62,7 @@ export class ConversationalInterviewClient {
   private voiceActivityMonitor: NodeJS.Timeout | null = null
   private generatingAudioCount = 0
   private totalAudioMemoryMB = 0
+  private interviewerName: string // Add this property
 
   private constructor(
     jobId: string,
@@ -73,9 +77,21 @@ export class ConversationalInterviewClient {
     this.resumeId = resumeId
     this.questions = questions
     this.jobContext = jobContext
-    this.resumeContext = resumeContext
     this.config = config
     this.callbacks = callbacks
+
+    // Select random interviewer name
+    this.interviewerName = INTERVIEWER_NAMES[Math.floor(Math.random() * INTERVIEWER_NAMES.length)]
+
+    // Extract candidate name from resume content if available
+    this.resumeContext = {
+      ...resumeContext,
+      name: this.extractCandidateName(resumeContext),
+      interviewerName: this.interviewerName,
+    }
+
+    console.log(`🎭 Selected interviewer: ${this.interviewerName}`)
+    console.log(`👤 Candidate name: ${this.resumeContext.name}`)
   }
 
   static async create(
@@ -126,12 +142,50 @@ export class ConversationalInterviewClient {
     }
   }
 
+  private extractCandidateName(resumeContext: any): string {
+    if (!resumeContext) return "the candidate"
+
+    // Try to extract name from resume content/text first
+    if (resumeContext.content || resumeContext.text) {
+      const resumeText = resumeContext.content || resumeContext.text
+
+      // Look for common name patterns in resume text
+      const namePatterns = [
+        /^([A-Z][a-z]+ [A-Z][a-z]+)/m, // First line with First Last
+        /Name:\s*([A-Z][a-z]+ [A-Z][a-z]+)/i, // "Name: First Last"
+        /([A-Z][a-z]+ [A-Z][a-z]+)\s*\n/m, // First Last followed by newline
+        /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/, // Multiple capitalized words at start
+      ]
+
+      for (const pattern of namePatterns) {
+        const match = resumeText.match(pattern)
+        if (match && match[1]) {
+          const extractedName = match[1].trim()
+          // Validate it looks like a real name (2-4 words, reasonable length)
+          const words = extractedName.split(" ")
+          if (words.length >= 2 && words.length <= 4 && extractedName.length <= 50) {
+            console.log(`📝 Extracted name from resume content: ${extractedName}`)
+            return extractedName
+          }
+        }
+      }
+    }
+
+    // Fallback to resumeContext.name if provided
+    if (resumeContext.name && resumeContext.name !== "undefined" && resumeContext.name.trim()) {
+      return resumeContext.name.trim()
+    }
+
+    // Final fallback
+    return "the candidate"
+  }
+
   private createIntroductionText(): string {
     const applicantName = this.resumeContext?.name || "there"
     const companyName = this.jobContext?.company || "our company"
     const positionTitle = this.jobContext?.title || "this position"
 
-    return `Hello ${applicantName}, this is Alex calling from ${companyName}. Thank you for taking the time to speak with me today about the ${positionTitle} role. I hope you're doing well. Before we dive into the questions, I want to let you know this should take about 15 minutes, and I'm excited to learn more about your background and experience. Do you have a few minutes to chat, or would you prefer to reschedule for a better time?`
+    return `Hello ${applicantName}, this is ${this.interviewerName} calling from ${companyName}. Thank you for taking the time to speak with me today about the ${positionTitle} role. I hope you're doing well. Before we dive into the questions, I want to let you know this should take about 15 minutes, and I'm excited to learn more about your background and experience. Do you have a few minutes to chat, or would you prefer to reschedule for a better time?`
   }
 
   private setupVoiceActivityDetection(): void {
@@ -307,117 +361,37 @@ export class ConversationalInterviewClient {
   }
 
   private createIntroductionPrompt(introText: string): string {
-    return `ROLE: You are Alex, a professional phone interviewer from ${this.jobContext?.company || "the company"}.
+    return `ROLE: You are ${this.interviewerName}, a professional phone interviewer from ${this.jobContext?.company || "the company"}.
 
 INSTRUCTION: Deliver this introduction naturally and warmly as if starting a phone interview. Speak clearly and professionally.
 
 INTRODUCTION: "${introText}"
 
-DELIVERY: Speak this introduction with a warm, welcoming tone. Include natural pauses and inflection. Sound genuinely pleased to be speaking with the candidate.`
+DELIVERY REQUIREMENTS:
+1. Speak this introduction with a warm, welcoming tone
+2. Include natural pauses and inflection
+3. Sound genuinely pleased to be speaking with the candidate
+4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
+5. DO NOT narrate your actions - only speak the actual words you would say
+
+OUTPUT: Speak the introduction directly without any stage directions or descriptions of how to speak it.`
   }
 
   private createQuestionPrompt(questionText: string): string {
-    return `ROLE: You are Alex, a professional phone interviewer conducting a screening interview for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
+    return `ROLE: You are ${this.interviewerName}, a professional phone interviewer conducting a screening interview for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
 
 INSTRUCTION: Ask this interview question naturally and professionally. Speak as if you're genuinely interested in hearing the candidate's response.
 
 QUESTION: "${questionText}"
 
-DELIVERY: Ask this question with a professional, encouraging tone. Include natural pauses and speak clearly for phone audio quality. Sound engaged and interested in their response.`
-  }
+DELIVERY REQUIREMENTS:
+1. Ask this question with a professional, encouraging tone
+2. Include natural pauses and speak clearly for phone audio quality
+3. Sound engaged and interested in their response
+4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
+5. DO NOT narrate your actions - only speak the actual words you would say
 
-  private async playNextQuestion(): Promise<void> {
-    try {
-      if (this.currentQuestionIndex >= this.allQuestions.length) {
-        console.log("🎉 All questions completed")
-        await this.playClosingStatement()
-        this.callbacks.onInterviewComplete()
-        this.endInterview()
-        return
-      }
-
-      // Find the current question in the queue
-      let currentQuestion = this.questionQueue.find((q) => q.index === this.currentQuestionIndex)
-
-      if (!currentQuestion) {
-        // Question not in queue yet, add it
-        currentQuestion = {
-          text: this.allQuestions[this.currentQuestionIndex],
-          index: this.currentQuestionIndex,
-          isGenerating: false,
-        }
-        this.questionQueue.push(currentQuestion)
-      }
-
-      const questionNumber = this.currentQuestionIndex + 1
-      const totalQuestions = this.allQuestions.length
-      const isIntroduction = this.currentQuestionIndex === 0
-
-      console.log(`❓ Playing ${isIntroduction ? "introduction" : "question"} ${questionNumber}/${totalQuestions}`)
-
-      // Notify UI about the current question
-      this.callbacks.onQuestionStarted(currentQuestion.text, questionNumber, totalQuestions)
-
-      // Wait for audio to be ready if it's still generating
-      if (!currentQuestion.audioData) {
-        if (!currentQuestion.isGenerating) {
-          // Start generating audio for this question
-          currentQuestion.isGenerating = true
-          console.log(
-            `🎵 Generating audio on-demand for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
-          )
-          try {
-            currentQuestion.audioData = await this.generateQuestionAudio(currentQuestion.text, isIntroduction)
-            currentQuestion.isGenerating = false
-          } catch (error) {
-            console.error(
-              `❌ Failed to generate audio for ${isIntroduction ? "introduction" : "question"} ${questionNumber}:`,
-              error,
-            )
-            this.callbacks.onError(
-              `Failed to generate audio for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
-            )
-            return
-          }
-        } else {
-          // Wait for audio generation to complete
-          console.log(
-            `⏳ Waiting for audio generation to complete for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
-          )
-          while (currentQuestion.isGenerating && this.active) {
-            await new Promise((resolve) => setTimeout(resolve, 100))
-          }
-        }
-      }
-
-      if (!currentQuestion.audioData) {
-        console.error(
-          `❌ No audio data available for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
-        )
-        this.callbacks.onError(
-          `No audio data available for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
-        )
-        return
-      }
-
-      // Play the audio
-      this.isPlayingQuestion = true
-      this.callbacks.onQuestionAudioPlaying()
-
-      await this.playAudioData(currentQuestion.audioData)
-
-      this.isPlayingQuestion = false
-      this.callbacks.onQuestionAudioComplete()
-
-      // Add next questions to queue if needed
-      this.maintainQueue()
-
-      // Start listening for user response
-      this.startListeningForResponse()
-    } catch (error: any) {
-      console.error("❌ Failed to play question:", error)
-      this.callbacks.onError(`Failed to play question: ${error.message}`)
-    }
+OUTPUT: Ask the question directly without any stage directions or descriptions of how to speak it.`
   }
 
   private async playClosingStatement(): Promise<void> {
@@ -426,9 +400,24 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
 
     const closingText = `${applicantName}, thank you so much for taking the time to speak with me today. I really enjoyed learning about your experience and background. The next step in our process is a follow-up interview with the hiring manager, and you can expect to hear from us within 3 to 5 business days. Do you have any questions about the role, ${companyName}, or our interview process before we wrap up? Thank you again, and have a wonderful rest of your day!`
 
+    const closingPrompt = `ROLE: You are ${this.interviewerName}, a professional phone interviewer concluding a screening interview.
+
+INSTRUCTION: Deliver this closing statement naturally and professionally as if ending a phone interview.
+
+CLOSING: "${closingText}"
+
+DELIVERY REQUIREMENTS:
+1. Speak with a warm, professional tone
+2. Sound genuinely appreciative of their time
+3. Speak clearly for phone audio quality
+4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
+5. DO NOT narrate your actions - only speak the actual words you would say
+
+OUTPUT: Speak the closing statement directly without any stage directions or descriptions.`
+
     try {
       console.log("🎬 Playing closing statement...")
-      const audioData = await this.generateQuestionAudio(closingText, false)
+      const audioData = await this.generateQuestionAudio(closingPrompt, false)
 
       this.isPlayingQuestion = true
       await this.playAudioData(audioData)
@@ -740,5 +729,9 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
       audioFormat: "24kHz 16-bit Mono PCM",
       totalProcessed: this.currentQuestionIndex,
     }
+  }
+
+  getInterviewerName(): string {
+    return this.interviewerName
   }
 }

@@ -40,12 +40,12 @@ function createInterviewerPrompt(questionText: string, jobContext?: any, resumeC
   const applicantName = resumeContext?.name || "the candidate"
   const companyName = jobContext?.company || "our company"
   const positionTitle = jobContext?.title || "this position"
-  const interviewerName = "Alex" // Default interviewer name
+  const interviewerName = resumeContext?.interviewerName || "Alex" // Use dynamic interviewer name
   const duration = "15 minutes"
   const nextStep = "a follow-up interview with the hiring manager"
   const timeframe = "3-5 business days"
 
-  return `ROLE: You are Alex, a professional phone interviewer conducting a screening interview.
+  return `ROLE: You are ${interviewerName}, a professional phone interviewer conducting a screening interview.
 
 CONTEXT VARIABLES:
 - APPLICANT_NAME: ${applicantName}
@@ -66,6 +66,8 @@ DELIVERY REQUIREMENTS:
 3. Sound genuinely interested
 4. Speak clearly for phone audio quality
 5. Include natural speech patterns (slight pauses, inflection)
+6. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
+7. DO NOT narrate your actions - only speak the actual words you would say
 
-OUTPUT: Generate only the interviewer's audio asking this specific question. Do not simulate a full conversation or include candidate responses.`
+OUTPUT: Generate only the interviewer's audio asking this specific question. Speak the words directly without any stage directions or descriptions of how to speak them.`
 }
