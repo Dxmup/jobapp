@@ -85,7 +85,7 @@ export function LandingFeaturesOptimized() {
               onMouseLeave={() => setHoveredIndex(null)}
             >
               <Card
-                className={`h-80 bg-gradient-to-br ${feature.bgGradient} border-0 shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden relative transform hover:-translate-y-2 hover:scale-105`}
+                className={`h-full min-h-[320px] bg-gradient-to-br ${feature.bgGradient} border-0 shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden relative transform hover:-translate-y-2 hover:scale-105`}
               >
                 <CardContent className="p-6 relative z-10">
                   {/* Icon with gradient */}
