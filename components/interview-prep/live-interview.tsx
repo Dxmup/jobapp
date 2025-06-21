@@ -80,11 +80,26 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       setError(null)
       setInterviewState("initializing")
 
+      // Prepare job and resume context
+      const jobContext = {
+        company: job.company,
+        title: job.title,
+        description: job.description,
+      }
+
+      const resumeContext = {
+        name: resume?.name || "the candidate",
+        title: resume?.title,
+        experience: resume?.experience,
+      }
+
       // Create interview client
       const client = await ConversationalInterviewClient.create(
         job.id,
         resume?.id,
         questions,
+        jobContext,
+        resumeContext,
         {
           voice: selectedVoice,
           maxDuration: 15 * 60 * 1000, // 15 minutes
@@ -248,7 +263,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       case "connected":
         return "Connected - Starting interview..."
       case "playing_question":
-        return "AI interviewer is asking a question"
+        return "AI interviewer is speaking"
       case "listening":
         return "Your turn to speak - microphone is active"
       case "user_speaking":
@@ -313,11 +328,11 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Conversational AI Interview</span>
+            <span>Professional Phone Interview</span>
             <div className="flex gap-2">
               <Badge variant="outline" className="flex items-center gap-1">
                 <Zap className="h-3 w-3" />
-                {selectedVoice} Voice
+                Alex ({selectedVoice} Voice)
               </Badge>
               <Badge variant="outline">Queue: 8 questions</Badge>
               <Badge variant="outline">15 min max</Badge>
@@ -345,25 +360,23 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
 
             {/* Interview Context */}
             <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-medium text-blue-900">Conversational Interview Context</h3>
+              <h3 className="font-medium text-blue-900">Professional Phone Interview</h3>
               <div className="mt-2 text-sm text-blue-800">
                 <p>
-                  <strong>Company:</strong> {job.company}
+                  <strong>Interviewer:</strong> Alex from {job.company}
                 </p>
                 <p>
                   <strong>Position:</strong> {job.title}
                 </p>
-                {resume && (
-                  <p>
-                    <strong>Resume:</strong> {resume.title || "Selected"}
-                  </p>
-                )}
+                <p>
+                  <strong>Candidate:</strong> {resume?.name || "You"}
+                </p>
                 <p>
                   <strong>Questions Available:</strong> {questions.technical.length} technical,{" "}
                   {questions.behavioral.length} behavioral
                 </p>
                 <p>
-                  <strong>AI Interviewer:</strong> {selectedVoice} (Professional tone)
+                  <strong>Format:</strong> Professional phone screening with introduction and closing
                 </p>
               </div>
             </div>
@@ -375,7 +388,8 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 <div className="font-medium">{getStateDisplay()}</div>
                 {currentQuestion && (
                   <div className="text-sm text-muted-foreground mt-1">
-                    Question {currentQuestionIndex}/{totalQuestions}: {currentQuestion.substring(0, 100)}
+                    {currentQuestionIndex === 1 ? "Introduction" : `Question ${currentQuestionIndex}/${totalQuestions}`}
+                    : {currentQuestion.substring(0, 100)}
                     {currentQuestion.length > 100 ? "..." : ""}
                   </div>
                 )}
@@ -435,7 +449,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                       interviewState === "playing_question" ? "bg-blue-500" : "bg-gray-300"
                     }`}
                   />
-                  <span>AI Speaking</span>
+                  <span>Alex Speaking</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div
@@ -468,7 +482,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
             {canStartInterview && (
               <Button onClick={startConversationalInterview} size="lg" className="bg-green-600 hover:bg-green-700">
                 <PhoneCall className="h-4 w-4 mr-2" />
-                Start Conversational Interview
+                Start Phone Interview
               </Button>
             )}
 
@@ -515,13 +529,14 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
           <CardHeader>
             <CardTitle className="text-green-800 flex items-center gap-2">
               <CheckCircle className="h-5 w-5" />
-              Conversational Interview Completed! 🎉
+              Phone Interview Completed! 🎉
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <p className="text-green-700">
-                Excellent work! You've completed a conversational AI interview for {job.title} at {job.company}.
+                Excellent work! You've completed a professional phone interview with Alex from {job.company} for the{" "}
+                {job.title} position.
               </p>
               <div className="flex gap-4 text-sm text-green-600">
                 <div>
@@ -531,16 +546,17 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                   <span className="font-medium">Questions:</span> {currentQuestionIndex}/{totalQuestions}
                 </div>
                 <div>
-                  <span className="font-medium">AI Interviewer:</span> {selectedVoice}
+                  <span className="font-medium">Interviewer:</span> Alex ({selectedVoice})
                 </div>
                 <div>
-                  <span className="font-medium">Format:</span> Queue-based Audio
+                  <span className="font-medium">Format:</span> Professional Phone Screening
                 </div>
               </div>
               <div className="bg-green-100 p-3 rounded-lg">
                 <p className="text-sm text-green-800">
-                  <strong>What's Next:</strong> This was a practice interview with efficient queue-based audio
-                  generation. The system generated audio on-demand to provide a smooth, natural conversation flow.
+                  <strong>What's Next:</strong> This was a realistic phone interview simulation with proper introduction
+                  and closing. In real interviews, remember to speak clearly, ask clarifying questions, and maintain
+                  professional enthusiasm throughout.
                 </p>
               </div>
             </div>
@@ -552,7 +568,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       {interviewState === "ready" && hasEnoughQuestions && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-800">How Queue-Based Interview Works</CardTitle>
+            <CardTitle className="text-blue-800">How Professional Phone Interview Works</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 text-sm text-blue-700">
@@ -560,31 +576,31 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   1
                 </div>
-                <p>System maintains a queue of 8 questions with audio generated on-demand</p>
+                <p>Alex will introduce themselves and explain the interview process</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   2
                 </div>
-                <p>Audio is generated as needed, reducing wait time and improving performance</p>
+                <p>Questions are asked professionally with natural conversation flow</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   3
                 </div>
-                <p>Questions play immediately when ready, creating natural conversation flow</p>
+                <p>Your microphone activates after each question for your response</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   4
                 </div>
-                <p>Voice activity detection automatically moves to next question after 0.75s silence</p>
+                <p>Silence detection (0.75s) automatically moves to the next question</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   5
                 </div>
-                <p>Queue is maintained dynamically throughout the interview</p>
+                <p>Interview concludes with professional closing and next steps</p>
               </div>
             </div>
           </CardContent>

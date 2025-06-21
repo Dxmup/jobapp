@@ -34,6 +34,8 @@ export class ConversationalInterviewClient {
   private jobId: string
   private resumeId?: string
   private questions: any
+  private jobContext: any
+  private resumeContext: any
   private config: ConversationalInterviewConfig
   private callbacks: ConversationalInterviewCallbacks
   private active = false
@@ -52,17 +54,22 @@ export class ConversationalInterviewClient {
   private microphoneSource: MediaStreamAudioSourceNode | null = null
   private voiceActivityMonitor: NodeJS.Timeout | null = null
   private generatingAudioCount = 0
+  private hasPlayedIntroduction = false
 
   private constructor(
     jobId: string,
     resumeId: string | undefined,
     questions: any,
+    jobContext: any,
+    resumeContext: any,
     config: ConversationalInterviewConfig,
     callbacks: ConversationalInterviewCallbacks,
   ) {
     this.jobId = jobId
     this.resumeId = resumeId
     this.questions = questions
+    this.jobContext = jobContext
+    this.resumeContext = resumeContext
     this.config = config
     this.callbacks = callbacks
   }
@@ -71,10 +78,20 @@ export class ConversationalInterviewClient {
     jobId: string,
     resumeId: string | undefined,
     questions: any,
+    jobContext: any,
+    resumeContext: any,
     config: ConversationalInterviewConfig,
     callbacks: ConversationalInterviewCallbacks,
   ): Promise<ConversationalInterviewClient> {
-    const client = new ConversationalInterviewClient(jobId, resumeId, questions, config, callbacks)
+    const client = new ConversationalInterviewClient(
+      jobId,
+      resumeId,
+      questions,
+      jobContext,
+      resumeContext,
+      config,
+      callbacks,
+    )
     await client.initialize()
     return client
   }
@@ -91,9 +108,10 @@ export class ConversationalInterviewClient {
       // Set up audio analysis for voice activity detection
       this.setupVoiceActivityDetection()
 
-      // Prepare all questions
-      this.allQuestions = [...this.questions.technical, ...this.questions.behavioral]
-      console.log(`📝 Prepared ${this.allQuestions.length} questions for interview`)
+      // Prepare all questions with introduction
+      const introductionText = this.createIntroductionText()
+      this.allQuestions = [introductionText, ...this.questions.technical, ...this.questions.behavioral]
+      console.log(`📝 Prepared ${this.allQuestions.length} questions for interview (including introduction)`)
 
       console.log("✅ ConversationalInterviewClient initialized successfully")
       this.callbacks.onConnected()
@@ -101,6 +119,14 @@ export class ConversationalInterviewClient {
       console.error("❌ Failed to initialize ConversationalInterviewClient:", error)
       this.callbacks.onError(`Failed to initialize: ${error.message}`)
     }
+  }
+
+  private createIntroductionText(): string {
+    const applicantName = this.resumeContext?.name || "there"
+    const companyName = this.jobContext?.company || "our company"
+    const positionTitle = this.jobContext?.title || "this position"
+
+    return `Hello ${applicantName}, this is Alex calling from ${companyName}. Thank you for taking the time to speak with me today about the ${positionTitle} role. I hope you're doing well. Before we dive into the questions, I want to let you know this should take about 15 minutes, and I'm excited to learn more about your background and experience. Do you have a few minutes to chat, or would you prefer to reschedule for a better time?`
   }
 
   private setupVoiceActivityDetection(): void {
@@ -195,7 +221,7 @@ export class ConversationalInterviewClient {
 
       this.callbacks.onAudioGenerationProgress(this.generatingAudioCount, this.config.queueSize)
 
-      const audioData = await this.generateQuestionAudio(questionToGenerate.text)
+      const audioData = await this.generateQuestionAudio(questionToGenerate.text, questionToGenerate.index === 0)
       questionToGenerate.audioData = audioData
       questionToGenerate.isGenerating = false
 
@@ -220,7 +246,11 @@ export class ConversationalInterviewClient {
     }
   }
 
-  private async generateQuestionAudio(questionText: string): Promise<string> {
+  private async generateQuestionAudio(questionText: string, isIntroduction = false): Promise<string> {
+    const prompt = isIntroduction
+      ? this.createIntroductionPrompt(questionText)
+      : this.createQuestionPrompt(questionText)
+
     const response = await fetch("/api/interview/generate-real-audio", {
       method: "POST",
       headers: {
@@ -228,9 +258,11 @@ export class ConversationalInterviewClient {
         Accept: "application/json",
       },
       body: JSON.stringify({
-        text: questionText,
+        text: prompt,
         voice: this.config.voice,
         tone: "professional",
+        jobContext: this.jobContext,
+        resumeContext: this.resumeContext,
       }),
     })
 
@@ -247,10 +279,31 @@ export class ConversationalInterviewClient {
     }
   }
 
+  private createIntroductionPrompt(introText: string): string {
+    return `ROLE: You are Alex, a professional phone interviewer from ${this.jobContext?.company || "the company"}.
+
+INSTRUCTION: Deliver this introduction naturally and warmly as if starting a phone interview. Speak clearly and professionally.
+
+INTRODUCTION: "${introText}"
+
+DELIVERY: Speak this introduction with a warm, welcoming tone. Include natural pauses and inflection. Sound genuinely pleased to be speaking with the candidate.`
+  }
+
+  private createQuestionPrompt(questionText: string): string {
+    return `ROLE: You are Alex, a professional phone interviewer conducting a screening interview for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
+
+INSTRUCTION: Ask this interview question naturally and professionally. Speak as if you're genuinely interested in hearing the candidate's response.
+
+QUESTION: "${questionText}"
+
+DELIVERY: Ask this question with a professional, encouraging tone. Include natural pauses and speak clearly for phone audio quality. Sound engaged and interested in their response.`
+  }
+
   private async playNextQuestion(): Promise<void> {
     try {
       if (this.currentQuestionIndex >= this.allQuestions.length) {
         console.log("🎉 All questions completed")
+        await this.playClosingStatement()
         this.callbacks.onInterviewComplete()
         this.endInterview()
         return
@@ -271,8 +324,9 @@ export class ConversationalInterviewClient {
 
       const questionNumber = this.currentQuestionIndex + 1
       const totalQuestions = this.allQuestions.length
+      const isIntroduction = this.currentQuestionIndex === 0
 
-      console.log(`❓ Playing question ${questionNumber}/${totalQuestions}`)
+      console.log(`❓ Playing ${isIntroduction ? "introduction" : "question"} ${questionNumber}/${totalQuestions}`)
 
       // Notify UI about the current question
       this.callbacks.onQuestionStarted(currentQuestion.text, questionNumber, totalQuestions)
@@ -282,18 +336,27 @@ export class ConversationalInterviewClient {
         if (!currentQuestion.isGenerating) {
           // Start generating audio for this question
           currentQuestion.isGenerating = true
-          console.log(`🎵 Generating audio on-demand for question ${questionNumber}`)
+          console.log(
+            `🎵 Generating audio on-demand for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+          )
           try {
-            currentQuestion.audioData = await this.generateQuestionAudio(currentQuestion.text)
+            currentQuestion.audioData = await this.generateQuestionAudio(currentQuestion.text, isIntroduction)
             currentQuestion.isGenerating = false
           } catch (error) {
-            console.error(`❌ Failed to generate audio for question ${questionNumber}:`, error)
-            this.callbacks.onError(`Failed to generate audio for question ${questionNumber}`)
+            console.error(
+              `❌ Failed to generate audio for ${isIntroduction ? "introduction" : "question"} ${questionNumber}:`,
+              error,
+            )
+            this.callbacks.onError(
+              `Failed to generate audio for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+            )
             return
           }
         } else {
           // Wait for audio generation to complete
-          console.log(`⏳ Waiting for audio generation to complete for question ${questionNumber}`)
+          console.log(
+            `⏳ Waiting for audio generation to complete for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+          )
           while (currentQuestion.isGenerating && this.active) {
             await new Promise((resolve) => setTimeout(resolve, 100))
           }
@@ -301,8 +364,12 @@ export class ConversationalInterviewClient {
       }
 
       if (!currentQuestion.audioData) {
-        console.error(`❌ No audio data available for question ${questionNumber}`)
-        this.callbacks.onError(`No audio data available for question ${questionNumber}`)
+        console.error(
+          `❌ No audio data available for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+        )
+        this.callbacks.onError(
+          `No audio data available for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+        )
         return
       }
 
@@ -323,6 +390,26 @@ export class ConversationalInterviewClient {
     } catch (error: any) {
       console.error("❌ Failed to play question:", error)
       this.callbacks.onError(`Failed to play question: ${error.message}`)
+    }
+  }
+
+  private async playClosingStatement(): Promise<void> {
+    const applicantName = this.resumeContext?.name || "there"
+    const companyName = this.jobContext?.company || "our company"
+
+    const closingText = `${applicantName}, thank you so much for taking the time to speak with me today. I really enjoyed learning about your experience and background. The next step in our process is a follow-up interview with the hiring manager, and you can expect to hear from us within 3 to 5 business days. Do you have any questions about the role, ${companyName}, or our interview process before we wrap up? Thank you again, and have a wonderful rest of your day!`
+
+    try {
+      console.log("🎬 Playing closing statement...")
+      const audioData = await this.generateQuestionAudio(closingText, false)
+
+      this.isPlayingQuestion = true
+      await this.playAudioData(audioData)
+      this.isPlayingQuestion = false
+
+      console.log("✅ Closing statement completed")
+    } catch (error) {
+      console.error("❌ Failed to play closing statement:", error)
     }
   }
 
