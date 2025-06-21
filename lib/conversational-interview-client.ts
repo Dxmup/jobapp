@@ -327,6 +327,100 @@ export class ConversationalInterviewClient {
     }
   }
 
+  private async playNextQuestion(): Promise<void> {
+    try {
+      if (this.currentQuestionIndex >= this.allQuestions.length) {
+        console.log("🎉 All questions completed")
+        await this.playClosingStatement()
+        this.callbacks.onInterviewComplete()
+        this.endInterview()
+        return
+      }
+
+      // Find the current question in the queue
+      let currentQuestion = this.questionQueue.find((q) => q.index === this.currentQuestionIndex)
+
+      if (!currentQuestion) {
+        // Question not in queue yet, add it
+        currentQuestion = {
+          text: this.allQuestions[this.currentQuestionIndex],
+          index: this.currentQuestionIndex,
+          isGenerating: false,
+        }
+        this.questionQueue.push(currentQuestion)
+      }
+
+      const questionNumber = this.currentQuestionIndex + 1
+      const totalQuestions = this.allQuestions.length
+      const isIntroduction = this.currentQuestionIndex === 0
+
+      console.log(`❓ Playing ${isIntroduction ? "introduction" : "question"} ${questionNumber}/${totalQuestions}`)
+
+      // Notify UI about the current question
+      this.callbacks.onQuestionStarted(currentQuestion.text, questionNumber, totalQuestions)
+
+      // Wait for audio to be ready if it's still generating
+      if (!currentQuestion.audioData) {
+        if (!currentQuestion.isGenerating) {
+          // Start generating audio for this question
+          currentQuestion.isGenerating = true
+          console.log(
+            `🎵 Generating audio on-demand for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+          )
+          try {
+            currentQuestion.audioData = await this.generateQuestionAudio(currentQuestion.text, isIntroduction)
+            currentQuestion.isGenerating = false
+          } catch (error) {
+            console.error(
+              `❌ Failed to generate audio for ${isIntroduction ? "introduction" : "question"} ${questionNumber}:`,
+              error,
+            )
+            this.callbacks.onError(
+              `Failed to generate audio for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+            )
+            return
+          }
+        } else {
+          // Wait for audio generation to complete
+          console.log(
+            `⏳ Waiting for audio generation to complete for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+          )
+          while (currentQuestion.isGenerating && this.active) {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+        }
+      }
+
+      if (!currentQuestion.audioData) {
+        console.error(
+          `❌ No audio data available for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+        )
+        this.callbacks.onError(
+          `No audio data available for ${isIntroduction ? "introduction" : "question"} ${questionNumber}`,
+        )
+        return
+      }
+
+      // Play the audio
+      this.isPlayingQuestion = true
+      this.callbacks.onQuestionAudioPlaying()
+
+      await this.playAudioData(currentQuestion.audioData)
+
+      this.isPlayingQuestion = false
+      this.callbacks.onQuestionAudioComplete()
+
+      // Add next questions to queue if needed
+      this.maintainQueue()
+
+      // Start listening for user response
+      this.startListeningForResponse()
+    } catch (error: any) {
+      console.error("❌ Failed to play question:", error)
+      this.callbacks.onError(`Failed to play question: ${error.message}`)
+    }
+  }
+
   private async generateQuestionAudio(questionText: string, isIntroduction = false): Promise<string> {
     const prompt = isIntroduction
       ? this.createIntroductionPrompt(questionText)
