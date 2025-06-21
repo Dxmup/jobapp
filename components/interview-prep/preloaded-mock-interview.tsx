@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { LiveInterview } from "@/components/interview/live-interview"
+import { LiveInterview } from "./live-interview"
 import type { ConversationalInterviewConfig } from "@/lib/interview/types"
 
 interface PreloadedMockInterviewProps {

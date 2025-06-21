@@ -1,7 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ConversationalInterviewClient, type ConversationalInterviewConfig } from "@typeface/interview-client"
+import {
+  ConversationalInterviewClient,
+  type ConversationalInterviewConfig,
+} from "@/lib/conversational-interview-client"
 
 interface LiveInterviewProps {
   job: any
