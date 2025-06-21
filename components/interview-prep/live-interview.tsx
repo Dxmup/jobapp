@@ -18,6 +18,7 @@ import {
   Loader2,
   PhoneOff,
   MicIcon,
+  TicketIcon as Queue,
 } from "lucide-react"
 import {
   ConversationalInterviewClient,
@@ -35,7 +36,7 @@ interface LiveInterviewProps {
 
 type InterviewState =
   | "ready"
-  | "generating_audio"
+  | "initializing"
   | "connecting"
   | "connected"
   | "playing_question"
@@ -56,6 +57,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
   const [currentQuestion, setCurrentQuestion] = useState<string>("")
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [totalQuestions, setTotalQuestions] = useState(0)
+  const [queueStatus, setQueueStatus] = useState({ queued: 0, ready: 0, generating: 0 })
   const [selectedVoice, setSelectedVoice] = useState<ConversationalInterviewConfig["voice"]>("Kore")
 
   const clientRef = useRef<ConversationalInterviewClient | null>(null)
@@ -76,7 +78,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
   const startConversationalInterview = async () => {
     try {
       setError(null)
-      setInterviewState("connecting")
+      setInterviewState("initializing")
 
       // Create interview client
       const client = await ConversationalInterviewClient.create(
@@ -89,6 +91,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
           timeWarningAt: 12 * 60 * 1000, // 12 minutes
           silenceThreshold: 30, // Audio level threshold for silence detection
           silenceDuration: 750, // 0.75 seconds of silence
+          queueSize: 8, // Keep 8 questions in queue
         },
         {
           onConnected: () => {
@@ -143,12 +146,10 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
           },
           onUserResponseComplete: (duration) => {
             console.log(`✅ User response completed in ${duration}ms`)
-            // Brief pause before next question
             setInterviewState("connecting")
           },
-          onAudioGenerationStarted: () => {
-            console.log("🔊 Audio generation started...")
-            setInterviewState("generating_audio")
+          onAudioGenerationProgress: (current, total) => {
+            console.log(`🎵 Audio generation progress: ${current}/${total}`)
           },
         },
       )
@@ -156,8 +157,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       clientRef.current = client
       setInterviewClient(client)
 
-      // Set generating audio state immediately
-      setInterviewState("generating_audio")
+      setInterviewState("connecting")
 
       // Start the interview
       await client.startInterview()
@@ -173,14 +173,17 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     }
   }
 
-  // Start duration timer
+  // Start duration timer and queue status updates
   const startDurationTimer = () => {
     durationTimerRef.current = setInterval(() => {
       if (clientRef.current && clientRef.current.isActive()) {
         const currentDuration = clientRef.current.getInterviewDuration()
         const remaining = clientRef.current.getRemainingTime()
+        const status = clientRef.current.getQueueStatus()
+
         setDuration(currentDuration)
         setRemainingTime(remaining)
+        setQueueStatus(status)
       }
     }, 1000)
   }
@@ -206,6 +209,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     setCurrentQuestion("")
     setCurrentQuestionIndex(0)
     setTotalQuestions(0)
+    setQueueStatus({ queued: 0, ready: 0, generating: 0 })
     clientRef.current = null
 
     if (durationTimerRef.current) {
@@ -237,10 +241,10 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     switch (interviewState) {
       case "ready":
         return "Ready to start conversational interview"
-      case "generating_audio":
-        return "Pre-generating question audio..."
+      case "initializing":
+        return "Initializing interview system..."
       case "connecting":
-        return "Connecting to interview service..."
+        return "Preparing next question..."
       case "connected":
         return "Connected - Starting interview..."
       case "playing_question":
@@ -268,7 +272,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     switch (interviewState) {
       case "ready":
         return <Phone className="h-4 w-4" />
-      case "generating_audio":
+      case "initializing":
       case "connecting":
       case "connected":
         return <Loader2 className="h-4 w-4 animate-spin" />
@@ -296,7 +300,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
   const isInterviewActive = ["playing_question", "listening", "user_speaking", "user_silence", "time_warning"].includes(
     interviewState,
   )
-  const isConnecting = ["connecting", "connected", "generating_audio"].includes(interviewState)
+  const isConnecting = ["connecting", "connected", "initializing"].includes(interviewState)
   const isCompleted = interviewState === "completed"
   const hasError = interviewState === "error"
 
@@ -315,6 +319,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 <Zap className="h-3 w-3" />
                 {selectedVoice} Voice
               </Badge>
+              <Badge variant="outline">Queue: 8 questions</Badge>
               <Badge variant="outline">15 min max</Badge>
               {isInterviewActive && (
                 <Badge variant="default" className="flex items-center gap-1">
@@ -382,6 +387,20 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 </div>
               )}
             </div>
+
+            {/* Queue Status */}
+            {(isInterviewActive || isConnecting) && queueStatus.queued > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                <Queue className="h-4 w-4 text-green-600" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-green-800">Question Queue Status</div>
+                  <div className="text-xs text-green-600">
+                    {queueStatus.ready} ready • {queueStatus.generating} generating • {queueStatus.queued} total in
+                    queue
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Progress Bars */}
             {(isInterviewActive || isCompleted) && (
@@ -456,7 +475,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
             {isConnecting && (
               <Button disabled size="lg">
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {interviewState === "generating_audio" ? "Generating Audio..." : "Connecting..."}
+                {interviewState === "initializing" ? "Initializing..." : "Preparing..."}
               </Button>
             )}
 
@@ -515,14 +534,13 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                   <span className="font-medium">AI Interviewer:</span> {selectedVoice}
                 </div>
                 <div>
-                  <span className="font-medium">Format:</span> Conversational Audio
+                  <span className="font-medium">Format:</span> Queue-based Audio
                 </div>
               </div>
               <div className="bg-green-100 p-3 rounded-lg">
                 <p className="text-sm text-green-800">
-                  <strong>What's Next:</strong> This was a practice interview with natural conversation flow. In a real
-                  interview, remember to speak clearly, take your time to think, and engage naturally with the
-                  interviewer.
+                  <strong>What's Next:</strong> This was a practice interview with efficient queue-based audio
+                  generation. The system generated audio on-demand to provide a smooth, natural conversation flow.
                 </p>
               </div>
             </div>
@@ -534,7 +552,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       {interviewState === "ready" && hasEnoughQuestions && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-800">How Conversational Interview Works</CardTitle>
+            <CardTitle className="text-blue-800">How Queue-Based Interview Works</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 text-sm text-blue-700">
@@ -542,31 +560,31 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   1
                 </div>
-                <p>Click "Start Conversational Interview" to begin pre-generating question audio</p>
+                <p>System maintains a queue of 8 questions with audio generated on-demand</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   2
                 </div>
-                <p>The AI will ask each question with natural speech, one at a time</p>
+                <p>Audio is generated as needed, reducing wait time and improving performance</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   3
                 </div>
-                <p>After each question, your microphone activates automatically</p>
+                <p>Questions play immediately when ready, creating natural conversation flow</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   4
                 </div>
-                <p>Speak your answer naturally - the system detects when you finish (0.75s silence)</p>
+                <p>Voice activity detection automatically moves to next question after 0.75s silence</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   5
                 </div>
-                <p>The next question plays automatically, creating a natural conversation flow</p>
+                <p>Queue is maintained dynamically throughout the interview</p>
               </div>
             </div>
           </CardContent>

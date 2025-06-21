@@ -4,6 +4,7 @@ export interface ConversationalInterviewConfig {
   timeWarningAt: number
   silenceThreshold: number // Audio level threshold for silence detection
   silenceDuration: number // Duration of silence before considering user finished (ms)
+  queueSize: number // Number of questions to keep in queue
 }
 
 export interface ConversationalInterviewCallbacks {
@@ -19,12 +20,14 @@ export interface ConversationalInterviewCallbacks {
   onUserSpeaking: () => void
   onUserSilence: () => void
   onUserResponseComplete: (duration: number) => void
+  onAudioGenerationProgress: (current: number, total: number) => void
 }
 
-interface PreGeneratedQuestion {
+interface QueuedQuestion {
   text: string
-  audioData: string
+  audioData?: string
   index: number
+  isGenerating?: boolean
 }
 
 export class ConversationalInterviewClient {
@@ -40,14 +43,15 @@ export class ConversationalInterviewClient {
   private currentQuestionIndex = 0
   private timeoutId: NodeJS.Timeout | null = null
   private stream: MediaStream | null = null
-  private preGeneratedQuestions: PreGeneratedQuestion[] = []
-  private isGeneratingAudio = false
+  private questionQueue: QueuedQuestion[] = []
+  private allQuestions: string[] = []
   private isPlayingQuestion = false
   private isListeningForResponse = false
   private silenceTimer: NodeJS.Timeout | null = null
   private audioAnalyzer: AnalyserNode | null = null
   private microphoneSource: MediaStreamAudioSourceNode | null = null
   private voiceActivityMonitor: NodeJS.Timeout | null = null
+  private generatingAudioCount = 0
 
   private constructor(
     jobId: string,
@@ -86,6 +90,10 @@ export class ConversationalInterviewClient {
 
       // Set up audio analysis for voice activity detection
       this.setupVoiceActivityDetection()
+
+      // Prepare all questions
+      this.allQuestions = [...this.questions.technical, ...this.questions.behavioral]
+      console.log(`📝 Prepared ${this.allQuestions.length} questions for interview`)
 
       console.log("✅ ConversationalInterviewClient initialized successfully")
       this.callbacks.onConnected()
@@ -133,8 +141,8 @@ export class ConversationalInterviewClient {
         }
       }, this.config.maxDuration)
 
-      // Pre-generate audio for all questions
-      await this.preGenerateAllQuestionAudio()
+      // Initialize the question queue with first batch
+      await this.initializeQuestionQueue()
 
       // Start the conversation
       await this.playNextQuestion()
@@ -144,35 +152,71 @@ export class ConversationalInterviewClient {
     }
   }
 
-  private async preGenerateAllQuestionAudio(): Promise<void> {
+  private async initializeQuestionQueue(): Promise<void> {
     try {
-      this.isGeneratingAudio = true
-      const allQuestions = [...this.questions.technical, ...this.questions.behavioral]
+      console.log(`🔄 Initializing question queue with ${this.config.queueSize} questions...`)
 
-      console.log(`🎵 Pre-generating audio for ${allQuestions.length} questions...`)
+      // Add first batch of questions to queue
+      const initialBatchSize = Math.min(this.config.queueSize, this.allQuestions.length)
 
-      for (let i = 0; i < allQuestions.length; i++) {
-        const question = allQuestions[i]
-        console.log(`🎵 Generating audio for question ${i + 1}/${allQuestions.length}`)
-
-        try {
-          const audioData = await this.generateQuestionAudio(question)
-          this.preGeneratedQuestions.push({
-            text: question,
-            audioData: audioData,
-            index: i,
-          })
-        } catch (error) {
-          console.error(`❌ Failed to generate audio for question ${i + 1}:`, error)
-          // Continue with other questions even if one fails
-        }
+      for (let i = 0; i < initialBatchSize; i++) {
+        this.questionQueue.push({
+          text: this.allQuestions[i],
+          index: i,
+          isGenerating: false,
+        })
       }
 
-      this.isGeneratingAudio = false
-      console.log(`✅ Pre-generated audio for ${this.preGeneratedQuestions.length} questions`)
+      // Start generating audio for the first few questions
+      await this.generateNextQueuedAudio()
+
+      console.log(`✅ Question queue initialized with ${this.questionQueue.length} questions`)
     } catch (error: any) {
-      this.isGeneratingAudio = false
-      throw new Error(`Failed to pre-generate question audio: ${error.message}`)
+      throw new Error(`Failed to initialize question queue: ${error.message}`)
+    }
+  }
+
+  private async generateNextQueuedAudio(): Promise<void> {
+    // Find the next question that needs audio generation
+    const questionToGenerate = this.questionQueue.find((q) => !q.audioData && !q.isGenerating)
+
+    if (!questionToGenerate) {
+      console.log("📭 No more questions need audio generation in current queue")
+      return
+    }
+
+    try {
+      questionToGenerate.isGenerating = true
+      this.generatingAudioCount++
+
+      console.log(
+        `🎵 Generating audio for question ${questionToGenerate.index + 1}: "${questionToGenerate.text.substring(0, 50)}..."`,
+      )
+
+      this.callbacks.onAudioGenerationProgress(this.generatingAudioCount, this.config.queueSize)
+
+      const audioData = await this.generateQuestionAudio(questionToGenerate.text)
+      questionToGenerate.audioData = audioData
+      questionToGenerate.isGenerating = false
+
+      console.log(`✅ Audio generated for question ${questionToGenerate.index + 1}`)
+
+      // Continue generating audio for other questions in the background
+      setTimeout(() => {
+        if (this.active) {
+          this.generateNextQueuedAudio()
+        }
+      }, 100) // Small delay to prevent overwhelming the API
+    } catch (error: any) {
+      console.error(`❌ Failed to generate audio for question ${questionToGenerate.index + 1}:`, error)
+      questionToGenerate.isGenerating = false
+
+      // Continue with other questions even if one fails
+      setTimeout(() => {
+        if (this.active) {
+          this.generateNextQueuedAudio()
+        }
+      }, 1000)
     }
   }
 
@@ -205,30 +249,74 @@ export class ConversationalInterviewClient {
 
   private async playNextQuestion(): Promise<void> {
     try {
-      if (this.currentQuestionIndex >= this.preGeneratedQuestions.length) {
+      if (this.currentQuestionIndex >= this.allQuestions.length) {
         console.log("🎉 All questions completed")
         this.callbacks.onInterviewComplete()
         this.endInterview()
         return
       }
 
-      const questionData = this.preGeneratedQuestions[this.currentQuestionIndex]
+      // Find the current question in the queue
+      let currentQuestion = this.questionQueue.find((q) => q.index === this.currentQuestionIndex)
+
+      if (!currentQuestion) {
+        // Question not in queue yet, add it
+        currentQuestion = {
+          text: this.allQuestions[this.currentQuestionIndex],
+          index: this.currentQuestionIndex,
+          isGenerating: false,
+        }
+        this.questionQueue.push(currentQuestion)
+      }
+
       const questionNumber = this.currentQuestionIndex + 1
-      const totalQuestions = this.preGeneratedQuestions.length
+      const totalQuestions = this.allQuestions.length
 
       console.log(`❓ Playing question ${questionNumber}/${totalQuestions}`)
 
       // Notify UI about the current question
-      this.callbacks.onQuestionStarted(questionData.text, questionNumber, totalQuestions)
+      this.callbacks.onQuestionStarted(currentQuestion.text, questionNumber, totalQuestions)
 
-      // Play the pre-generated audio
+      // Wait for audio to be ready if it's still generating
+      if (!currentQuestion.audioData) {
+        if (!currentQuestion.isGenerating) {
+          // Start generating audio for this question
+          currentQuestion.isGenerating = true
+          console.log(`🎵 Generating audio on-demand for question ${questionNumber}`)
+          try {
+            currentQuestion.audioData = await this.generateQuestionAudio(currentQuestion.text)
+            currentQuestion.isGenerating = false
+          } catch (error) {
+            console.error(`❌ Failed to generate audio for question ${questionNumber}:`, error)
+            this.callbacks.onError(`Failed to generate audio for question ${questionNumber}`)
+            return
+          }
+        } else {
+          // Wait for audio generation to complete
+          console.log(`⏳ Waiting for audio generation to complete for question ${questionNumber}`)
+          while (currentQuestion.isGenerating && this.active) {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+        }
+      }
+
+      if (!currentQuestion.audioData) {
+        console.error(`❌ No audio data available for question ${questionNumber}`)
+        this.callbacks.onError(`No audio data available for question ${questionNumber}`)
+        return
+      }
+
+      // Play the audio
       this.isPlayingQuestion = true
       this.callbacks.onQuestionAudioPlaying()
 
-      await this.playAudioData(questionData.audioData)
+      await this.playAudioData(currentQuestion.audioData)
 
       this.isPlayingQuestion = false
       this.callbacks.onQuestionAudioComplete()
+
+      // Add next questions to queue if needed
+      this.maintainQueue()
 
       // Start listening for user response
       this.startListeningForResponse()
@@ -236,6 +324,40 @@ export class ConversationalInterviewClient {
       console.error("❌ Failed to play question:", error)
       this.callbacks.onError(`Failed to play question: ${error.message}`)
     }
+  }
+
+  private maintainQueue(): void {
+    // Remove old questions from queue to keep it manageable
+    this.questionQueue = this.questionQueue.filter((q) => q.index >= this.currentQuestionIndex)
+
+    // Add new questions to queue if needed
+    const currentQueueSize = this.questionQueue.length
+    const questionsToAdd = Math.min(
+      this.config.queueSize - currentQueueSize,
+      this.allQuestions.length - (this.currentQuestionIndex + currentQueueSize),
+    )
+
+    for (let i = 0; i < questionsToAdd; i++) {
+      const questionIndex = this.currentQuestionIndex + currentQueueSize + i
+      if (questionIndex < this.allQuestions.length) {
+        this.questionQueue.push({
+          text: this.allQuestions[questionIndex],
+          index: questionIndex,
+          isGenerating: false,
+        })
+      }
+    }
+
+    // Start generating audio for new questions
+    if (questionsToAdd > 0) {
+      setTimeout(() => {
+        if (this.active) {
+          this.generateNextQueuedAudio()
+        }
+      }, 500) // Small delay after user response
+    }
+
+    console.log(`🔄 Queue maintained: ${this.questionQueue.length} questions in queue`)
   }
 
   private async playAudioData(audioData: string): Promise<void> {
@@ -293,7 +415,6 @@ export class ConversationalInterviewClient {
     this.isListeningForResponse = true
     const responseStartTime = Date.now()
     let isSpeaking = false
-    let lastSpeechTime = 0
 
     console.log("👂 Started listening for user response...")
 
@@ -307,7 +428,6 @@ export class ConversationalInterviewClient {
 
       // Calculate average volume
       const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength
-      const currentTime = Date.now()
 
       if (average > this.config.silenceThreshold) {
         // User is speaking
@@ -316,7 +436,6 @@ export class ConversationalInterviewClient {
           console.log("🗣️ User started speaking")
           this.callbacks.onUserSpeaking()
         }
-        lastSpeechTime = currentTime
 
         // Clear any existing silence timer
         if (this.silenceTimer) {
@@ -427,11 +546,15 @@ export class ConversationalInterviewClient {
   }
 
   getTotalQuestions(): number {
-    return this.preGeneratedQuestions.length
+    return this.allQuestions.length
   }
 
-  isGeneratingAudio(): boolean {
-    return this.isGeneratingAudio
+  getQueueStatus(): { queued: number; ready: number; generating: number } {
+    return {
+      queued: this.questionQueue.length,
+      ready: this.questionQueue.filter((q) => q.audioData).length,
+      generating: this.questionQueue.filter((q) => q.isGenerating).length,
+    }
   }
 
   isPlayingQuestion(): boolean {
