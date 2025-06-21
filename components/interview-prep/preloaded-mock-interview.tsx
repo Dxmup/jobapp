@@ -31,6 +31,8 @@ export function PreloadedMockInterview({
   const [isLoading, setIsLoading] = useState(!preloadedQuestions && shouldPreload)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const hasQuestions = questions.technical.length > 0 || questions.behavioral.length > 0
+  const totalQuestions = questions.technical.length + questions.behavioral.length
 
   useEffect(() => {
     // If we don't have preloaded questions but should preload, fetch them
@@ -43,6 +45,14 @@ export function PreloadedMockInterview({
       setLoadingProgress(100)
     }
   }, [preloadedQuestions, shouldPreload])
+
+  useEffect(() => {
+    // If we have no questions and haven't tried loading them yet, try to load them
+    if (!isLoading && !hasQuestions && !error && !preloadedQuestions) {
+      console.log("🔄 No questions found, attempting to generate them...")
+      loadQuestions()
+    }
+  }, [isLoading, error, preloadedQuestions])
 
   const loadQuestions = async () => {
     try {
@@ -57,7 +67,26 @@ export function PreloadedMockInterview({
         setLoadingProgress((prev) => Math.min(prev + 10, 90))
       }, 200)
 
-      const result = await getInterviewQuestions(job.id, resume?.id)
+      let result = await getInterviewQuestions(job.id, resume?.id)
+
+      // If no questions exist, try to generate them
+      if (
+        result.success &&
+        result.questions &&
+        result.questions.technical.length === 0 &&
+        result.questions.behavioral.length === 0
+      ) {
+        console.log("📝 No existing questions found, generating new ones...")
+        setLoadingProgress(50)
+
+        const { generateInterviewQuestions } = await import("@/app/actions/interview-prep-actions")
+        const generateResult = await generateInterviewQuestions(job.id, resume?.id)
+
+        if (generateResult.success && generateResult.questions) {
+          result = generateResult
+          console.log("✅ Generated new questions successfully")
+        }
+      }
 
       clearInterval(progressInterval)
 
@@ -78,9 +107,6 @@ export function PreloadedMockInterview({
       setIsLoading(false)
     }
   }
-
-  const hasQuestions = questions.technical.length > 0 || questions.behavioral.length > 0
-  const totalQuestions = questions.technical.length + questions.behavioral.length
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
