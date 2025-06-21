@@ -1,3 +1,5 @@
+import { AudioFormatAnalyzer, type AudioFormatInfo } from "./audio-format-analyzer"
+
 export interface ConversationalInterviewConfig {
   voice: "Puck" | "Charon" | "Kore" | "Fenrir" | "Aoede" | "Leda" | "Orus" | "Zephyr"
   maxDuration: number
@@ -21,11 +23,13 @@ export interface ConversationalInterviewCallbacks {
   onUserSilence: () => void
   onUserResponseComplete: (duration: number) => void
   onAudioGenerationProgress: (current: number, total: number) => void
+  onAudioFormatInfo?: (formatInfo: AudioFormatInfo) => void
 }
 
 interface QueuedQuestion {
   text: string
   audioData?: string
+  audioFormatInfo?: AudioFormatInfo
   index: number
   isGenerating?: boolean
 }
@@ -54,7 +58,7 @@ export class ConversationalInterviewClient {
   private microphoneSource: MediaStreamAudioSourceNode | null = null
   private voiceActivityMonitor: NodeJS.Timeout | null = null
   private generatingAudioCount = 0
-  private hasPlayedIntroduction = false
+  private totalAudioMemoryMB = 0
 
   private constructor(
     jobId: string,
@@ -112,6 +116,7 @@ export class ConversationalInterviewClient {
       const introductionText = this.createIntroductionText()
       this.allQuestions = [introductionText, ...this.questions.technical, ...this.questions.behavioral]
       console.log(`📝 Prepared ${this.allQuestions.length} questions for interview (including introduction)`)
+      console.log("🎵 Expected audio format: 24kHz, 16-bit, Mono PCM")
 
       console.log("✅ ConversationalInterviewClient initialized successfully")
       this.callbacks.onConnected()
@@ -225,7 +230,29 @@ export class ConversationalInterviewClient {
       questionToGenerate.audioData = audioData
       questionToGenerate.isGenerating = false
 
-      console.log(`✅ Audio generated for question ${questionToGenerate.index + 1}`)
+      // Analyze the received audio format
+      const formatInfo = AudioFormatAnalyzer.analyzeReceivedAudio(audioData)
+      const validation = AudioFormatAnalyzer.validateAudioFormat(audioData)
+
+      console.log(`📊 Audio format for question ${questionToGenerate.index + 1}:`, formatInfo)
+
+      if (!validation.isValid) {
+        console.warn(`⚠️ Audio validation issues:`, validation.issues)
+        console.log(`💡 Recommendations:`, validation.recommendations)
+      }
+
+      questionToGenerate.audioFormatInfo = formatInfo
+      // Track total memory usage
+      this.totalAudioMemoryMB += formatInfo.sizeInMB
+
+      // Notify callback with format info
+      if (this.callbacks.onAudioFormatInfo) {
+        this.callbacks.onAudioFormatInfo(formatInfo)
+      }
+
+      console.log(
+        `✅ Audio generated for question ${questionToGenerate.index + 1} (${formatInfo.estimatedDuration}s, ${formatInfo.sizeInMB}MB)`,
+      )
 
       // Continue generating audio for other questions in the background
       setTimeout(() => {
@@ -418,9 +445,13 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
     const questionsToRemove = this.questionQueue.filter((q) => q.index < this.currentQuestionIndex)
 
     questionsToRemove.forEach((question) => {
-      if (question.audioData) {
-        console.log(`🗑️ Removing audio data for completed question ${question.index + 1}`)
+      if (question.audioData && question.audioFormatInfo) {
+        console.log(
+          `🗑️ Removing audio data for completed question ${question.index + 1} (${question.audioFormatInfo.sizeInMB}MB)`,
+        )
+        this.totalAudioMemoryMB -= question.audioFormatInfo.sizeInMB
         question.audioData = undefined
+        question.audioFormatInfo = undefined
       }
     })
 
@@ -464,34 +495,24 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
         throw new Error("Audio context not initialized")
       }
 
-      // Decode base64 audio data
-      const audioBuffer = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
+      console.log("🎵 Converting audio format for playback...")
 
-      // Convert PCM data to AudioBuffer
-      const sampleRate = 24000
-      const numSamples = audioBuffer.length / 2
+      // Use our audio format analyzer for conversion
+      const audioBuffer = await AudioFormatAnalyzer.convertToAudioBuffer(audioData, this.audioContext)
 
-      const audioContextBuffer = this.audioContext.createBuffer(1, numSamples, sampleRate)
-      const channelData = audioContextBuffer.getChannelData(0)
-
-      // Convert 16-bit PCM to float32
-      for (let i = 0; i < numSamples; i++) {
-        const sample = (audioBuffer[i * 2] | (audioBuffer[i * 2 + 1] << 8)) / 32768.0
-        channelData[i] = sample
-      }
+      console.log(
+        `✅ Audio converted: ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels} channel(s)`,
+      )
 
       // Play the audio
       const source = this.audioContext.createBufferSource()
-      source.buffer = audioContextBuffer
+      source.buffer = audioBuffer
       source.connect(this.audioContext.destination)
 
       return new Promise((resolve, reject) => {
         source.onended = () => {
           console.log("✅ Question audio playback completed")
-
-          // Clean up the audio data after playback to free memory
           this.cleanupPlayedAudio()
-
           resolve()
         }
 
@@ -509,20 +530,21 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
   }
 
   private cleanupPlayedAudio(): void {
-    // Remove audio data from played questions to free memory
-    // Keep only current and upcoming questions
     const currentIndex = this.currentQuestionIndex
 
-    this.questionQueue = this.questionQueue.filter((question, index) => {
+    this.questionQueue = this.questionQueue.filter((question) => {
       if (question.index < currentIndex) {
-        // This question has been played, remove its audio data
-        if (question.audioData) {
-          console.log(`🗑️ Cleaning up audio data for played question ${question.index + 1}`)
+        if (question.audioData && question.audioFormatInfo) {
+          console.log(
+            `🗑️ Cleaning up audio data for played question ${question.index + 1} (${question.audioFormatInfo.sizeInMB}MB)`,
+          )
+          this.totalAudioMemoryMB -= question.audioFormatInfo.sizeInMB
           question.audioData = undefined
+          question.audioFormatInfo = undefined
         }
-        return false // Remove from queue entirely
+        return false
       }
-      return true // Keep current and future questions
+      return true
     })
 
     // Force garbage collection hint (not guaranteed but helps)
@@ -674,7 +696,11 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
     return this.allQuestions.length
   }
 
-  getQueueStatus(): { queued: number; ready: number; generating: number } {
+  getQueueStatus(): {
+    queued: number
+    ready: number
+    generating: number
+  } {
     return {
       queued: this.questionQueue.length,
       ready: this.questionQueue.filter((q) => q.audioData).length,
@@ -690,25 +716,29 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
     return this.isListeningForResponse
   }
 
-  getMemoryStatus(): { queueSize: number; audioDataSize: number; estimatedMemoryMB: number } {
-    let totalAudioDataSize = 0
+  getMemoryStatus(): {
+    queueSize: number
+    audioDataSize: number
+    estimatedMemoryMB: number
+    audioFormat: string
+    totalProcessed: number
+  } {
     let questionsWithAudio = 0
+    let totalDuration = 0
 
     this.questionQueue.forEach((question) => {
-      if (question.audioData) {
-        totalAudioDataSize += question.audioData.length
+      if (question.audioData && question.audioFormatInfo) {
         questionsWithAudio++
+        totalDuration += question.audioFormatInfo.estimatedDuration
       }
     })
-
-    // Rough estimate: base64 encoded audio is ~1.33x the original size
-    // PCM audio at 24kHz 16-bit is ~48KB per second
-    const estimatedMemoryMB = (totalAudioDataSize * 0.75) / (1024 * 1024) // Convert to MB
 
     return {
       queueSize: this.questionQueue.length,
       audioDataSize: questionsWithAudio,
-      estimatedMemoryMB: Math.round(estimatedMemoryMB * 100) / 100,
+      estimatedMemoryMB: Math.round(this.totalAudioMemoryMB * 100) / 100,
+      audioFormat: "24kHz 16-bit Mono PCM",
+      totalProcessed: this.currentQuestionIndex,
     }
   }
 }
