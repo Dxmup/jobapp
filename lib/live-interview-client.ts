@@ -12,6 +12,7 @@ export interface LiveInterviewCallbacks {
   onTimeUp: () => void
   onInterviewComplete: () => void
   onAudioReceived: (audioData: string) => void
+  onQuestionDisplayed?: (question: string, index: number, total: number) => void
 }
 
 export class LiveInterviewClient {
@@ -67,7 +68,15 @@ export class LiveInterviewClient {
 
       // Test speech synthesis availability
       if (!this.speechSynthesis) {
-        throw new Error("Speech synthesis not supported in this browser")
+        console.warn("⚠️ Speech synthesis not supported, will show text only")
+      } else {
+        // Load voices
+        if (this.speechSynthesis.getVoices().length === 0) {
+          await new Promise((resolve) => {
+            this.speechSynthesis!.onvoiceschanged = resolve
+            setTimeout(resolve, 1000) // Fallback timeout
+          })
+        }
       }
 
       console.log("✅ LiveInterviewClient initialized successfully")
@@ -122,70 +131,84 @@ export class LiveInterviewClient {
       }
 
       const question = allQuestions[this.currentQuestionIndex]
-      console.log(
-        `❓ Asking question ${this.currentQuestionIndex + 1}/${allQuestions.length}: ${question.substring(0, 100)}...`,
-      )
+      const questionNumber = this.currentQuestionIndex + 1
+      const totalQuestions = allQuestions.length
 
-      // Generate audio for the question
-      const response = await fetch("/api/interview/generate-real-audio", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          text: question,
-          voice: this.config.voice,
-          tone: "professional",
-        }),
-      })
+      console.log(`❓ Question ${questionNumber}/${totalQuestions}: ${question.substring(0, 100)}...`)
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      // Notify UI about the current question
+      if (this.callbacks.onQuestionDisplayed) {
+        this.callbacks.onQuestionDisplayed(question, questionNumber, totalQuestions)
       }
 
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text()
-        console.error("❌ Non-JSON response:", text.substring(0, 200))
-        throw new Error("Server returned non-JSON response")
-      }
+      try {
+        // Try to get audio from API
+        const response = await fetch("/api/interview/generate-real-audio", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            text: question,
+            voice: this.config.voice,
+            tone: "professional",
+          }),
+        })
 
-      const data = await response.json()
+        if (response.ok) {
+          const data = await response.json()
 
-      if (data.success) {
-        if (data.audioData) {
-          // Use provided audio data
-          console.log("🔊 Playing generated audio...")
-          await this.playAudio(data.audioData)
+          if (data.success) {
+            console.log("🔊 Using Web Speech API for question audio...")
+            await this.speakText(data.text || question)
+            this.callbacks.onAudioReceived("speech-synthesis")
+          } else {
+            throw new Error(data.error || "API returned unsuccessful response")
+          }
         } else {
-          // Use Web Speech API as fallback
-          console.log("🔊 Using Web Speech API for audio...")
-          await this.speakText(data.text || question)
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
         }
+      } catch (apiError: any) {
+        console.warn("⚠️ API call failed, speaking question directly:", apiError.message)
+        // Fallback: speak the question directly
+        await this.speakText(question)
+        this.callbacks.onAudioReceived("speech-synthesis-fallback")
+      }
 
-        this.callbacks.onAudioReceived(data.audioData || "speech-synthesis")
+      // Wait for user response
+      setTimeout(() => {
+        this.currentQuestionIndex++
+        if (this.active) {
+          this.askNextQuestion()
+        }
+      }, 25000) // 25 seconds to answer
+    } catch (error: any) {
+      console.error("❌ Failed to ask question:", error)
 
-        // Wait for user response
+      // Try to continue with next question instead of failing completely
+      if (
+        this.active &&
+        this.currentQuestionIndex < [...this.questions.technical, ...this.questions.behavioral].length - 1
+      ) {
+        console.log("🔄 Attempting to continue with next question...")
+        this.currentQuestionIndex++
         setTimeout(() => {
-          this.currentQuestionIndex++
           if (this.active) {
             this.askNextQuestion()
           }
-        }, 20000) // 20 seconds to answer
+        }, 2000)
       } else {
-        throw new Error(data.error || "Failed to generate audio")
+        this.callbacks.onError(`Interview error: ${error.message}`)
       }
-    } catch (error: any) {
-      console.error("❌ Failed to ask question:", error)
-      this.callbacks.onError(`Failed to ask question: ${error.message}`)
     }
   }
 
   private async speakText(text: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.speechSynthesis) {
-        reject(new Error("Speech synthesis not available"))
+        console.log("📝 Speech synthesis not available, showing text only")
+        resolve()
         return
       }
 
@@ -197,69 +220,48 @@ export class LiveInterviewClient {
       // Configure voice settings
       const voices = this.speechSynthesis.getVoices()
       const preferredVoice =
-        voices.find(
-          (voice) =>
-            voice.name.toLowerCase().includes("female") ||
-            voice.name.toLowerCase().includes("karen") ||
-            voice.name.toLowerCase().includes("samantha"),
-        ) ||
+        voices.find((voice) => voice.name.toLowerCase().includes("karen")) ||
+        voices.find((voice) => voice.name.toLowerCase().includes("samantha")) ||
+        voices.find((voice) => voice.name.toLowerCase().includes("female")) ||
+        voices.find((voice) => voice.lang.startsWith("en-US")) ||
         voices.find((voice) => voice.lang.startsWith("en")) ||
         voices[0]
 
       if (preferredVoice) {
         utterance.voice = preferredVoice
+        console.log(`🗣️ Using voice: ${preferredVoice.name} (${preferredVoice.lang})`)
       }
 
-      utterance.rate = 0.9 // Slightly slower for clarity
+      utterance.rate = 0.85 // Slightly slower for clarity
       utterance.pitch = 1.0
-      utterance.volume = 0.8
+      utterance.volume = 0.9
 
       utterance.onend = () => {
-        console.log("✅ Speech synthesis completed")
+        console.log("✅ Speech completed")
         resolve()
       }
 
       utterance.onerror = (event) => {
-        console.error("❌ Speech synthesis error:", event.error)
-        reject(new Error(`Speech synthesis failed: ${event.error}`))
+        console.error("❌ Speech error:", event.error)
+        // Don't reject, just resolve to continue the interview
+        resolve()
       }
 
       console.log(`🗣️ Speaking: "${text.substring(0, 50)}..."`)
       this.speechSynthesis.speak(utterance)
+
+      // Fallback timeout in case speech doesn't trigger events
+      setTimeout(
+        () => {
+          if (utterance.pending || this.speechSynthesis?.speaking) {
+            console.log("⏰ Speech timeout, continuing...")
+            this.speechSynthesis?.cancel()
+            resolve()
+          }
+        },
+        Math.max(5000, text.length * 100),
+      ) // Minimum 5 seconds, or 100ms per character
     })
-  }
-
-  private async playAudio(audioData: string): Promise<void> {
-    try {
-      const audioBuffer = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
-      const audioBlob = new Blob([audioBuffer], { type: "audio/wav" })
-      const audioUrl = URL.createObjectURL(audioBlob)
-
-      const audio = new Audio(audioUrl)
-
-      return new Promise((resolve, reject) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl)
-          console.log("✅ Audio playback completed")
-          resolve()
-        }
-
-        audio.onerror = (e) => {
-          URL.revokeObjectURL(audioUrl)
-          console.error("❌ Audio playback failed:", e)
-          reject(new Error("Audio playback failed"))
-        }
-
-        audio.play().catch((playError) => {
-          URL.revokeObjectURL(audioUrl)
-          console.error("❌ Audio play() failed:", playError)
-          reject(playError)
-        })
-      })
-    } catch (error: any) {
-      console.error("❌ Failed to play audio:", error)
-      throw new Error(`Failed to play audio: ${error.message}`)
-    }
   }
 
   endInterview(): void {

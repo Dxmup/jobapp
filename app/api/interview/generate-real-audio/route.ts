@@ -8,47 +8,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Text is required" }, { status: 400 })
     }
 
-    console.log(`🎙️ Generating speech for: "${text.substring(0, 100)}..."`)
+    console.log(`🎙️ Processing speech request for: "${text.substring(0, 100)}..."`)
 
-    // Use Gemini Live API for speech generation
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1alpha/models/gemini-2.0-flash-exp:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GOOGLE_AI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Please convert this text to speech with a ${tone} tone: "${text}"`,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          },
-          systemInstruction: {
-            parts: [
-              {
-                text: `You are a professional interviewer with a ${tone} tone. Speak clearly and at a moderate pace suitable for an interview setting.`,
-              },
-            ],
-          },
-        }),
-      },
-    )
+    // For now, we'll use client-side Web Speech API since it's more reliable
+    // In the future, you can integrate with Gemini Live API or other TTS services
 
-    if (!response.ok) {
-      console.error("❌ Gemini API error:", response.status, response.statusText)
-      // Fallback to Web Speech API
+    // Check if we have a valid API key
+    if (!process.env.GOOGLE_AI_API_KEY) {
+      console.log("⚠️ No Google AI API key found, using Web Speech API fallback")
       return NextResponse.json({
         success: true,
         audioData: null, // Signal to use client-side TTS
@@ -56,13 +23,61 @@ export async function POST(request: NextRequest) {
         voice,
         tone,
         fallback: true,
+        reason: "No API key configured",
       })
     }
 
-    const data = await response.json()
+    // Try Gemini API with correct authentication
+    try {
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `You are a professional interviewer. Please acknowledge that you will ask this interview question with a ${tone} tone: "${text}"`,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              topK: 1,
+              topP: 1,
+              maxOutputTokens: 100,
+            },
+          }),
+        },
+      )
 
-    // For now, return the text for client-side TTS since Gemini doesn't directly return audio
-    // In a real implementation, you'd need to use a TTS service that returns audio
+      if (geminiResponse.ok) {
+        const geminiData = await geminiResponse.json()
+        console.log("✅ Gemini API response received")
+
+        // Even with Gemini response, we'll use Web Speech API for actual audio
+        return NextResponse.json({
+          success: true,
+          audioData: null, // Use client-side TTS
+          text: text,
+          voice,
+          tone,
+          fallback: true,
+          geminiResponse: geminiData.candidates?.[0]?.content?.parts?.[0]?.text,
+        })
+      } else {
+        console.log(`⚠️ Gemini API returned ${geminiResponse.status}, using fallback`)
+      }
+    } catch (geminiError: any) {
+      console.log("⚠️ Gemini API error, using Web Speech API fallback:", geminiError.message)
+    }
+
+    // Always return success with Web Speech API fallback
     return NextResponse.json({
       success: true,
       audioData: null, // Signal to use client-side TTS
@@ -70,21 +85,20 @@ export async function POST(request: NextRequest) {
       voice,
       tone,
       fallback: true,
+      reason: "Using Web Speech API for reliable audio generation",
     })
   } catch (error: any) {
-    console.error("❌ Error generating audio:", error)
+    console.error("❌ Error in generate-real-audio:", error)
 
-    // Return fallback response
+    // Even on error, return a fallback response
     return NextResponse.json({
       success: true,
       audioData: null,
-      text: await request
-        .json()
-        .then((body) => body.text)
-        .catch(() => "Interview question"),
+      text: "I'm ready to begin the interview. Let's start with your first question.",
       voice: "Kore",
       tone: "professional",
       fallback: true,
+      error: error.message,
     })
   }
 }
