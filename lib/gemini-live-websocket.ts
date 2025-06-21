@@ -131,6 +131,9 @@ export class GeminiLiveWebSocket {
   private handleMessage(message: any): void {
     console.log("📨 Received message type:", Object.keys(message)[0])
 
+    // Log the full message structure for debugging
+    console.log("📨 Full message:", JSON.stringify(message, null, 2))
+
     if (message.setupComplete) {
       console.log("✅ Setup complete")
       return
@@ -138,14 +141,52 @@ export class GeminiLiveWebSocket {
 
     if (message.serverContent) {
       const serverContent = message.serverContent
+      let foundAudio = false
 
-      // Extract audio data from the response
+      // Check for audio in different possible locations
       if (serverContent.modelTurn && serverContent.modelTurn.parts) {
         for (const part of serverContent.modelTurn.parts) {
-          if (part.inlineData && part.inlineData.mimeType === "audio/pcm") {
-            this.onAudioData(part.inlineData.data)
+          // Check for inline audio data
+          if (part.inlineData) {
+            if (part.inlineData.mimeType === "audio/pcm" || part.inlineData.mimeType?.includes("audio")) {
+              console.log("🔊 Found audio data in inlineData")
+              this.onAudioData(part.inlineData.data)
+              foundAudio = true
+            }
+          }
+
+          // Check for direct audio data
+          if (part.audio || part.audioData) {
+            console.log("🔊 Found audio data in audio field")
+            this.onAudioData(part.audio || part.audioData)
+            foundAudio = true
           }
         }
+      }
+
+      // Check for audio at the serverContent level
+      if (serverContent.audio || serverContent.audioData) {
+        console.log("🔊 Found audio data at serverContent level")
+        this.onAudioData(serverContent.audio || serverContent.audioData)
+        foundAudio = true
+      }
+
+      // Check for audio in any parts array at serverContent level
+      if (serverContent.parts) {
+        for (const part of serverContent.parts) {
+          if (
+            part.inlineData &&
+            (part.inlineData.mimeType === "audio/pcm" || part.inlineData.mimeType?.includes("audio"))
+          ) {
+            console.log("🔊 Found audio data in serverContent.parts")
+            this.onAudioData(part.inlineData.data)
+            foundAudio = true
+          }
+        }
+      }
+
+      if (!foundAudio) {
+        console.log("⚠️ No audio data found in serverContent message")
       }
 
       // Check if the turn is complete
@@ -199,6 +240,7 @@ export async function generateSpeechWithWebSocket(text: string, apiKey: string, 
   return new Promise((resolve, reject) => {
     const audioChunks: string[] = []
     const setupComplete = false
+    let turnComplete = false
 
     const client = new GeminiLiveWebSocket(apiKey, "gemini-2.0-flash-live-001", voice, {
       onAudioData: (audioData: string) => {
@@ -210,10 +252,16 @@ export async function generateSpeechWithWebSocket(text: string, apiKey: string, 
         reject(error)
       },
       onComplete: () => {
+        turnComplete = true
         const combinedAudio = audioChunks.join("")
         console.log(`✅ Audio generation complete: ${combinedAudio.length} total characters`)
         client.disconnect()
-        resolve(combinedAudio)
+
+        if (combinedAudio.length > 0) {
+          resolve(combinedAudio)
+        } else {
+          reject(new Error("No audio data received"))
+        }
       },
     })
 
@@ -229,12 +277,19 @@ export async function generateSpeechWithWebSocket(text: string, apiKey: string, 
       })
       .catch(reject)
 
-    // Timeout protection
+    // Timeout protection - but also resolve if we have audio data
     setTimeout(() => {
-      if (audioChunks.length === 0) {
-        client.disconnect()
-        reject(new Error("Timeout waiting for audio response"))
+      if (!turnComplete) {
+        if (audioChunks.length > 0) {
+          console.log("⏰ Timeout reached but we have audio data, resolving...")
+          const combinedAudio = audioChunks.join("")
+          client.disconnect()
+          resolve(combinedAudio)
+        } else {
+          client.disconnect()
+          reject(new Error("Timeout waiting for audio response"))
+        }
       }
-    }, 30000)
+    }, 25000) // Reduced timeout to 25 seconds
   })
 }
