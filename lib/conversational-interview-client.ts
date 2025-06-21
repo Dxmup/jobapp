@@ -187,7 +187,7 @@ export class ConversationalInterviewClient {
     const companyName = this.jobContext?.company || "our company"
     const positionTitle = this.jobContext?.title || "this position"
 
-    return `Hello ${applicantName}, this is ${this.interviewerName} calling from ${companyName}. Thank you for taking the time to speak with me today about the ${positionTitle} role. I hope you're doing well. Before we dive into the questions, I want to let you know this should take about 15 minutes, and I'm excited to learn more about your background and experience. Do you have a few minutes to chat, or would you prefer to reschedule for a better time?`
+    return `Hello ${applicantName}, this is ${this.interviewerName} calling from ${companyName}. Thank you for taking the time to speak with me today about the ${positionTitle} role. I hope you're doing well. Before we dive into the questions, I want to let you know this should take about 15 minutes, and I'm excited to learn more about your background and experience. Are you ready to begin?
   }
 
   private setupVoiceActivityDetection(): void {
