@@ -414,7 +414,16 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
   }
 
   private maintainQueue(): void {
-    // Remove old questions from queue to keep it manageable
+    // Remove old questions from queue to keep it manageable and free memory
+    const questionsToRemove = this.questionQueue.filter((q) => q.index < this.currentQuestionIndex)
+
+    questionsToRemove.forEach((question) => {
+      if (question.audioData) {
+        console.log(`🗑️ Removing audio data for completed question ${question.index + 1}`)
+        question.audioData = undefined
+      }
+    })
+
     this.questionQueue = this.questionQueue.filter((q) => q.index >= this.currentQuestionIndex)
 
     // Add new questions to queue if needed
@@ -444,7 +453,9 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
       }, 500) // Small delay after user response
     }
 
-    console.log(`🔄 Queue maintained: ${this.questionQueue.length} questions in queue`)
+    console.log(
+      `🔄 Queue maintained: ${this.questionQueue.length} questions in queue, ${questionsToRemove.length} cleaned up`,
+    )
   }
 
   private async playAudioData(audioData: string): Promise<void> {
@@ -477,6 +488,10 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
       return new Promise((resolve, reject) => {
         source.onended = () => {
           console.log("✅ Question audio playback completed")
+
+          // Clean up the audio data after playback to free memory
+          this.cleanupPlayedAudio()
+
           resolve()
         }
 
@@ -490,6 +505,29 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
     } catch (error: any) {
       console.error("❌ Failed to play audio data:", error)
       throw new Error(`Failed to play audio data: ${error.message}`)
+    }
+  }
+
+  private cleanupPlayedAudio(): void {
+    // Remove audio data from played questions to free memory
+    // Keep only current and upcoming questions
+    const currentIndex = this.currentQuestionIndex
+
+    this.questionQueue = this.questionQueue.filter((question, index) => {
+      if (question.index < currentIndex) {
+        // This question has been played, remove its audio data
+        if (question.audioData) {
+          console.log(`🗑️ Cleaning up audio data for played question ${question.index + 1}`)
+          question.audioData = undefined
+        }
+        return false // Remove from queue entirely
+      }
+      return true // Keep current and future questions
+    })
+
+    // Force garbage collection hint (not guaranteed but helps)
+    if (typeof window !== "undefined" && "gc" in window) {
+      ;(window as any).gc()
     }
   }
 
@@ -650,5 +688,27 @@ DELIVERY: Ask this question with a professional, encouraging tone. Include natur
 
   isListening(): boolean {
     return this.isListeningForResponse
+  }
+
+  getMemoryStatus(): { queueSize: number; audioDataSize: number; estimatedMemoryMB: number } {
+    let totalAudioDataSize = 0
+    let questionsWithAudio = 0
+
+    this.questionQueue.forEach((question) => {
+      if (question.audioData) {
+        totalAudioDataSize += question.audioData.length
+        questionsWithAudio++
+      }
+    })
+
+    // Rough estimate: base64 encoded audio is ~1.33x the original size
+    // PCM audio at 24kHz 16-bit is ~48KB per second
+    const estimatedMemoryMB = (totalAudioDataSize * 0.75) / (1024 * 1024) // Convert to MB
+
+    return {
+      queueSize: this.questionQueue.length,
+      audioDataSize: questionsWithAudio,
+      estimatedMemoryMB: Math.round(estimatedMemoryMB * 100) / 100,
+    }
   }
 }

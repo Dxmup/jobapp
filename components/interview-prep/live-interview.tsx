@@ -59,6 +59,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
   const [totalQuestions, setTotalQuestions] = useState(0)
   const [queueStatus, setQueueStatus] = useState({ queued: 0, ready: 0, generating: 0 })
   const [selectedVoice, setSelectedVoice] = useState<ConversationalInterviewConfig["voice"]>("Kore")
+  const [memoryStatus, setMemoryStatus] = useState({ queueSize: 0, audioDataSize: 0, estimatedMemoryMB: 0 })
 
   const clientRef = useRef<ConversationalInterviewClient | null>(null)
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -195,10 +196,12 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
         const currentDuration = clientRef.current.getInterviewDuration()
         const remaining = clientRef.current.getRemainingTime()
         const status = clientRef.current.getQueueStatus()
+        const memory = clientRef.current.getMemoryStatus()
 
         setDuration(currentDuration)
         setRemainingTime(remaining)
         setQueueStatus(status)
+        setMemoryStatus(memory)
       }
     }, 1000)
   }
@@ -411,6 +414,9 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                   <div className="text-xs text-green-600">
                     {queueStatus.ready} ready • {queueStatus.generating} generating • {queueStatus.queued} total in
                     queue
+                  </div>
+                  <div className="text-xs text-green-500 mt-1">
+                    Memory: {memoryStatus.audioDataSize} audio clips • ~{memoryStatus.estimatedMemoryMB}MB used
                   </div>
                 </div>
               </div>
