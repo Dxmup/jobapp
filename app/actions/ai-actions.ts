@@ -1,5 +1,7 @@
 import { getCurrentUserId } from "@/lib/auth-cookie"
 
+// Remove the old getCurrentUserId function - now using centralized auth
+
 export async function generateTitle(prompt: string) {
   const userId = await getCurrentUserId()
 
