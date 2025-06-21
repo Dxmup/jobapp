@@ -21,13 +21,12 @@ interface JobInterviewPrepPageProps {
   searchParams: {
     resumeId?: string
     debug?: string
-    interviewType?: "phone-screener" | "first-interview"
   }
 }
 
 export default async function JobInterviewPrepPage({ params, searchParams }: JobInterviewPrepPageProps) {
   const { jobId } = params
-  const { resumeId, debug, interviewType = "first-interview" } = searchParams
+  const { resumeId, debug } = searchParams
   const showDebug = debug === "true"
 
   // Get debug information if debug mode is enabled
@@ -115,8 +114,8 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
 
   // Build the mock interview URL with job ID and resume ID
   const mockInterviewUrl = resumeId
-    ? `/dashboard/interview-prep/${jobId}/mock-interview?resumeId=${resumeId}&preload=true&interviewType=${interviewType}`
-    : `/dashboard/interview-prep/${jobId}/mock-interview?preload=true&interviewType=${interviewType}`
+    ? `/dashboard/interview-prep/${jobId}/mock-interview?resumeId=${resumeId}&preload=true`
+    : `/dashboard/interview-prep/${jobId}/mock-interview?preload=true`
 
   return (
     <div className="container py-6 space-y-8">
@@ -142,8 +141,7 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
               <div className="mb-4 md:mb-0">
                 <h3 className="text-xl font-bold text-purple-800">Practice Mock Phone Interviews</h3>
                 <p className="text-purple-700">
-                  Simulate a real {interviewType === "phone-screener" ? "phone screening" : "first interview"} with our
-                  AI interviewer based on this job description
+                  Simulate a real phone interview with our AI interviewer based on this job description
                   {resumeId ? " and your resume" : ""}.
                 </p>
                 <p className="text-sm text-purple-600 mt-1">
