@@ -6,8 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Phone, PhoneCall, Mic, Volume2, Clock, Zap, AlertCircle, CheckCircle, Loader2, PhoneOff } from "lucide-react"
-import { LiveInterviewClient, type LiveInterviewConfig } from "@/lib/live-interview-client"
+import {
+  Phone,
+  PhoneCall,
+  Mic,
+  Volume2,
+  Clock,
+  Zap,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  PhoneOff,
+  MicIcon,
+} from "lucide-react"
+import {
+  ConversationalInterviewClient,
+  type ConversationalInterviewConfig,
+} from "@/lib/conversational-interview-client"
 
 interface LiveInterviewProps {
   job: any
@@ -20,9 +35,13 @@ interface LiveInterviewProps {
 
 type InterviewState =
   | "ready"
+  | "generating_audio"
   | "connecting"
   | "connected"
-  | "active"
+  | "playing_question"
+  | "listening"
+  | "user_speaking"
+  | "user_silence"
   | "time_warning"
   | "ending"
   | "completed"
@@ -30,14 +49,16 @@ type InterviewState =
 
 export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
   const [interviewState, setInterviewState] = useState<InterviewState>("ready")
-  const [interviewClient, setInterviewClient] = useState<LiveInterviewClient | null>(null)
+  const [interviewClient, setInterviewClient] = useState<ConversationalInterviewClient | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [duration, setDuration] = useState(0)
   const [remainingTime, setRemainingTime] = useState(15 * 60 * 1000) // 15 minutes
-  const [isAudioActive, setIsAudioActive] = useState(false)
-  const [selectedVoice, setSelectedVoice] = useState<LiveInterviewConfig["voice"]>("Kore")
+  const [currentQuestion, setCurrentQuestion] = useState<string>("")
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [totalQuestions, setTotalQuestions] = useState(0)
+  const [selectedVoice, setSelectedVoice] = useState<ConversationalInterviewConfig["voice"]>("Kore")
 
-  const clientRef = useRef<LiveInterviewClient | null>(null)
+  const clientRef = useRef<ConversationalInterviewClient | null>(null)
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Check if we have enough questions and required data
@@ -46,19 +67,19 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
 
   // Randomly assign voice on component mount
   useEffect(() => {
-    const voices: LiveInterviewConfig["voice"][] = ["Puck", "Charon", "Kore", "Fenrir", "Aoede"]
+    const voices: ConversationalInterviewConfig["voice"][] = ["Puck", "Charon", "Kore", "Fenrir", "Aoede"]
     const randomVoice = voices[Math.floor(Math.random() * voices.length)]
     setSelectedVoice(randomVoice)
   }, [])
 
-  // Start the live interview
-  const startLiveInterview = async () => {
+  // Start the conversational interview
+  const startConversationalInterview = async () => {
     try {
       setError(null)
       setInterviewState("connecting")
 
-      // Create interview client using secure factory method
-      const client = await LiveInterviewClient.create(
+      // Create interview client
+      const client = await ConversationalInterviewClient.create(
         job.id,
         resume?.id,
         questions,
@@ -66,30 +87,31 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
           voice: selectedVoice,
           maxDuration: 15 * 60 * 1000, // 15 minutes
           timeWarningAt: 12 * 60 * 1000, // 12 minutes
+          silenceThreshold: 30, // Audio level threshold for silence detection
+          silenceDuration: 750, // 0.75 seconds of silence
         },
         {
           onConnected: () => {
-            console.log("✅ Connected to live interview")
+            console.log("✅ Connected to conversational interview")
             setInterviewState("connected")
           },
           onDisconnected: () => {
-            console.log("🔗 Disconnected from live interview")
-            if (interviewState === "active") {
+            console.log("🔗 Disconnected from conversational interview")
+            if (interviewState !== "completed") {
               setInterviewState("completed")
             }
           },
           onError: (error) => {
-            console.error("❌ Live interview error:", error)
+            console.error("❌ Conversational interview error:", error)
             setError(error)
             setInterviewState("error")
           },
           onTimeWarning: (remainingMinutes) => {
             console.log(`⏰ Time warning: ${remainingMinutes} minutes remaining`)
             setInterviewState("time_warning")
-            // Return to active state after showing warning
             setTimeout(() => {
               if (interviewState === "time_warning") {
-                setInterviewState("active")
+                setInterviewState("listening")
               }
             }, 3000)
           },
@@ -101,10 +123,28 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
             console.log("🎉 Interview completed")
             setInterviewState("completed")
           },
-          onAudioReceived: (audioData) => {
-            setIsAudioActive(true)
-            // Reset audio indicator after a short delay
-            setTimeout(() => setIsAudioActive(false), 1000)
+          onQuestionStarted: (question, index, total) => {
+            console.log(`❓ Question ${index}/${total}: ${question.substring(0, 50)}...`)
+            setCurrentQuestion(question)
+            setCurrentQuestionIndex(index)
+            setTotalQuestions(total)
+          },
+          onQuestionAudioPlaying: () => {
+            setInterviewState("playing_question")
+          },
+          onQuestionAudioComplete: () => {
+            setInterviewState("listening")
+          },
+          onUserSpeaking: () => {
+            setInterviewState("user_speaking")
+          },
+          onUserSilence: () => {
+            setInterviewState("user_silence")
+          },
+          onUserResponseComplete: (duration) => {
+            console.log(`✅ User response completed in ${duration}ms`)
+            // Brief pause before next question
+            setInterviewState("connecting")
           },
         },
       )
@@ -112,16 +152,20 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       clientRef.current = client
       setInterviewClient(client)
 
+      // Check if we're generating audio
+      if (client.isGeneratingAudio()) {
+        setInterviewState("generating_audio")
+      }
+
       // Start the interview
       await client.startInterview()
-      setInterviewState("active")
 
       // Start duration timer
       startDurationTimer()
 
-      console.log("🎙️ Live interview started successfully")
+      console.log("🎙️ Conversational interview started successfully")
     } catch (error: any) {
-      console.error("❌ Failed to start live interview:", error)
+      console.error("❌ Failed to start conversational interview:", error)
       setError(`Failed to start interview: ${error.message}`)
       setInterviewState("error")
     }
@@ -157,7 +201,9 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     setError(null)
     setDuration(0)
     setRemainingTime(15 * 60 * 1000)
-    setIsAudioActive(false)
+    setCurrentQuestion("")
+    setCurrentQuestionIndex(0)
+    setTotalQuestions(0)
     clientRef.current = null
 
     if (durationTimerRef.current) {
@@ -188,13 +234,21 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
   const getStateDisplay = () => {
     switch (interviewState) {
       case "ready":
-        return "Ready to start live interview"
+        return "Ready to start conversational interview"
+      case "generating_audio":
+        return "Pre-generating question audio..."
       case "connecting":
         return "Connecting to interview service..."
       case "connected":
         return "Connected - Starting interview..."
-      case "active":
-        return "Live interview in progress"
+      case "playing_question":
+        return "AI interviewer is asking a question"
+      case "listening":
+        return "Your turn to speak - microphone is active"
+      case "user_speaking":
+        return "Listening to your response..."
+      case "user_silence":
+        return "Detected silence - processing your response..."
       case "time_warning":
         return "Time warning - 3 minutes remaining!"
       case "ending":
@@ -212,15 +266,18 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     switch (interviewState) {
       case "ready":
         return <Phone className="h-4 w-4" />
+      case "generating_audio":
       case "connecting":
       case "connected":
         return <Loader2 className="h-4 w-4 animate-spin" />
-      case "active":
-        return isAudioActive ? (
-          <Volume2 className="h-4 w-4 text-green-500" />
-        ) : (
-          <Mic className="h-4 w-4 text-blue-500" />
-        )
+      case "playing_question":
+        return <Volume2 className="h-4 w-4 text-blue-500" />
+      case "listening":
+        return <MicIcon className="h-4 w-4 text-green-500" />
+      case "user_speaking":
+        return <Mic className="h-4 w-4 text-green-500 animate-pulse" />
+      case "user_silence":
+        return <Mic className="h-4 w-4 text-yellow-500" />
       case "time_warning":
         return <Clock className="h-4 w-4 text-orange-500" />
       case "ending":
@@ -234,12 +291,15 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
     }
   }
 
-  const isInterviewActive = ["active", "time_warning"].includes(interviewState)
-  const isConnecting = ["connecting", "connected"].includes(interviewState)
+  const isInterviewActive = ["playing_question", "listening", "user_speaking", "user_silence", "time_warning"].includes(
+    interviewState,
+  )
+  const isConnecting = ["connecting", "connected", "generating_audio"].includes(interviewState)
   const isCompleted = interviewState === "completed"
   const hasError = interviewState === "error"
 
   const progress = duration > 0 ? (duration / (15 * 60 * 1000)) * 100 : 0
+  const questionProgress = totalQuestions > 0 ? (currentQuestionIndex / totalQuestions) * 100 : 0
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -247,7 +307,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Live AI Interview</span>
+            <span>Conversational AI Interview</span>
             <div className="flex gap-2">
               <Badge variant="outline" className="flex items-center gap-1">
                 <Zap className="h-3 w-3" />
@@ -278,7 +338,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
 
             {/* Interview Context */}
             <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-medium text-blue-900">Live Interview Context</h3>
+              <h3 className="font-medium text-blue-900">Conversational Interview Context</h3>
               <div className="mt-2 text-sm text-blue-800">
                 <p>
                   <strong>Company:</strong> {job.company}
@@ -306,14 +366,10 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
               {getStateIcon()}
               <div className="flex-1">
                 <div className="font-medium">{getStateDisplay()}</div>
-                {interviewState === "active" && (
-                  <div className="text-sm text-muted-foreground">
-                    Speak naturally - this is a real-time conversation with AI
-                  </div>
-                )}
-                {interviewState === "time_warning" && (
-                  <div className="text-sm text-orange-600 font-medium">
-                    The interview will end automatically in 3 minutes
+                {currentQuestion && (
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Question {currentQuestionIndex}/{totalQuestions}: {currentQuestion.substring(0, 100)}
+                    {currentQuestion.length > 100 ? "..." : ""}
                   </div>
                 )}
               </div>
@@ -325,27 +381,58 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
               )}
             </div>
 
-            {/* Progress Bar */}
+            {/* Progress Bars */}
             {(isInterviewActive || isCompleted) && (
-              <div>
-                <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                  <span>Interview Progress</span>
-                  <span>{Math.round(progress)}%</span>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                    <span>Interview Progress</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                  <Progress value={progress} className="w-full" />
                 </div>
-                <Progress value={progress} className="w-full" />
+                {totalQuestions > 0 && (
+                  <div>
+                    <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                      <span>Questions Progress</span>
+                      <span>
+                        {currentQuestionIndex}/{totalQuestions}
+                      </span>
+                    </div>
+                    <Progress value={questionProgress} className="w-full" />
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Audio Indicator */}
+            {/* Voice Activity Indicator */}
             {isInterviewActive && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
-                  <div className={`w-2 h-2 rounded-full ${isAudioActive ? "bg-green-500" : "bg-gray-300"}`} />
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      interviewState === "playing_question" ? "bg-blue-500" : "bg-gray-300"
+                    }`}
+                  />
                   <span>AI Speaking</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Mic className="h-3 w-3 text-blue-500" />
-                  <span>Your Microphone Active</span>
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      ["listening", "user_speaking", "user_silence"].includes(interviewState)
+                        ? "bg-green-500"
+                        : "bg-gray-300"
+                    }`}
+                  />
+                  <span>Your Microphone</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      interviewState === "user_speaking" ? "bg-green-500 animate-pulse" : "bg-gray-300"
+                    }`}
+                  />
+                  <span>Voice Detected</span>
                 </div>
               </div>
             )}
@@ -358,16 +445,16 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
         <CardContent className="pt-6">
           <div className="flex justify-center gap-4">
             {canStartInterview && (
-              <Button onClick={startLiveInterview} size="lg" className="bg-green-600 hover:bg-green-700">
+              <Button onClick={startConversationalInterview} size="lg" className="bg-green-600 hover:bg-green-700">
                 <PhoneCall className="h-4 w-4 mr-2" />
-                Start Live Interview
+                Start Conversational Interview
               </Button>
             )}
 
             {isConnecting && (
               <Button disabled size="lg">
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Connecting...
+                {interviewState === "generating_audio" ? "Generating Audio..." : "Connecting..."}
               </Button>
             )}
 
@@ -407,29 +494,33 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
           <CardHeader>
             <CardTitle className="text-green-800 flex items-center gap-2">
               <CheckCircle className="h-5 w-5" />
-              Live Interview Completed! 🎉
+              Conversational Interview Completed! 🎉
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <p className="text-green-700">
-                Excellent work! You've completed a live AI interview for {job.title} at {job.company}.
+                Excellent work! You've completed a conversational AI interview for {job.title} at {job.company}.
               </p>
               <div className="flex gap-4 text-sm text-green-600">
                 <div>
                   <span className="font-medium">Duration:</span> {formatTime(duration)}
                 </div>
                 <div>
+                  <span className="font-medium">Questions:</span> {currentQuestionIndex}/{totalQuestions}
+                </div>
+                <div>
                   <span className="font-medium">AI Interviewer:</span> {selectedVoice}
                 </div>
                 <div>
-                  <span className="font-medium">Format:</span> Live Audio Conversation
+                  <span className="font-medium">Format:</span> Conversational Audio
                 </div>
               </div>
               <div className="bg-green-100 p-3 rounded-lg">
                 <p className="text-sm text-green-800">
-                  <strong>What's Next:</strong> This was a practice interview to help you prepare. In a real interview,
-                  remember to speak clearly, take your time to think, and ask clarifying questions when needed.
+                  <strong>What's Next:</strong> This was a practice interview with natural conversation flow. In a real
+                  interview, remember to speak clearly, take your time to think, and engage naturally with the
+                  interviewer.
                 </p>
               </div>
             </div>
@@ -441,7 +532,7 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
       {interviewState === "ready" && hasEnoughQuestions && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-800">How Live Interview Works</CardTitle>
+            <CardTitle className="text-blue-800">How Conversational Interview Works</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 text-sm text-blue-700">
@@ -449,31 +540,31 @@ export function LiveInterview({ job, resume, questions }: LiveInterviewProps) {
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   1
                 </div>
-                <p>Click "Start Live Interview" to connect to the AI interviewer</p>
+                <p>Click "Start Conversational Interview" to begin pre-generating question audio</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   2
                 </div>
-                <p>The AI will introduce itself and begin asking questions naturally</p>
+                <p>The AI will ask each question with natural speech, one at a time</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   3
                 </div>
-                <p>Speak naturally - this is a real-time conversation, just like a phone interview</p>
+                <p>After each question, your microphone activates automatically</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   4
                 </div>
-                <p>The AI will ask follow-up questions and keep the conversation on track</p>
+                <p>Speak your answer naturally - the system detects when you finish (0.75s silence)</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
                   5
                 </div>
-                <p>Interview automatically ends after 15 minutes or when naturally concluded</p>
+                <p>The next question plays automatically, creating a natural conversation flow</p>
               </div>
             </div>
           </CardContent>
