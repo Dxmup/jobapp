@@ -55,12 +55,37 @@ export class GeminiLiveWebSocket {
           resolve()
         }
 
-        this.ws.onmessage = (event) => {
+        this.ws.onmessage = async (event) => {
           try {
-            const message = JSON.parse(event.data)
-            this.handleMessage(message)
+            // Handle both text and binary messages
+            let messageData: string
+
+            if (event.data instanceof Blob) {
+              // Convert Blob to text
+              messageData = await event.data.text()
+              console.log("📨 Received binary message, converted to text")
+            } else if (typeof event.data === "string") {
+              messageData = event.data
+              console.log("📨 Received text message")
+            } else {
+              console.log("📨 Received unknown message type:", typeof event.data)
+              return
+            }
+
+            // Try to parse as JSON
+            try {
+              const message = JSON.parse(messageData)
+              this.handleMessage(message)
+            } catch (parseError) {
+              // If it's not JSON, it might be raw audio data
+              console.log("📨 Received non-JSON data, treating as audio")
+              if (messageData.length > 100) {
+                // Assume it's base64 audio data
+                this.onAudioData(messageData)
+              }
+            }
           } catch (error) {
-            console.error("❌ Failed to parse WebSocket message:", error)
+            console.error("❌ Failed to process WebSocket message:", error)
           }
         }
 
@@ -173,9 +198,11 @@ export class GeminiLiveWebSocket {
 export async function generateSpeechWithWebSocket(text: string, apiKey: string, voice = "Kore"): Promise<string> {
   return new Promise((resolve, reject) => {
     const audioChunks: string[] = []
+    const setupComplete = false
 
     const client = new GeminiLiveWebSocket(apiKey, "gemini-2.0-flash-live-001", voice, {
       onAudioData: (audioData: string) => {
+        console.log(`📨 Received audio chunk: ${audioData.length} characters`)
         audioChunks.push(audioData)
       },
       onError: (error: Error) => {
@@ -184,6 +211,7 @@ export async function generateSpeechWithWebSocket(text: string, apiKey: string, 
       },
       onComplete: () => {
         const combinedAudio = audioChunks.join("")
+        console.log(`✅ Audio generation complete: ${combinedAudio.length} total characters`)
         client.disconnect()
         resolve(combinedAudio)
       },
@@ -193,7 +221,11 @@ export async function generateSpeechWithWebSocket(text: string, apiKey: string, 
     client
       .connect()
       .then(() => {
-        client.sendText(text)
+        console.log("🔗 Connected, sending text...")
+        // Wait a moment for setup to complete
+        setTimeout(() => {
+          client.sendText(text)
+        }, 1000)
       })
       .catch(reject)
 
