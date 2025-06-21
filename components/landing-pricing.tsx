@@ -27,7 +27,7 @@ export function LandingPricing() {
     },
     {
       name: "Pro",
-      price: "$19",
+      price: "$25",
       period: "per month",
       description: "Advanced tools for serious job seekers",
       features: [
