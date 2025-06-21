@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateSpeechWithLiveAPI } from "@/lib/gemini-live-client"
+import { generateSpeechWithWebSocket } from "@/lib/gemini-live-websocket"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +13,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Google AI API key not configured" }, { status: 500 })
     }
 
-    console.log(`🎙️ Generating Live API audio for: "${text.substring(0, 100)}..."`)
+    console.log(`🎙️ Generating Live API audio via WebSocket for: "${text.substring(0, 100)}..."`)
 
-    const audioData = await generateSpeechWithLiveAPI(text, process.env.GOOGLE_AI_API_KEY, voice)
+    const audioData = await generateSpeechWithWebSocket(text, process.env.GOOGLE_AI_API_KEY, voice)
 
     console.log(`✅ Generated audio data: ${audioData.length} characters`)
 
