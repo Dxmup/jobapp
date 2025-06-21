@@ -12,7 +12,6 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@clerk/nextjs": "latest",
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
     "@hookform/resolvers": "latest",
