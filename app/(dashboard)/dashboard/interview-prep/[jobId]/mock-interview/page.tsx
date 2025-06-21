@@ -12,12 +12,13 @@ interface MockInterviewPageProps {
   searchParams: {
     resumeId?: string
     preload?: string
+    interviewType?: "phone-screener" | "first-interview"
   }
 }
 
 export default async function MockInterviewPage({ params, searchParams }: MockInterviewPageProps) {
   const { jobId } = params
-  const { resumeId, preload } = searchParams
+  const { resumeId, preload, interviewType } = searchParams
   const shouldPreload = preload === "true"
 
   // Verify job exists and belongs to the user
@@ -110,6 +111,7 @@ export default async function MockInterviewPage({ params, searchParams }: MockIn
           resume={resume}
           preloadedQuestions={preloadedQuestions}
           shouldPreload={shouldPreload}
+          interviewType={interviewType || "first-interview"}
         />
       </Suspense>
     </div>

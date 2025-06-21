@@ -7,6 +7,7 @@ export interface ConversationalInterviewConfig {
   silenceThreshold: number // Audio level threshold for silence detection
   silenceDuration: number // Duration of silence before considering user finished (ms)
   queueSize: number // Number of questions to keep in queue
+  interviewType: "phone-screener" | "first-interview" // Add this line
 }
 
 export interface ConversationalInterviewCallbacks {
@@ -186,8 +187,9 @@ export class ConversationalInterviewClient {
     const applicantName = this.resumeContext?.name || "there"
     const companyName = this.jobContext?.company || "our company"
     const positionTitle = this.jobContext?.title || "this position"
+    const durationMinutes = this.config.maxDuration / (60 * 1000) // Convert ms to minutes
 
-    return `Hello ${applicantName}, this is ${this.interviewerName} calling from ${companyName}. Thank you for taking the time to speak with me today about the ${positionTitle} role. I hope you're doing well. Before we dive into the questions, I want to let you know this should take about 15 minutes, and I'm excited to learn more about your background and experience. Are you ready to begin?
+    return `Hello ${applicantName}, this is ${this.interviewerName} calling from ${companyName}. Thank you for taking the time to speak with me today about the ${positionTitle} role. I hope you're doing well. Before we dive into the questions, I want to let you know this should take about ${durationMinutes} minutes, and I'm excited to learn more about your background and experience. Are you ready to begin?`
   }
 
   private setupVoiceActivityDetection(): void {
@@ -496,9 +498,27 @@ export class ConversationalInterviewClient {
   }
 
   private createIntroductionPrompt(introText: string): string {
+    const phoneScreenerInstructions = `
+IMPORTANT: The questions provided are designed for in-depth interviews, but this is a brief phone screening. You must adapt each question to be:
+
+More concise: Reduce complex multi-part questions to single, focused questions
+Screen-appropriate: Focus on basic qualifications, interest level, and major red flags
+Time-efficient: Ask for brief examples rather than detailed stories
+High-level: Cover broad topics rather than deep technical details
+
+Adaptation Examples:
+
+Instead of: "Walk me through a complex project where you had to overcome significant challenges..."
+Ask: "Can you briefly describe a recent project you're proud of?"
+Instead of: "Describe your approach to conflict resolution with detailed examples..."
+Ask: "How do you typically handle workplace disagreements?"
+
+Remember: Save detailed behavioral questions and technical deep-dives for later interview rounds. Focus on screening basics: qualifications, genuine interest, communication skills, and availability.
+`
     return `ROLE: You are ${this.interviewerName}, a professional phone interviewer from ${this.jobContext?.company || "the company"}.
 
 INSTRUCTION: Deliver this introduction naturally and warmly as if starting a phone interview. Speak clearly and professionally.
+${this.config.interviewType === "phone-screener" ? phoneScreenerInstructions : ""}
 
 INTRODUCTION: "${introText}"
 
@@ -513,9 +533,27 @@ OUTPUT: Speak the introduction directly without any stage directions or descript
   }
 
   private createQuestionPrompt(questionText: string): string {
+    const phoneScreenerInstructions = `
+IMPORTANT: The questions provided are designed for in-depth interviews, but this is a brief phone screening. You must adapt each question to be:
+
+More concise: Reduce complex multi-part questions to single, focused questions
+Screen-appropriate: Focus on basic qualifications, interest level, and major red flags
+Time-efficient: Ask for brief examples rather than detailed stories
+High-level: Cover broad topics rather than deep technical details
+
+Adaptation Examples:
+
+Instead of: "Walk me through a complex project where you had to overcome significant challenges..."
+Ask: "Can you briefly describe a recent project you're proud of?"
+Instead of: "Describe your approach to conflict resolution with detailed examples..."
+Ask: "How do you typically handle workplace disagreements?"
+
+Remember: Save detailed behavioral questions and technical deep-dives for later interview rounds. Focus on screening basics: qualifications, genuine interest, communication skills, and availability.
+`
     return `ROLE: You are ${this.interviewerName}, a professional phone interviewer conducting a screening interview for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
 
 INSTRUCTION: Ask this interview question naturally and professionally. Speak as if you're genuinely interested in hearing the candidate's response.
+${this.config.interviewType === "phone-screener" ? phoneScreenerInstructions : ""}
 
 QUESTION: "${questionText}"
 
@@ -532,6 +570,7 @@ OUTPUT: Ask the question directly without any stage directions or descriptions o
   private async playClosingStatement(): Promise<void> {
     const applicantName = this.resumeContext?.name || "there"
     const companyName = this.jobContext?.company || "our company"
+    const durationMinutes = this.config.maxDuration / (60 * 1000) // Convert ms to minutes
 
     const closingText = `${applicantName}, thank you so much for taking the time to speak with me today. I really enjoyed learning about your experience and background. The next step in our process is a follow-up interview with the hiring manager, and you can expect to hear from us within 3 to 5 business days. Do you have any questions about the role, ${companyName}, or our interview process before we wrap up? Thank you again, and have a wonderful rest of your day!`
 

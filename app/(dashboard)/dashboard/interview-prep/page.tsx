@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { StreamlinedJobSelector } from "@/components/interview-prep/streamlined-job-selector"
 import { Suspense } from "react"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
 
 export default function InterviewPrepPage() {
   const router = useRouter()
@@ -19,6 +21,7 @@ export default function InterviewPrepPage() {
   const [selectedResumeId, setSelectedResumeId] = useState<string>("")
   const [jobs, setJobs] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [interviewType, setInterviewType] = useState<"phone-screener" | "first-interview">("first-interview")
 
   // Load jobs on mount
   useEffect(() => {
@@ -62,9 +65,7 @@ export default function InterviewPrepPage() {
     }
 
     // Navigate directly to mock interview
-    const mockInterviewUrl = selectedResumeId
-      ? `/dashboard/interview-prep/${selectedJobId}/mock-interview?resumeId=${selectedResumeId}`
-      : `/dashboard/interview-prep/${selectedJobId}/mock-interview`
+    const mockInterviewUrl = `/dashboard/interview-prep/${selectedJobId}/mock-interview?interviewType=${interviewType}${selectedResumeId ? `&resumeId=${selectedResumeId}` : ""}`
 
     router.push(mockInterviewUrl)
   }
@@ -76,9 +77,7 @@ export default function InterviewPrepPage() {
       return
     }
 
-    const textQuestionsUrl = selectedResumeId
-      ? `/dashboard/interview-prep/${selectedJobId}?resumeId=${selectedResumeId}`
-      : `/dashboard/interview-prep/${selectedJobId}`
+    const textQuestionsUrl = `/dashboard/interview-prep/${selectedJobId}?interviewType=${interviewType}${selectedResumeId ? `&resumeId=${selectedResumeId}` : ""}`
 
     router.push(textQuestionsUrl)
   }
@@ -148,6 +147,28 @@ export default function InterviewPrepPage() {
                   </p>
                 </div>
               )}
+
+              {/* New: Interview Type Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="interview-type" className="text-purple-800 font-medium">
+                  Interview Type
+                </Label>
+                <RadioGroup
+                  id="interview-type"
+                  value={interviewType}
+                  onValueChange={(value: "phone-screener" | "first-interview") => setInterviewType(value)}
+                  className="flex space-x-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="phone-screener" id="phone-screener" />
+                    <Label htmlFor="phone-screener">Phone Screener (15 min)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="first-interview" id="first-interview" />
+                    <Label htmlFor="first-interview">First Interview (30 min)</Label>
+                  </div>
+                </RadioGroup>
+              </div>
 
               <Button
                 onClick={handleMockInterviewClick}
