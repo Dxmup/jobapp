@@ -1,46 +1,43 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { createServerClient } from "@/lib/supabase/server"
 
-export async function GET(request: Request) {
+export async function POST() {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const userId = cookieStore.get("user_id")?.value
+    const isAuthenticated = cookieStore.get("authenticated")?.value === "true"
 
-    // Get the current session
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession()
+    console.log("Session refresh attempt:", { userId, isAuthenticated })
 
-    if (error) {
-      console.error("Session error:", error)
-      return NextResponse.json({ error: "Failed to get session" }, { status: 401 })
+    if (userId && isAuthenticated) {
+      console.log("Cookie-based authentication is valid")
+      return NextResponse.json({
+        success: true,
+        message: "Session is valid (cookie-based authentication)",
+        authenticated: true,
+        userId,
+        authMethod: "cookie",
+      })
     }
 
-    if (!session) {
-      return NextResponse.json({ error: "No active session" }, { status: 401 })
-    }
-
-    // Refresh the session
-    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-
-    if (refreshError) {
-      console.error("Session refresh error:", refreshError)
-      return NextResponse.json({ error: "Failed to refresh session" }, { status: 401 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "Session refreshed successfully",
-      user: refreshData.user,
-    })
-  } catch (error) {
-    console.error("Unexpected error in refresh-session:", error)
+    console.log("No valid authentication found in cookies")
     return NextResponse.json(
       {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
+        success: false,
+        message: "No active session found",
+        authenticated: false,
+        authMethod: "none",
+      },
+      { status: 401 },
+    )
+  } catch (error) {
+    console.error("Session refresh error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Failed to refresh session",
+        error: error instanceof Error ? error.message : "Unknown error",
+        authenticated: false,
       },
       { status: 500 },
     )

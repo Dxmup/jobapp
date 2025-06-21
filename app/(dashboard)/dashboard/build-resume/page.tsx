@@ -9,9 +9,22 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { ChevronRight, ChevronLeft, Save, AlertCircle, Info, Sparkles, Trash2, Plus, Loader2 } from "lucide-react"
+import {
+  ChevronRight,
+  ChevronLeft,
+  Save,
+  AlertCircle,
+  Info,
+  Sparkles,
+  Trash2,
+  Plus,
+  Loader2,
+  Upload,
+} from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { toast } from "@/components/ui/use-toast"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { NewResumeForm } from "@/components/resumes/new-resume-form"
 
 export default function BuildResumePage() {
   const router = useRouter()
@@ -78,6 +91,7 @@ export default function BuildResumePage() {
     ],
   })
 
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const totalSteps = 6
 
   const handleNext = () => {
@@ -1049,6 +1063,10 @@ export default function BuildResumePage() {
     <div className="container max-w-4xl py-6 space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Resume Builder</h1>
+        <Button variant="outline" size="sm" onClick={() => setIsUploadDialogOpen(true)}>
+          Upload Existing Resume
+          <Upload className="ml-2 h-4 w-4" />
+        </Button>
         <div className="text-sm text-muted-foreground">
           Step {currentStep} of {totalSteps}
         </div>
@@ -1094,6 +1112,18 @@ export default function BuildResumePage() {
           )}
         </div>
       </div>
+
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-full sm:max-w-[600px] md:max-w-[700px] lg:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle>Upload Your Resume</DialogTitle>
+            <DialogDescription>Upload your existing resume to quickly get started.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-1">
+            <NewResumeForm onClose={() => setIsUploadDialogOpen(false)} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
