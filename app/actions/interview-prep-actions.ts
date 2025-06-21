@@ -4,63 +4,38 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
-// Helper function to get the current user ID - with improved debugging
+// Simple in-memory cache for request deduplication
+const requestCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_TTL = 5000 // 5 seconds
+
+function getCachedResult<T>(key: string): T | null {
+  const cached = requestCache.get(key)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data as T
+  }
+  requestCache.delete(key) // Clean up expired cache
+  return null
+}
+
+function setCachedResult<T>(key: string, data: T): void {
+  requestCache.set(key, { data, timestamp: Date.now() })
+}
+
+// Helper function to get the current user ID - simplified for cookie-based auth
 async function getCurrentUserId(): Promise<string> {
   try {
-    const supabase = createServerSupabaseClient()
     const cookieStore = cookies()
-
-    // Try to get user from session first
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
-
-    // Log session information for debugging
-    console.log(
-      "Session info:",
-      session
-        ? {
-            sessionId: session.id,
-            userId: session.user?.id,
-            hasUser: !!session.user,
-          }
-        : "No session",
-    )
-
-    if (sessionError) {
-      console.error("Session error:", sessionError)
-    }
-
-    if (session?.user?.id) {
-      console.log("Using user ID from session:", session.user.id)
-      return session.user.id
-    }
-
-    // Fallback to cookie
     const userId = cookieStore.get("user_id")?.value
 
-    // Log cookie information for debugging
-    console.log("Cookie user_id:", userId || "Not found")
-
     if (!userId) {
-      console.log("No user ID found, redirecting to login")
-      // If no user ID is found, redirect to login
+      console.log("No user ID found in cookies, redirecting to login")
       redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
     }
 
     return userId
   } catch (error) {
     console.error("Error getting current user ID:", error)
-    // Try to get from cookie as last resort
-    const cookieStore = cookies()
-    const userId = cookieStore.get("user_id")?.value
-
-    if (!userId) {
-      redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
-    }
-
-    return userId
+    redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
   }
 }
 
@@ -767,10 +742,18 @@ export async function getUserJobs(): Promise<{
   error?: string
 }> {
   try {
-    const supabase = createServerSupabaseClient()
     const userId = await getCurrentUserId()
+    const cacheKey = `user_jobs_${userId}`
 
-    console.log(`Getting all jobs for user: ${userId}`)
+    // Check cache first
+    const cached = getCachedResult<{ success: boolean; jobs?: any[]; error?: string }>(cacheKey)
+    if (cached) {
+      console.log(`Returning cached jobs for user: ${userId}`)
+      return cached
+    }
+
+    const supabase = createServerSupabaseClient()
+    console.log(`Fetching fresh jobs for user: ${userId}`)
 
     // Try with user_id field first
     let { data, error } = await supabase
@@ -794,12 +777,12 @@ export async function getUserJobs(): Promise<{
       }
     }
 
-    if (error) {
-      console.error("Error fetching user jobs:", error)
-      return { success: false, error: "Failed to fetch jobs" }
-    }
+    const result = error ? { success: false, error: "Failed to fetch jobs" } : { success: true, jobs: data || [] }
 
-    return { success: true, jobs: data || [] }
+    // Cache the result
+    setCachedResult(cacheKey, result)
+
+    return result
   } catch (error) {
     console.error("Error fetching user jobs:", error)
     return {

@@ -67,12 +67,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Special case for interview prep pages - allow access but client-side will handle auth
-  if (path.startsWith("/dashboard/interview-prep")) {
-    console.log("Interview prep page accessed, allowing access for client-side handling")
-    return NextResponse.next()
-  }
-
   // If user is not authenticated and trying to access protected routes
   if (
     !isAuthenticated &&
@@ -80,8 +74,7 @@ export async function middleware(request: NextRequest) {
       path.startsWith("/jobs") ||
       path.startsWith("/onboarding") ||
       path.startsWith("/admin")) &&
-    !path.startsWith("/dashboard/resumes") && // Exclude resume pages from middleware auth check
-    !path.startsWith("/dashboard/interview-prep") // Exclude interview prep pages from middleware auth check
+    !path.startsWith("/dashboard/resumes") // Exclude resume pages from middleware auth check
   ) {
     // For admin routes, redirect to admin login
     if (path.startsWith("/admin")) {
@@ -128,15 +121,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // If user is authenticated but doesn't have a baseline resume
-  // and is trying to access dashboard or jobs (but not onboarding, admin, resumes, or interview prep)
+  // and is trying to access dashboard or jobs (but not onboarding or admin)
   if (
     isAuthenticated &&
     !hasBaselineResume &&
     (path.startsWith("/dashboard") || path.startsWith("/jobs")) &&
     !path.startsWith("/onboarding") &&
-    !path.startsWith("/admin") &&
-    !path.startsWith("/dashboard/resumes") &&
-    !path.startsWith("/dashboard/interview-prep")
+    !path.startsWith("/admin")
   ) {
     console.log(`Redirecting user without baseline resume to onboarding`)
     return NextResponse.redirect(new URL("/onboarding", request.url))
