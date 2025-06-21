@@ -13,8 +13,10 @@
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
+    "@google/genai": "latest",
     "@hookform/resolvers": "latest",
     "@jest/globals": "latest",
+    "@modelcontextprotocol/sdk": "latest",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "latest",

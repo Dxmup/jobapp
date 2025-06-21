@@ -8,97 +8,102 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Text is required" }, { status: 400 })
     }
 
-    console.log(`🎙️ Processing speech request for: "${text.substring(0, 100)}..."`)
-
-    // For now, we'll use client-side Web Speech API since it's more reliable
-    // In the future, you can integrate with Gemini Live API or other TTS services
-
-    // Check if we have a valid API key
     if (!process.env.GOOGLE_AI_API_KEY) {
-      console.log("⚠️ No Google AI API key found, using Web Speech API fallback")
-      return NextResponse.json({
-        success: true,
-        audioData: null, // Signal to use client-side TTS
-        text: text,
-        voice,
-        tone,
-        fallback: true,
-        reason: "No API key configured",
-      })
+      return NextResponse.json({ success: false, error: "Google AI API key not configured" }, { status: 500 })
     }
 
-    // Try Gemini API with correct authentication
-    try {
-      const geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are a professional interviewer. Please acknowledge that you will ask this interview question with a ${tone} tone: "${text}"`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.3,
-              topK: 1,
-              topP: 1,
-              maxOutputTokens: 100,
-            },
-          }),
+    console.log(`🎙️ Generating Live API audio for: "${text.substring(0, 100)}..."`)
+
+    // Import the Google GenAI library dynamically
+    const { GoogleGenAI, Modality } = await import("@google/genai")
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY })
+    const model = "gemini-2.0-flash-live-001"
+    const config = {
+      responseModalities: [Modality.AUDIO],
+      voiceConfig: {
+        prebuiltVoiceConfig: {
+          voiceName: voice,
         },
-      )
-
-      if (geminiResponse.ok) {
-        const geminiData = await geminiResponse.json()
-        console.log("✅ Gemini API response received")
-
-        // Even with Gemini response, we'll use Web Speech API for actual audio
-        return NextResponse.json({
-          success: true,
-          audioData: null, // Use client-side TTS
-          text: text,
-          voice,
-          tone,
-          fallback: true,
-          geminiResponse: geminiData.candidates?.[0]?.content?.parts?.[0]?.text,
-        })
-      } else {
-        console.log(`⚠️ Gemini API returned ${geminiResponse.status}, using fallback`)
-      }
-    } catch (geminiError: any) {
-      console.log("⚠️ Gemini API error, using Web Speech API fallback:", geminiError.message)
+      },
+      speechConfig: {
+        languageCode: "en-US",
+      },
     }
 
-    // Always return success with Web Speech API fallback
+    // Create a promise to handle the Live API session
+    const audioData = await new Promise<string>((resolve, reject) => {
+      const responseQueue: any[] = []
+      const audioChunks: string[] = []
+
+      const session = ai.live.connect({
+        model: model,
+        callbacks: {
+          onopen: () => {
+            console.log("✅ Live API session opened")
+            // Send the text to be converted to speech
+            session.sendClientContent({
+              turns: [
+                {
+                  role: "user",
+                  parts: [{ text: text }],
+                },
+              ],
+              turnComplete: true,
+            })
+          },
+          onmessage: (message: any) => {
+            console.log("📨 Received message:", message.type || "unknown")
+            responseQueue.push(message)
+
+            // Check for audio data
+            if (message.data) {
+              audioChunks.push(message.data)
+            }
+
+            // Check if turn is complete
+            if (message.serverContent && message.serverContent.turnComplete) {
+              console.log("✅ Turn complete, combining audio chunks")
+              const combinedAudio = audioChunks.join("")
+              session.close()
+              resolve(combinedAudio)
+            }
+          },
+          onerror: (e: any) => {
+            console.error("❌ Live API error:", e.message)
+            session.close()
+            reject(new Error(`Live API error: ${e.message}`))
+          },
+          onclose: (e: any) => {
+            console.log("🔚 Live API session closed:", e.reason)
+            if (audioChunks.length === 0) {
+              reject(new Error("No audio data received"))
+            }
+          },
+        },
+        config: config,
+      })
+
+      // Set a timeout to prevent hanging
+      setTimeout(() => {
+        if (audioChunks.length === 0) {
+          session.close()
+          reject(new Error("Timeout waiting for audio response"))
+        }
+      }, 30000) // 30 second timeout
+    })
+
+    console.log(`✅ Generated audio data: ${audioData.length} characters`)
+
     return NextResponse.json({
       success: true,
-      audioData: null, // Signal to use client-side TTS
-      text: text,
-      voice,
-      tone,
-      fallback: true,
-      reason: "Using Web Speech API for reliable audio generation",
+      audioData: audioData,
+      voice: voice,
+      tone: tone,
+      model: model,
     })
   } catch (error: any) {
-    console.error("❌ Error in generate-real-audio:", error)
-
-    // Even on error, return a fallback response
-    return NextResponse.json({
-      success: true,
-      audioData: null,
-      text: "I'm ready to begin the interview. Let's start with your first question.",
-      voice: "Kore",
-      tone: "professional",
-      fallback: true,
-      error: error.message,
-    })
+    console.error("❌ Error generating Live API audio:", error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

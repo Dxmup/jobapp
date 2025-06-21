@@ -28,7 +28,6 @@ export class LiveInterviewClient {
   private currentQuestionIndex = 0
   private timeoutId: NodeJS.Timeout | null = null
   private stream: MediaStream | null = null
-  private speechSynthesis: SpeechSynthesis | null = null
 
   private constructor(
     jobId: string,
@@ -42,7 +41,6 @@ export class LiveInterviewClient {
     this.questions = questions
     this.config = config
     this.callbacks = callbacks
-    this.speechSynthesis = window.speechSynthesis
   }
 
   static async create(
@@ -59,25 +57,12 @@ export class LiveInterviewClient {
 
   private async initialize(): Promise<void> {
     try {
-      // Initialize audio context
+      // Initialize audio context for playback
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
 
-      // Request microphone access
+      // Request microphone access for recording user responses
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       this.mediaRecorder = new MediaRecorder(this.stream)
-
-      // Test speech synthesis availability
-      if (!this.speechSynthesis) {
-        console.warn("⚠️ Speech synthesis not supported, will show text only")
-      } else {
-        // Load voices
-        if (this.speechSynthesis.getVoices().length === 0) {
-          await new Promise((resolve) => {
-            this.speechSynthesis!.onvoiceschanged = resolve
-            setTimeout(resolve, 1000) // Fallback timeout
-          })
-        }
-      }
 
       console.log("✅ LiveInterviewClient initialized successfully")
       this.callbacks.onConnected()
@@ -93,7 +78,7 @@ export class LiveInterviewClient {
       this.startTime = Date.now()
       this.currentQuestionIndex = 0
 
-      console.log("🎙️ Starting live interview...")
+      console.log("🎙️ Starting live interview with Gemini Live API...")
 
       // Set up time warning
       setTimeout(() => {
@@ -141,137 +126,104 @@ export class LiveInterviewClient {
         this.callbacks.onQuestionDisplayed(question, questionNumber, totalQuestions)
       }
 
-      try {
-        // Try to get audio from API
-        const response = await fetch("/api/interview/generate-real-audio", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            text: question,
-            voice: this.config.voice,
-            tone: "professional",
-          }),
-        })
+      // Generate audio using Gemini Live API
+      const response = await fetch("/api/interview/generate-real-audio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          text: question,
+          voice: this.config.voice,
+          tone: "professional",
+        }),
+      })
 
-        if (response.ok) {
-          const data = await response.json()
-
-          if (data.success) {
-            console.log("🔊 Using Web Speech API for question audio...")
-            await this.speakText(data.text || question)
-            this.callbacks.onAudioReceived("speech-synthesis")
-          } else {
-            throw new Error(data.error || "API returned unsuccessful response")
-          }
-        } else {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-      } catch (apiError: any) {
-        console.warn("⚠️ API call failed, speaking question directly:", apiError.message)
-        // Fallback: speak the question directly
-        await this.speakText(question)
-        this.callbacks.onAudioReceived("speech-synthesis-fallback")
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // Wait for user response
-      setTimeout(() => {
-        this.currentQuestionIndex++
-        if (this.active) {
-          this.askNextQuestion()
-        }
-      }, 25000) // 25 seconds to answer
-    } catch (error: any) {
-      console.error("❌ Failed to ask question:", error)
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("❌ Non-JSON response:", text.substring(0, 200))
+        throw new Error("Server returned non-JSON response")
+      }
 
-      // Try to continue with next question instead of failing completely
-      if (
-        this.active &&
-        this.currentQuestionIndex < [...this.questions.technical, ...this.questions.behavioral].length - 1
-      ) {
-        console.log("🔄 Attempting to continue with next question...")
-        this.currentQuestionIndex++
+      const data = await response.json()
+
+      if (data.success && data.audioData) {
+        console.log("🔊 Playing Gemini Live API generated audio...")
+        await this.playLiveAPIAudio(data.audioData)
+        this.callbacks.onAudioReceived(data.audioData)
+
+        // Wait for user response
         setTimeout(() => {
+          this.currentQuestionIndex++
           if (this.active) {
             this.askNextQuestion()
           }
-        }, 2000)
+        }, 30000) // 30 seconds to answer
       } else {
-        this.callbacks.onError(`Interview error: ${error.message}`)
+        throw new Error(data.error || "Failed to generate audio with Live API")
       }
+    } catch (error: any) {
+      console.error("❌ Failed to ask question:", error)
+      this.callbacks.onError(`Failed to ask question: ${error.message}`)
     }
   }
 
-  private async speakText(text: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.speechSynthesis) {
-        console.log("📝 Speech synthesis not available, showing text only")
-        resolve()
-        return
+  private async playLiveAPIAudio(audioData: string): Promise<void> {
+    try {
+      if (!this.audioContext) {
+        throw new Error("Audio context not initialized")
       }
 
-      // Cancel any ongoing speech
-      this.speechSynthesis.cancel()
+      // Decode base64 audio data
+      const audioBuffer = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
 
-      const utterance = new SpeechSynthesisUtterance(text)
+      // Convert PCM data to AudioBuffer
+      // Live API returns 16-bit PCM at 24kHz
+      const sampleRate = 24000
+      const numSamples = audioBuffer.length / 2 // 16-bit = 2 bytes per sample
 
-      // Configure voice settings
-      const voices = this.speechSynthesis.getVoices()
-      const preferredVoice =
-        voices.find((voice) => voice.name.toLowerCase().includes("karen")) ||
-        voices.find((voice) => voice.name.toLowerCase().includes("samantha")) ||
-        voices.find((voice) => voice.name.toLowerCase().includes("female")) ||
-        voices.find((voice) => voice.lang.startsWith("en-US")) ||
-        voices.find((voice) => voice.lang.startsWith("en")) ||
-        voices[0]
+      const audioContextBuffer = this.audioContext.createBuffer(1, numSamples, sampleRate)
+      const channelData = audioContextBuffer.getChannelData(0)
 
-      if (preferredVoice) {
-        utterance.voice = preferredVoice
-        console.log(`🗣️ Using voice: ${preferredVoice.name} (${preferredVoice.lang})`)
+      // Convert 16-bit PCM to float32
+      for (let i = 0; i < numSamples; i++) {
+        const sample = (audioBuffer[i * 2] | (audioBuffer[i * 2 + 1] << 8)) / 32768.0
+        channelData[i] = sample
       }
 
-      utterance.rate = 0.85 // Slightly slower for clarity
-      utterance.pitch = 1.0
-      utterance.volume = 0.9
+      // Play the audio
+      const source = this.audioContext.createBufferSource()
+      source.buffer = audioContextBuffer
+      source.connect(this.audioContext.destination)
 
-      utterance.onend = () => {
-        console.log("✅ Speech completed")
-        resolve()
-      }
+      return new Promise((resolve, reject) => {
+        source.onended = () => {
+          console.log("✅ Live API audio playback completed")
+          resolve()
+        }
 
-      utterance.onerror = (event) => {
-        console.error("❌ Speech error:", event.error)
-        // Don't reject, just resolve to continue the interview
-        resolve()
-      }
+        source.onerror = (e) => {
+          console.error("❌ Live API audio playback failed:", e)
+          reject(new Error("Audio playback failed"))
+        }
 
-      console.log(`🗣️ Speaking: "${text.substring(0, 50)}..."`)
-      this.speechSynthesis.speak(utterance)
-
-      // Fallback timeout in case speech doesn't trigger events
-      setTimeout(
-        () => {
-          if (utterance.pending || this.speechSynthesis?.speaking) {
-            console.log("⏰ Speech timeout, continuing...")
-            this.speechSynthesis?.cancel()
-            resolve()
-          }
-        },
-        Math.max(5000, text.length * 100),
-      ) // Minimum 5 seconds, or 100ms per character
-    })
+        source.start()
+      })
+    } catch (error: any) {
+      console.error("❌ Failed to play Live API audio:", error)
+      throw new Error(`Failed to play Live API audio: ${error.message}`)
+    }
   }
 
   endInterview(): void {
     console.log("🔚 Ending interview...")
     this.active = false
-
-    // Stop any ongoing speech
-    if (this.speechSynthesis) {
-      this.speechSynthesis.cancel()
-    }
 
     if (this.timeoutId) {
       clearTimeout(this.timeoutId)
