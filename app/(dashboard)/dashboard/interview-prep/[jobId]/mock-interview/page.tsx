@@ -5,6 +5,7 @@ import { getInterviewQuestions } from "@/app/actions/interview-prep-actions"
 import { SimpleMockInterview } from "@/components/interview-prep/simple-mock-interview"
 import { Loader2 } from "lucide-react"
 import { cookies } from "next/headers"
+import { TTSTest } from "@/components/interview-prep/tts-test"
 
 interface MockInterviewPageProps {
   params: {
@@ -80,6 +81,10 @@ export default async function MockInterviewPage({ params, searchParams }: MockIn
         <p className="text-muted-foreground">
           Practice your interview skills with AI-generated voice questions for {job.title} at {job.company}
         </p>
+      </div>
+
+      <div className="mb-6">
+        <TTSTest />
       </div>
 
       <Suspense

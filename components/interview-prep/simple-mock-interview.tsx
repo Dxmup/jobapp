@@ -29,6 +29,7 @@ export function SimpleMockInterview({ job, resume, questions }: MockInterviewPro
   const [queueStatus, setQueueStatus] = useState({ total: 0, ready: 0, loading: 0, current: 0 })
   const [audioProgress, setAudioProgress] = useState({ current: 0, duration: 0 })
   const [isInitialized, setIsInitialized] = useState(false)
+  const [currentQuestionText, setCurrentQuestionText] = useState<string>("")
 
   const managerRef = useRef<ConversationFlowManager | null>(null)
 
@@ -83,6 +84,12 @@ export function SimpleMockInterview({ job, resume, questions }: MockInterviewPro
           onQuestionChange: (questionIndex, total) => {
             setCurrentQuestionIndex(questionIndex)
             setTotalQuestions(total)
+
+            // Update current question text
+            const interviewQuestions = prepareQuestions()
+            if (interviewQuestions[questionIndex]) {
+              setCurrentQuestionText(interviewQuestions[questionIndex].text)
+            }
           },
           onAudioProgress: (current, duration) => {
             setAudioProgress({ current, duration })
@@ -336,6 +343,25 @@ export function SimpleMockInterview({ job, resume, questions }: MockInterviewPro
                 </div>
               )}
             </div>
+
+            {/* Current Question Display */}
+            {(conversationState === "playing_question" || conversationState === "listening_for_response") &&
+              currentQuestionText && (
+                <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <Volume2 className="h-5 w-5 text-blue-600 mt-0.5" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-blue-900 mb-2">Interviewer is asking:</h4>
+                      <p className="text-blue-800 leading-relaxed">{currentQuestionText}</p>
+                      {conversationState === "listening_for_response" && (
+                        <p className="text-sm text-blue-600 mt-2 italic">💬 Please respond now - I'm listening...</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
             {/* Progress */}
             {totalQuestions > 0 && (
