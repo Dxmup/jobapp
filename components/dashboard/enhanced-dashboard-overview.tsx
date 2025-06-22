@@ -20,6 +20,7 @@ interface DashboardStats {
 export function EnhancedDashboardOverview() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [userName, setUserName] = useState<string>("")
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -61,6 +62,22 @@ export function EnhancedDashboardOverview() {
     }
 
     fetchStats()
+
+    // Fetch user name
+    const fetchUserName = async () => {
+      try {
+        const response = await fetch("/api/user/profile")
+        if (response.ok) {
+          const userData = await response.json()
+          const name = userData.full_name || userData.first_name || userData.email?.split("@")[0] || ""
+          setUserName(name)
+        }
+      } catch (error) {
+        console.error("Failed to fetch user name:", error)
+      }
+    }
+
+    fetchUserName()
   }, [])
 
   const quickActions = [
@@ -110,7 +127,7 @@ export function EnhancedDashboardOverview() {
             </div>
             <div className="min-w-0">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-cyan-200 bg-clip-text text-transparent">
-                Welcome back!
+                Welcome back{userName ? `'s ${userName}` : ""}!
               </h1>
               <p className="text-white/60 text-sm sm:text-base">Ready to land your dream job?</p>
             </div>
