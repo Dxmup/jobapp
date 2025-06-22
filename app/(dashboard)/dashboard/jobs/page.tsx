@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { JobFolderList } from "@/components/dashboard/job-folder-list"
 import { Input } from "@/components/ui/input"
-import { Search, Plus, Briefcase, TrendingUp, Clock, Target } from "lucide-react"
+import { Search, Plus, Briefcase, TrendingUp, Clock, Target, Sparkles, Zap, Star, Rocket } from "lucide-react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -266,20 +266,20 @@ export default function JobsPage() {
     switch (statusLower) {
       case "interviewing":
       case "interview":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
+        return "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-lg"
       case "applied":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+        return "bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 shadow-lg"
       case "drafting":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+        return "bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 shadow-lg"
       case "offer":
       case "offer received":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+        return "bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg"
       case "rejected":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+        return "bg-gradient-to-r from-red-500 to-pink-500 text-white border-0 shadow-lg"
       case "saved":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+        return "bg-gradient-to-r from-gray-400 to-gray-600 text-white border-0 shadow-lg"
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+        return "bg-gradient-to-r from-gray-400 to-gray-600 text-white border-0 shadow-lg"
     }
   }
 
@@ -367,85 +367,99 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-cyan-50 relative overflow-hidden">
       <style jsx global>
         {pulseAnimationCSS}
       </style>
 
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="relative px-6 py-16">
-          <div className="mx-auto max-w-7xl">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                    <Briefcase className="h-6 w-6" />
-                  </div>
-                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Job Applications</h1>
-                </div>
-                <p className="text-lg text-white/90 max-w-2xl">
-                  Manage and track all your job applications in one place. Stay organized and never miss an opportunity.
-                </p>
-              </div>
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-400/20 to-blue-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-pink-300/10 to-purple-300/10 rounded-full blur-3xl animate-pulse delay-500"></div>
+      </div>
 
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Total</span>
-                  </div>
-                  <div className="text-2xl font-bold">{stats.total}</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Active</span>
-                  </div>
-                  <div className="text-2xl font-bold">{stats.active}</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Interviews</span>
-                  </div>
-                  <div className="text-2xl font-bold">{stats.interviewing}</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Briefcase className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Offers</span>
-                  </div>
-                  <div className="text-2xl font-bold">{stats.offers}</div>
-                </div>
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 via-transparent to-cyan-900/50"></div>
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg%3E%3Cg fill=\"none\" fillRule=\"evenodd\"%3E%3Cg fill=\"%23ffffff\" fillOpacity=\"0.05\"%3E%3Ccircle cx=\"30\" cy=\"30\" r=\"2\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-30"></div>
+        
+        <div className="relative px-6 py-20">
+          <div className="mx-auto max-w-7xl">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 mb-6 border border-white/20">
+                <Sparkles className="h-5 w-5 text-yellow-300 animate-pulse" />
+                <span className="text-white/90 font-medium">Your Dream Job Awaits</span>
+                <Rocket className="h-5 w-5 text-cyan-300 animate-bounce" />
               </div>
+              
+              <h1 className="text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6">
+                <span className="bg-gradient-to-r from-white via-cyan-200 to-pink-200 bg-clip-text text-transparent">
+                  Job Applications
+                </span>
+              </h1>
+              
+              <p className="text-xl lg:text-2xl text-white/80 max-w-3xl mx-auto leading-relaxed">
+                Manage and track all your job applications in one place. 
+                <span className="text-cyan-200 font-semibold"> Stay organized</span> and 
+                <span className="text-pink-200 font-semibold"> never miss an opportunity</span>.
+              </p>
+            </div>
+
+            {/* Enhanced Stats Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+              {[
+                { icon: Target, label: "Total", value: stats.total, color: "from-purple-500 to-pink-500" },
+                { icon: TrendingUp, label: "Active", value: stats.active, color: "from-cyan-500 to-blue-500" },
+                { icon: Clock, label: "Interviews", value: stats.interviewing, color: "from-green-500 to-emerald-500" },
+                { icon: Star, label: "Offers", value: stats.offers, color: "from-yellow-500 to-orange-500" },
+              ].map((stat, index) => (
+                <div
+                  key={stat.label}
+                  className="group relative bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-cyan-500/5"></div>
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`p-2 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
+                        <stat.icon className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="text-white/80 font-medium">{stat.label}</span>
+                    </div>
+                    <div className="text-3xl lg:text-4xl font-bold text-white group-hover:scale-110 transition-transform duration-300">
+                      {stat.value}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        {/* Action Bar */}
-        <div className="mb-8">
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+      <div className="relative mx-auto max-w-7xl px-6 py-12">
+        {/* Enhanced Action Bar */}
+        <div className="mb-12">
+          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-cyan-500/5"></div>
+            <CardContent className="relative p-8">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-purple-500" />
                   <Input
                     type="search"
-                    placeholder="Search applications..."
-                    className="pl-10 bg-white/50 border-white/20"
+                    placeholder="Search your dream opportunities..."
+                    className="pl-12 h-12 bg-white/70 border-purple-200 focus:border-purple-400 focus:ring-purple-400 rounded-xl text-lg"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-4">
                   <select
-                    className="h-10 rounded-lg border border-white/20 bg-white/50 px-3 py-2 text-sm backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="h-12 rounded-xl border-purple-200 bg-white/70 px-4 py-2 text-gray-700 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                   >
@@ -459,7 +473,7 @@ export default function JobsPage() {
                   </select>
 
                   <select
-                    className="h-10 rounded-lg border border-white/20 bg-white/50 px-3 py-2 text-sm backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="h-12 rounded-xl border-purple-200 bg-white/70 px-4 py-2 text-gray-700 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value)}
                   >
@@ -472,14 +486,17 @@ export default function JobsPage() {
                   <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <Button
                       onClick={() => setIsDialogOpen(true)}
-                      className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg"
+                      className="h-12 px-8 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 hover:from-purple-700 hover:via-pink-700 hover:to-cyan-700 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 rounded-xl font-semibold"
                     >
-                      <Plus className="mr-2 h-4 w-4" />
-                      {hasJobs ? "Add a Job to Track" : "Let's add the job you're interested in!"}
+                      <Plus className="mr-2 h-5 w-5" />
+                      <Zap className="mr-2 h-4 w-4" />
+                      {hasJobs ? "Add New Opportunity" : "Start Your Journey!"}
                     </Button>
-                    <DialogContent className="sm:max-w-[600px]">
+                    <DialogContent className="sm:max-w-[600px] bg-white/95 backdrop-blur-xl border-purple-200">
                       <DialogHeader>
-                        <DialogTitle>Add a Job to Track</DialogTitle>
+                        <DialogTitle className="text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                          Add Your Next Opportunity
+                        </DialogTitle>
                       </DialogHeader>
                       <NewJobForm onSuccess={handleJobCreationSuccess} />
                     </DialogContent>
@@ -487,11 +504,12 @@ export default function JobsPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                <span>
-                  Showing {filteredJobs.length} of {jobs.length} applications
+              <div className="mt-6 flex items-center justify-between text-sm">
+                <span className="text-gray-600 font-medium">
+                  Showing <span className="text-purple-600 font-bold">{filteredJobs.length}</span> of{" "}
+                  <span className="text-purple-600 font-bold">{jobs.length}</span> applications
                 </span>
-                <Badge variant="outline" className="bg-white/50">
+                <Badge variant="outline" className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200 font-semibold">
                   {filteredJobs.length} results
                 </Badge>
               </div>
@@ -499,26 +517,28 @@ export default function JobsPage() {
           </Card>
         </div>
 
-        {/* Content Tabs */}
+        {/* Enhanced Content Tabs */}
         <Tabs defaultValue="grid" className="w-full">
-          <div className="mb-6">
-            <TabsList className="bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg">
+          <div className="mb-8">
+            <TabsList className="bg-white/80 backdrop-blur-xl border border-purple-200 shadow-xl rounded-2xl p-2">
               <TabsTrigger
                 value="grid"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white rounded-xl font-semibold px-8 py-3 transition-all duration-300"
               >
+                <Briefcase className="mr-2 h-4 w-4" />
                 Grid View
               </TabsTrigger>
               <TabsTrigger
                 value="list"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white rounded-xl font-semibold px-8 py-3 transition-all duration-300"
               >
+                <TrendingUp className="mr-2 h-4 w-4" />
                 List View
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="grid" className="mt-6">
+          <TabsContent value="grid" className="mt-8">
             <JobFolderList
               jobs={filteredJobs}
               loading={loading}
@@ -534,17 +554,21 @@ export default function JobsPage() {
             />
           </TabsContent>
 
-          <TabsContent value="list" className="mt-6">
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
-                <CardTitle className="text-xl text-gray-800">Job Applications</CardTitle>
-                <CardDescription className="text-gray-600">
-                  A detailed list view of all your job applications.
+          <TabsContent value="list" className="mt-8">
+            <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-cyan-500/5"></div>
+              <CardHeader className="relative bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100">
+                <CardTitle className="text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
+                  <Briefcase className="h-6 w-6 text-purple-600" />
+                  Your Job Applications
+                </CardTitle>
+                <CardDescription className="text-gray-600 text-lg">
+                  A detailed overview of all your career opportunities.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="relative p-0">
                 <div className="overflow-hidden">
-                  <div className="grid grid-cols-5 p-4 font-medium border-b bg-gray-50/50 text-gray-700">
+                  <div className="grid grid-cols-5 p-6 font-semibold border-b bg-gradient-to-r from-purple-50/50 to-pink-50/50 text-gray-700">
                     <div>Job Title</div>
                     <div>Company</div>
                     <div>Status</div>
@@ -556,32 +580,41 @@ export default function JobsPage() {
                     Array(5)
                       .fill(0)
                       .map((_, index) => (
-                        <div key={index} className="grid grid-cols-5 p-4 border-b">
+                        <div key={index} className="grid grid-cols-5 p-6 border-b border-purple-100">
                           <div>
-                            <Skeleton className="h-5 w-32" />
+                            <Skeleton className="h-5 w-32 bg-purple-100" />
                           </div>
                           <div>
-                            <Skeleton className="h-5 w-24" />
+                            <Skeleton className="h-5 w-24 bg-purple-100" />
                           </div>
                           <div>
-                            <Skeleton className="h-5 w-20" />
+                            <Skeleton className="h-5 w-20 bg-purple-100" />
                           </div>
                           <div>
-                            <Skeleton className="h-5 w-20" />
+                            <Skeleton className="h-5 w-20 bg-purple-100" />
                           </div>
                           <div>
-                            <Skeleton className="h-5 w-20" />
+                            <Skeleton className="h-5 w-20 bg-purple-100" />
                           </div>
                         </div>
                       ))
                   ) : filteredJobs.length === 0 ? (
-                    <div className="p-12 text-center text-muted-foreground">
-                      <Briefcase className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                      <h3 className="text-lg font-medium mb-2">No job applications found</h3>
-                      <p className="text-sm">Try adjusting your filters or create a new application.</p>
+                    <div className="p-16 text-center">
+                      <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center">
+                        <Briefcase className="h-12 w-12 text-purple-500" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-gray-800 mb-3">No Applications Yet</h3>
+                      <p className="text-gray-600 mb-6">Ready to start your job search journey?</p>
+                      <Button
+                        onClick={() => setIsDialogOpen(true)}
+                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-xl"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Your First Job
+                      </Button>
                     </div>
                   ) : (
-                    filteredJobs.map((job) => {
+                    filteredJobs.map((job, index) => {
                       const isNewJob = job.id === newJobId
                       const shouldPulse = isNewJob && pulsedJobs.has(job.id)
 
@@ -599,8 +632,9 @@ export default function JobsPage() {
                         <div
                           id={`job-card-${job.id}`}
                           key={job.id}
-                          className={`grid grid-cols-5 p-4 border-b hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-indigo-50/50 transition-all duration-200 ${shouldPulse ? "animate-pulse-border border-purple-500" : ""}`}
+                          className={`grid grid-cols-5 p-6 border-b border-purple-50 hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-pink-50/50 transition-all duration-300 hover:shadow-lg ${shouldPulse ? "animate-pulse-border border-purple-500 bg-gradient-to-r from-purple-50 to-pink-50" : ""}`}
                           ref={isNewJob ? newJobRef : null}
+                          style={{ animationDelay: `${index * 50}ms` }}
                           onAnimationEnd={() => {
                             if (shouldPulse) {
                               setPulsedJobs((prev) => {
@@ -611,13 +645,15 @@ export default function JobsPage() {
                             }
                           }}
                         >
-                          <div className="font-medium text-gray-900">{job.title}</div>
-                          <div className="text-gray-700">{job.company}</div>
+                          <div className="font-semibold text-gray-900 hover:text-purple-600 transition-colors">
+                            {job.title}
+                          </div>
+                          <div className="text-gray-700 font-medium">{job.company}</div>
                           <div>
                             <button
                               type="button"
                               onClick={(e) => handleStatusClick(job.id, job.status, e)}
-                              className={`relative z-20 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:opacity-80 transition-all duration-200 ${getStatusBadgeClass(job.status)}`}
+                              className={`relative z-20 inline-flex items-center rounded-full px-3 py-1 text-xs font-bold cursor-pointer hover:scale-105 transition-all duration-200 ${getStatusBadgeClass(job.status)}`}
                               style={{ pointerEvents: "auto" }}
                             >
                               {displayStatus}
