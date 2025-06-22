@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Download, FileEdit, Search, Sparkles, TrendingUp, Clock, Target } from "lucide-react"
 import Link from "next/link"
 import { useRef, useEffect, useState } from "react"
-import { getUserCoverLetters } from "@/app/actions/cover-letter-actions"
+import { getCoverLetters } from "@/app/actions/cover-letter-actions"
 import {
   Dialog,
   DialogContent,
@@ -131,36 +131,36 @@ export default function CoverLettersPage() {
 
       try {
         // Get user cover letters using the server action
-        const result = await getUserCoverLetters()
+        const result = await getCoverLetters()
 
         debugLog += `Server action result: ${JSON.stringify(result)}
 `
 
-        if (result.success && result.coverLetters) {
-          setCoverLetters(result.coverLetters)
+        if (result.success && result.data) {
+          setCoverLetters(result.data)
 
           // Calculate stats
-          const total = result.coverLetters.length
-          const recent = result.coverLetters.filter((letter) => {
+          const total = result.data.length
+          const recent = result.data.filter((letter) => {
             const createdDate = new Date(letter.created_at)
             const weekAgo = new Date()
             weekAgo.setDate(weekAgo.getDate() - 7)
             return createdDate > weekAgo
           }).length
-          const aiGenerated = result.coverLetters.filter(
+          const aiGenerated = result.data.filter(
             (letter) => letter.name?.toLowerCase().includes("ai") || letter.name?.toLowerCase().includes("generated"),
           ).length
-          const jobSpecific = result.coverLetters.filter((letter) => letter.jobs?.title || letter.jobs?.company).length
+          const jobSpecific = result.data.filter((letter) => letter.jobs?.title || letter.jobs?.company).length
 
           setStats({ total, recent, aiGenerated, jobSpecific })
 
           // Extract unique companies
           const uniqueCompanies = Array.from(
-            new Set(result.coverLetters.filter((letter) => letter.jobs?.company).map((letter) => letter.jobs?.company)),
+            new Set(result.data.filter((letter) => letter.jobs?.company).map((letter) => letter.jobs?.company)),
           )
 
           setCompanies(uniqueCompanies as string[])
-          debugLog += `Found ${result.coverLetters.length} cover letters
+          debugLog += `Found ${result.data.length} cover letters
 `
         } else {
           debugLog += `Error: ${result.error || "Unknown error"}
