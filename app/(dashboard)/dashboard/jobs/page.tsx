@@ -439,10 +439,10 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-6 py-12 rounded-3xl">
+      <div className="relative mx-auto max-w-7xl px-6 py-12 bg-white/10 backdrop-blur-sm rounded-3xl border border-white/20 shadow-2xl">
         {/* Enhanced Action Bar */}
         <div className="mb-12">
-          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl relative overflow-hidden">
+          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl relative overflow-hidden rounded-3xl">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-cyan-500/5"></div>
             <CardContent className="relative p-8">
               <div className="flex flex-col lg:flex-row lg:items-center gap-6">
@@ -523,7 +523,7 @@ export default function JobsPage() {
         {/* Enhanced Content Tabs */}
         <Tabs defaultValue="grid" className="w-full">
           <div className="mb-8">
-            <TabsList className="bg-white/80 backdrop-blur-xl border border-purple-200 shadow-xl rounded-2xl p-2">
+            <TabsList className="bg-white/80 backdrop-blur-xl border border-purple-200 shadow-xl rounded-3xl p-2">
               <TabsTrigger
                 value="grid"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white rounded-xl font-semibold px-8 py-3 transition-all duration-300"
@@ -558,7 +558,7 @@ export default function JobsPage() {
           </TabsContent>
 
           <TabsContent value="list" className="mt-8">
-            <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl relative overflow-hidden">
+            <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl relative overflow-hidden rounded-3xl">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-cyan-500/5"></div>
               <CardHeader className="relative bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100">
                 <CardTitle className="text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
