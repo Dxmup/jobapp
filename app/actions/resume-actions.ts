@@ -260,3 +260,30 @@ export async function getResumeById(resumeId: string) {
     throw new Error("Failed to fetch resume")
   }
 }
+
+export async function removeResumeFromJob(resumeId: string, jobId: string) {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const supabase = createServerSupabaseClient()
+
+  try {
+    const { error } = await supabase
+      .from("job_resumes")
+      .delete()
+      .eq("resume_id", resumeId)
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+
+    if (error) throw error
+
+    revalidatePath(`/jobs/${jobId}`)
+    return { success: true }
+  } catch (error) {
+    console.error("Error removing resume from job:", error)
+    throw new Error("Failed to remove resume from job")
+  }
+}
