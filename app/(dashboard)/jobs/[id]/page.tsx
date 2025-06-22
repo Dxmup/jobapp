@@ -132,9 +132,9 @@ export default async function JobPage({ params }: { params: { id: string } }) {
                     Practice with our AI interviewer in a realistic phone interview simulation
                   </p>
                   <Button asChild className="mt-2">
-                    <Link href={`/dashboard/interview-prep/${jobId}/mock-interview`}>
+                    <Link href={`/dashboard/interview-prep?jobId=${jobId}`}>
                       <Phone className="mr-2 h-4 w-4" />
-                      Start Mock Interview
+                      Go to Interview Prep
                     </Link>
                   </Button>
                 </div>
@@ -144,9 +144,9 @@ export default async function JobPage({ params }: { params: { id: string } }) {
                     Review job-specific interview questions and prepare your answers
                   </p>
                   <Button asChild variant="outline" className="mt-2">
-                    <Link href={`/dashboard/interview-prep/${jobId}`}>
+                    <Link href={`/dashboard/interview-prep?jobId=${jobId}`}>
                       <FileText className="mr-2 h-4 w-4" />
-                      View Interview Questions
+                      View Interview Prep
                     </Link>
                   </Button>
                 </div>
