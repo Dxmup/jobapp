@@ -19,6 +19,7 @@ import {
   PhoneOff,
   MicIcon,
   TicketIcon as Queue,
+  Rocket,
 } from "lucide-react"
 import {
   ConversationalInterviewClient,
@@ -34,6 +35,7 @@ interface LiveInterviewProps {
     behavioral: string[]
   }
   interviewType?: "phone-screener" | "first-interview"
+  isPreloaded?: boolean
 }
 
 type InterviewState =
@@ -55,6 +57,7 @@ export function LiveInterview({
   resume,
   questions: initialQuestions,
   interviewType = "first-interview",
+  isPreloaded = false,
 }: LiveInterviewProps) {
   const [questions, setQuestions] = useState(initialQuestions)
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
@@ -83,18 +86,25 @@ export function LiveInterview({
   const hasEnoughQuestions = questions.technical.length + questions.behavioral.length >= 3
   const canStartInterview = hasEnoughQuestions && job && interviewState === "ready"
 
+  // Update questions when props change
+  useEffect(() => {
+    setQuestions(initialQuestions)
+  }, [initialQuestions])
+
   // Debug logging
   useEffect(() => {
-    console.log("🔍 LiveInterview received questions:", {
+    console.log("🔍 LiveInterview state:", {
       technical: questions.technical.length,
       behavioral: questions.behavioral.length,
       total: questions.technical.length + questions.behavioral.length,
       interviewType,
       hasEnoughQuestions,
+      isPreloaded,
+      canStartInterview,
     })
-  }, [questions, interviewType, hasEnoughQuestions])
+  }, [questions, interviewType, hasEnoughQuestions, isPreloaded, canStartInterview])
 
-  // Generate questions if not enough
+  // Generate questions if not enough (fallback)
   const handleGenerateQuestions = async () => {
     setIsGeneratingQuestions(true)
     setError(null)
@@ -118,14 +128,6 @@ export function LiveInterview({
       setIsGeneratingQuestions(false)
     }
   }
-
-  // Auto-generate questions if none exist
-  useEffect(() => {
-    if (!hasEnoughQuestions && !isGeneratingQuestions && interviewState === "ready") {
-      console.log("🤖 Auto-generating questions since none exist...")
-      handleGenerateQuestions()
-    }
-  }, [hasEnoughQuestions, isGeneratingQuestions, interviewState])
 
   // Randomly assign voice on component mount
   useEffect(() => {
@@ -363,7 +365,7 @@ export function LiveInterview({
   const getStateDisplay = () => {
     switch (interviewState) {
       case "ready":
-        return "Ready to start conversational interview"
+        return isPreloaded ? "Ready for instant start!" : "Ready to start conversational interview"
       case "initializing":
         return "Initializing interview system..."
       case "connecting":
@@ -394,7 +396,7 @@ export function LiveInterview({
   const getStateIcon = () => {
     switch (interviewState) {
       case "ready":
-        return <Phone className="h-4 w-4" />
+        return isPreloaded ? <Rocket className="h-4 w-4 text-green-500" /> : <Phone className="h-4 w-4" />
       case "initializing":
       case "connecting":
       case "connected":
@@ -440,6 +442,15 @@ export function LiveInterview({
               {interviewType === "phone-screener" ? "Phone Screening Interview" : "Professional Phone Interview"}
             </span>
             <div className="flex gap-2">
+              {isPreloaded && (
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1 bg-green-50 text-green-700 border-green-300"
+                >
+                  <Rocket className="h-3 w-3" />
+                  Instant Start
+                </Badge>
+              )}
               <Badge variant="outline" className="flex items-center gap-1">
                 <Zap className="h-3 w-3" />
                 {interviewClient?.getInterviewerName() || "Alex"} ({selectedVoice} Voice)
@@ -498,11 +509,12 @@ export function LiveInterview({
 
             {/* Interview Context */}
             {hasEnoughQuestions && (
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-medium text-blue-900">
+              <div className={`p-4 rounded-lg ${isPreloaded ? "bg-green-50" : "bg-blue-50"}`}>
+                <h3 className={`font-medium ${isPreloaded ? "text-green-900" : "text-blue-900"}`}>
                   {interviewType === "phone-screener" ? "Phone Screening Interview" : "Professional Phone Interview"}
+                  {isPreloaded && " • Optimized & Ready"}
                 </h3>
-                <div className="mt-2 text-sm text-blue-800">
+                <div className={`mt-2 text-sm ${isPreloaded ? "text-green-800" : "text-blue-800"}`}>
                   <p>
                     <strong>Interviewer:</strong> {interviewClient?.getInterviewerName() || "Alex"} from {job.company}
                   </p>
@@ -525,13 +537,21 @@ export function LiveInterview({
                   <p>
                     <strong>Duration:</strong> {interviewType === "phone-screener" ? "15 minutes" : "30 minutes"}
                   </p>
+                  {isPreloaded && (
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      <span className="text-green-700 font-medium">Fully optimized for instant start!</span>
+                    </p>
+                  )}
                 </div>
               </div>
             )}
 
             {/* Current State */}
             {hasEnoughQuestions && (
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+              <div
+                className={`flex items-center gap-3 p-4 rounded-lg ${isPreloaded && interviewState === "ready" ? "bg-green-50" : "bg-gray-50"}`}
+              >
                 {getStateIcon()}
                 <div className="flex-1">
                   <div className="font-medium">{getStateDisplay()}</div>
@@ -636,9 +656,14 @@ export function LiveInterview({
         <CardContent className="pt-6">
           <div className="flex justify-center gap-4">
             {canStartInterview && (
-              <Button onClick={startConversationalInterview} size="lg" className="bg-green-600 hover:bg-green-700">
-                <PhoneCall className="h-4 w-4 mr-2" />
-                Start {interviewType === "phone-screener" ? "Phone Screening" : "Phone Interview"}
+              <Button
+                onClick={startConversationalInterview}
+                size="lg"
+                className={`${isPreloaded ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}`}
+              >
+                {isPreloaded ? <Rocket className="h-4 w-4 mr-2" /> : <PhoneCall className="h-4 w-4 mr-2" />}
+                {isPreloaded ? "Instant Start" : "Start"}{" "}
+                {interviewType === "phone-screener" ? "Phone Screening" : "Phone Interview"}
               </Button>
             )}
 
