@@ -35,15 +35,29 @@ export function ResumeSelector({ jobId, onSelect, selectedResumeId }: ResumeSele
     async function fetchResumes() {
       try {
         setLoading(true)
+        setError(null)
 
-        // Use the ultra-simple endpoint
-        const response = await fetch("/api/resumes/list")
+        console.log("Fetching resumes for dropdown...")
+
+        // Use the consistent endpoint
+        const response = await fetch("/api/resumes/for-dropdown", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include", // Include cookies
+        })
+
+        console.log("Response status:", response.status)
 
         if (!response.ok) {
-          throw new Error("Failed to fetch resumes")
+          const errorData = await response.json().catch(() => ({}))
+          console.error("API Error:", errorData)
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
         }
 
         const data = await response.json()
+        console.log("API Response:", data)
 
         if (data.success) {
           console.log("Resumes loaded:", data.resumes)
@@ -71,6 +85,10 @@ export function ResumeSelector({ jobId, onSelect, selectedResumeId }: ResumeSele
   const baselineResumes = resumes.filter((resume) => resume.job_id === null)
   const currentJobResumes = jobId ? resumes.filter((resume) => resume.job_id === jobId) : []
   const otherJobResumes = resumes.filter((resume) => resume.job_id !== null && resume.job_id !== jobId)
+
+  if (error) {
+    return <div className="p-2 text-center text-sm text-red-500">Error loading resumes: {error}</div>
+  }
 
   return (
     <Select value={selectedResumeId} onValueChange={onSelect}>

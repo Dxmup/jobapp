@@ -1,49 +1,74 @@
 import { NextResponse } from "next/server"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
-import type { Database } from "@/lib/types/database"
 
-/**
- * Endpoint that reuses the successful logic from the /jobs Resume section
- * to populate the dropdown in the customize-resume page
- */
 export async function GET() {
   try {
-    // Get the user session using the same approach as the working endpoint
-    const cookieStore = cookies()
-    const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore })
+    console.log("=== RESUMES FOR DROPDOWN API START ===")
 
+    const cookieStore = cookies()
+    const supabase = createServerSupabaseClient()
+
+    // Get user session
     const {
       data: { session },
+      error: sessionError,
     } = await supabase.auth.getSession()
 
-    if (!session) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
+    let userId = null
+
+    if (session && !sessionError) {
+      userId = session.user.id
+      console.log("Found valid Supabase session for user:", userId)
+    } else {
+      // Fallback to cookie
+      userId = cookieStore.get("user_id")?.value
+      console.log("No Supabase session, trying cookie user ID:", userId)
+
+      if (!userId) {
+        console.error("No authentication found - no session and no user ID cookie")
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Authentication required. Please log in again.",
+            details: "No valid session or user ID found",
+          },
+          { status: 401 },
+        )
+      }
     }
 
-    const userId = session.user.id
-    console.log("Fetching resumes for user ID:", userId)
+    console.log("Querying resumes for user:", userId)
 
-    // Use the same query approach that's working in the /jobs Resume section
+    // Query resumes for the user
     const { data: resumes, error } = await supabase
       .from("resumes")
-      .select("*")
+      .select("id, name, job_id, user_id, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Error fetching resumes:", error)
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      console.error("Database error fetching resumes for dropdown:", error)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to fetch resumes from database",
+          details: error.message,
+        },
+        { status: 500 },
+      )
     }
 
-    console.log(`Found ${resumes?.length || 0} resumes for user ${userId}`)
+    console.log(`Successfully fetched ${resumes?.length || 0} resumes for dropdown for user ${userId}`)
+    console.log("Resumes data:", resumes)
+    console.log("=== RESUMES FOR DROPDOWN API END ===")
 
     return NextResponse.json({
       success: true,
       resumes: resumes || [],
     })
   } catch (error) {
-    console.error("Error in for-dropdown API:", error)
+    console.error("Unexpected error in resumes for-dropdown API:", error)
     return NextResponse.json(
       {
         success: false,

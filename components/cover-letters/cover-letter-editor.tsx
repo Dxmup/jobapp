@@ -401,7 +401,7 @@ export function CoverLetterEditor({ coverLetter }: CoverLetterEditorProps) {
                 {isUsingCustomEditor ? (
                   <>
                     <div
-                      className="min-h-[400px] font-mono text-sm p-3 border rounded-md bg-background focus-within:ring-1 focus-within:ring-ring focus-within:ring-offset-0 overflow-auto whitespace-pre-wrap"
+                      className="min-h-[400px] font-mono text-sm p-3 border rounded-md bg-background focus-within:ring-1 focus-within:ring-ring focus-within:ring-offset-0 overflow-auto whitespace-pre-wrap text-left"
                       contentEditable
                       suppressContentEditableWarning
                       onInput={handleContentEditableChange}
@@ -416,7 +416,7 @@ export function CoverLetterEditor({ coverLetter }: CoverLetterEditorProps) {
                     id="content"
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    className="min-h-[400px] font-mono text-sm"
+                    className="min-h-[400px] font-mono text-sm text-left"
                   />
                 )}
               </div>
