@@ -1,16 +1,20 @@
-import { ExclamationTriangleIcon } from "@radix-ui/react-icons"
+import type React from "react"
 
 interface FormErrorProps {
   message?: string
 }
 
-export const FormError = ({ message }: FormErrorProps) => {
-  if (!message) return null
+const FormError: React.FC<FormErrorProps> = ({ message }) => {
+  if (!message) {
+    return null
+  }
 
   return (
-    <div className="bg-destructive/15 p-3 rounded-md flex items-center gap-x-2 text-sm text-destructive">
-      <ExclamationTriangleIcon className="h-4 w-4" />
-      <p>{message}</p>
+    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+      <strong className="font-bold">Error!</strong>
+      <span className="block sm:inline"> {message}</span>
     </div>
   )
 }
+
+export default FormError

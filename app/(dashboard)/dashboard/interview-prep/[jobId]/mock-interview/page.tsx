@@ -1,119 +1,76 @@
-import { Suspense } from "react"
-import { notFound } from "next/navigation"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getInterviewQuestions } from "@/app/actions/interview-prep-actions"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
-import { PreloadedMockInterview } from "@/components/interview-prep/preloaded-mock-interview"
+import { redirect } from "next/navigation"
+import PreloadedMockInterview from "./PreloadedMockInterview"
 
-interface MockInterviewPageProps {
+interface Props {
   params: {
     jobId: string
   }
-  searchParams: {
-    resumeId?: string
-    preload?: string
-    interviewType?: "phone-screener" | "first-interview"
-  }
 }
 
-export default async function MockInterviewPage({ params, searchParams }: MockInterviewPageProps) {
-  const { jobId } = params
-  const { resumeId, preload, interviewType = "first-interview" } = searchParams
-  const shouldPreload = preload === "true"
+const MockInterviewPage = async ({ params: { jobId } }: Props) => {
+  const supabase = createServerComponentClient({ cookies })
 
-  // Verify job exists and belongs to the user
-  const supabase = createServerSupabaseClient()
-  const { data: session } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
-  // Get the user ID from session or cookie
-  const userId = session?.user?.id
-  const cookieStore = cookies()
-  const cookieUserId = cookieStore.get("user_id")?.value
+  if (!session) {
+    redirect("/sign-in")
+  }
 
-  // Use session user ID first, then fall back to cookie
-  const currentUserId = userId || cookieUserId
+  const currentUserId = session?.user?.id
 
-  console.log(`Looking for job ${jobId} for user ${currentUserId}`)
+  const { data: job, error: jobError } = await supabase.from("jobs").select("*").eq("id", jobId).single()
 
-  // Try to get the job with both user_id and userId fields
-  let job = null
+  if (jobError) {
+    console.error("Error fetching job:", jobError)
+    return <div>Error fetching job</div>
+  }
 
-  if (currentUserId) {
-    // Try with user_id field first
-    const { data: jobData, error: error1 } = await supabase
-      .from("jobs")
-      .select("*")
-      .eq("id", jobId)
+  const { data: resume, error: resumeError } = await supabase.from("resumes").select("*").eq("job_id", jobId).single()
+
+  if (resumeError) {
+    console.error("Error fetching resume:", resumeError)
+    return <div>Error fetching resume</div>
+  }
+
+  const { data: questions, error: questionsError } = await supabase.from("questions").select("*").eq("job_id", jobId)
+
+  if (questionsError) {
+    console.error("Error fetching questions:", questionsError)
+    return <div>Error fetching questions</div>
+  }
+
+  // Get the user's actual name from session or profile
+  let userName = "the candidate"
+  if (session?.user) {
+    // Try to get name from user metadata first
+    userName =
+      session.user.user_metadata?.full_name ||
+      session.user.user_metadata?.name ||
+      session.user.email?.split("@")[0] ||
+      "the candidate"
+  }
+
+  // If we still don't have a good name, try to get it from user profile
+  if (userName === "the candidate" && currentUserId) {
+    const { data: userProfile } = await supabase
+      .from("user_profiles")
+      .select("full_name, first_name, last_name")
       .eq("user_id", currentUserId)
       .single()
 
-    if (!error1 && jobData) {
-      job = jobData
-      console.log(`Found job with user_id: ${jobData.title}`)
-    } else {
-      console.log(`No job found with user_id, trying userId field`)
-      // Try with userId field
-      const { data: altJobData, error: error2 } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("id", jobId)
-        .eq("userId", currentUserId)
-        .single()
-
-      if (!error2 && altJobData) {
-        job = altJobData
-        console.log(`Found job with userId: ${altJobData.title}`)
-      }
+    if (userProfile) {
+      userName =
+        userProfile.full_name || `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() || userName
     }
   }
 
-  if (!job) {
-    console.log(`Job not found, redirecting to not found page`)
-    return notFound()
-  }
+  console.log(`👤 User name for mock interview: ${userName}`)
 
-  // Get resume data if resumeId is provided
-  let resume = null
-  if (resumeId && currentUserId) {
-    const { data: resumeData } = await supabase
-      .from("resumes")
-      .select("*")
-      .eq("id", resumeId)
-      .eq("user_id", currentUserId)
-      .single()
-
-    if (resumeData) {
-      resume = resumeData
-      console.log(`Found resume: ${resumeData.name}`)
-    }
-  }
-
-  // Preload interview questions if requested
-  let preloadedQuestions = null
-  if (shouldPreload) {
-    console.log("🚀 Preloading interview questions...")
-    const questionsResult = await getInterviewQuestions(jobId, resumeId)
-    if (questionsResult.success && questionsResult.questions) {
-      preloadedQuestions = questionsResult.questions
-      console.log(
-        `✅ Preloaded ${preloadedQuestions.technical.length} technical + ${preloadedQuestions.behavioral.length} behavioral questions`,
-      )
-    } else {
-      console.warn("⚠️ Failed to preload questions:", questionsResult.error)
-    }
-  }
-
-  return (
-    <div className="container py-6">
-      <Suspense fallback={<div>Loading mock interview...</div>}>
-        <PreloadedMockInterview
-          job={job}
-          resume={resume}
-          preloadedQuestions={preloadedQuestions}
-          shouldPreload={shouldPreload}
-          interviewType={interviewType}
-        />
-      </Suspense>
-    </div>
-  )
+  return <PreloadedMockInterview job={job} resume={resume} questions={questions} userName={userName} />
 }
+
+export default MockInterviewPage

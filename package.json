@@ -12,6 +12,8 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@auth/core": "latest",
+    "@clerk/nextjs": "latest",
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
     "@hookform/resolvers": "latest",
@@ -67,8 +69,10 @@
     "mammoth": "latest",
     "nanoid": "latest",
     "next": "14.2.16",
+    "next-auth": "latest",
     "next-themes": "latest",
     "node-notifier": "latest",
+    "nodemailer": "latest",
     "otplib": "latest",
     "path": "latest",
     "qrcode.react": "latest",
