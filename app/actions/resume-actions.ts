@@ -67,7 +67,7 @@ export async function createResume(data: { title: string; content: string; file_
     const { data: resume, error } = await supabase
       .from("resumes")
       .insert({
-        title: data.title,
+        name: data.title, // Use 'name' column instead of 'title'
         content: data.content,
         file_url: data.file_url,
         user_id: userId,
@@ -114,7 +114,7 @@ export async function getUserResumes() {
   const userId = await getCurrentUserId()
 
   if (!userId) {
-    throw new Error("Unauthorized")
+    return { success: false, error: "Unauthorized" }
   }
 
   const supabase = createServerSupabaseClient()
@@ -128,10 +128,10 @@ export async function getUserResumes() {
 
     if (error) throw error
 
-    return resumes || []
+    return { success: true, resumes: resumes || [] }
   } catch (error) {
     console.error("Error fetching user resumes:", error)
-    throw new Error("Failed to fetch user resumes")
+    return { success: false, error: "Failed to fetch user resumes" }
   }
 }
 
@@ -139,7 +139,7 @@ export async function associateResumeWithJob(resumeId: string, jobId: string) {
   const userId = await getCurrentUserId()
 
   if (!userId) {
-    throw new Error("Unauthorized")
+    return { success: false, error: "Unauthorized" }
   }
 
   const supabase = createServerSupabaseClient()
@@ -173,7 +173,7 @@ export async function associateResumeWithJob(resumeId: string, jobId: string) {
     return { success: true, association }
   } catch (error) {
     console.error("Error associating resume with job:", error)
-    throw new Error("Failed to associate resume with job")
+    return { success: false, error: "Failed to associate resume with job" }
   }
 }
 
@@ -181,7 +181,7 @@ export async function getJobResumes(jobId: string) {
   const userId = await getCurrentUserId()
 
   if (!userId) {
-    throw new Error("Unauthorized")
+    return { success: false, error: "Unauthorized" }
   }
 
   const supabase = createServerSupabaseClient()
@@ -196,20 +196,34 @@ export async function getJobResumes(jobId: string) {
         created_at,
         resumes (
           id,
-          title,
+          name,
+          file_name,
           content,
           file_url,
-          created_at
+          created_at,
+          is_ai_generated
         )
       `)
       .eq("job_id", jobId)
 
     if (error) throw error
 
-    return jobResumes || []
+    // Transform the data to match expected format
+    const resumes =
+      jobResumes?.map((jr: any) => ({
+        id: jr.resumes.id,
+        name: jr.resumes.name,
+        title: jr.resumes.name, // Map name to title for compatibility
+        content: jr.resumes.content,
+        file_url: jr.resumes.file_url,
+        created_at: jr.resumes.created_at,
+        is_ai_generated: jr.resumes.is_ai_generated || false,
+      })) || []
+
+    return { success: true, resumes }
   } catch (error) {
     console.error("Error fetching job resumes:", error)
-    throw new Error("Failed to fetch job resumes")
+    return { success: false, error: "Failed to fetch job resumes" }
   }
 }
 
@@ -217,7 +231,7 @@ export async function disassociateResumeFromJob(resumeId: string, jobId: string)
   const userId = await getCurrentUserId()
 
   if (!userId) {
-    throw new Error("Unauthorized")
+    return { success: false, error: "Unauthorized" }
   }
 
   const supabase = createServerSupabaseClient()
@@ -231,7 +245,7 @@ export async function disassociateResumeFromJob(resumeId: string, jobId: string)
     return { success: true }
   } catch (error) {
     console.error("Error disassociating resume from job:", error)
-    throw new Error("Failed to disassociate resume from job")
+    return { success: false, error: "Failed to disassociate resume from job" }
   }
 }
 
@@ -265,7 +279,7 @@ export async function removeResumeFromJob(resumeId: string, jobId: string) {
   const userId = await getCurrentUserId()
 
   if (!userId) {
-    throw new Error("Unauthorized")
+    return { success: false, error: "Unauthorized" }
   }
 
   const supabase = createServerSupabaseClient()
@@ -284,6 +298,6 @@ export async function removeResumeFromJob(resumeId: string, jobId: string) {
     return { success: true }
   } catch (error) {
     console.error("Error removing resume from job:", error)
-    throw new Error("Failed to remove resume from job")
+    return { success: false, error: "Failed to remove resume from job" }
   }
 }
