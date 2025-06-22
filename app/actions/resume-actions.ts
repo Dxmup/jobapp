@@ -110,6 +110,31 @@ export async function getResumes() {
   }
 }
 
+export async function getUserResumes() {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const supabase = createServerSupabaseClient()
+
+  try {
+    const { data: resumes, error } = await supabase
+      .from("resumes")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return resumes || []
+  } catch (error) {
+    console.error("Error fetching user resumes:", error)
+    throw new Error("Failed to fetch user resumes")
+  }
+}
+
 export async function associateResumeWithJob(resumeId: string, jobId: string) {
   const userId = await getCurrentUserId()
 
@@ -126,7 +151,6 @@ export async function associateResumeWithJob(resumeId: string, jobId: string) {
       .select("id")
       .eq("resume_id", resumeId)
       .eq("job_id", jobId)
-      .eq("user_id", userId)
       .single()
 
     if (existing) {
@@ -179,7 +203,6 @@ export async function getJobResumes(jobId: string) {
         )
       `)
       .eq("job_id", jobId)
-      .eq("user_id", userId)
 
     if (error) throw error
 
@@ -200,12 +223,7 @@ export async function disassociateResumeFromJob(resumeId: string, jobId: string)
   const supabase = createServerSupabaseClient()
 
   try {
-    const { error } = await supabase
-      .from("job_resumes")
-      .delete()
-      .eq("resume_id", resumeId)
-      .eq("job_id", jobId)
-      .eq("user_id", userId)
+    const { error } = await supabase.from("job_resumes").delete().eq("resume_id", resumeId).eq("job_id", jobId)
 
     if (error) throw error
 
