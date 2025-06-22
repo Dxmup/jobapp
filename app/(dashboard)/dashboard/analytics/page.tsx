@@ -63,7 +63,7 @@ export default function AnalyticsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white">
+      <div className="relative overflow-hidden bg-white border border-gray-200 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:14px_24px] text-gray-900 rounded-3xl">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative px-6 py-16">
           <div className="mx-auto max-w-7xl">
@@ -75,7 +75,7 @@ export default function AnalyticsPage() {
                   </div>
                   <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Analytics</h1>
                 </div>
-                <p className="text-lg text-white/90 max-w-2xl">
+                <p className="text-lg text-gray-900/90 max-w-2xl">
                   Track your job application performance and insights. Monitor your progress and optimize your job
                   search strategy.
                 </p>
@@ -83,31 +83,31 @@ export default function AnalyticsPage() {
 
               {/* Quick Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Applications</span>
+                    <Target className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Applications</span>
                   </div>
                   <div className="text-2xl font-bold">{analyticsData?.totalApplications || 0}</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Response Rate</span>
+                    <TrendingUp className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Response Rate</span>
                   </div>
                   <div className="text-2xl font-bold">{analyticsData?.responseRate || 0}%</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Users className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Interviews</span>
+                    <Users className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Interviews</span>
                   </div>
                   <div className="text-2xl font-bold">{analyticsData?.interviews || 0}</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Period</span>
+                    <Calendar className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Period</span>
                   </div>
                   <div className="text-lg font-bold">{dateRange} days</div>
                 </div>
@@ -117,10 +117,10 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-6 py-8 rounded-2xl">
         {/* Controls */}
         <div className="mb-8">
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -185,7 +185,7 @@ export default function AnalyticsPage() {
 
           <TabsContent value="overview" className="space-y-6 mt-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <Target className="h-4 w-4 text-purple-600" />
@@ -220,7 +220,7 @@ export default function AnalyticsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-indigo-600" />
@@ -257,7 +257,7 @@ export default function AnalyticsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <Users className="h-4 w-4 text-cyan-600" />
@@ -278,7 +278,7 @@ export default function AnalyticsPage() {
                         {analyticsData && analyticsData.interviewsTrend > 0 ? (
                           <span className="text-green-500">+{analyticsData.interviewsTrend}</span>
                         ) : analyticsData && analyticsData.interviewsTrend < 0 ? (
-                          <span className="text-red-500">{analyticsData.interviewsTrend}</span>
+                          <span className="text-red-500">{analyticsData.interviewsTrend}%</span>
                         ) : (
                           <span>No change</span>
                         )}{" "}
@@ -294,7 +294,7 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-              <Card className="col-span-1 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="col-span-1 border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
                 <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
                   <CardTitle>Application Status</CardTitle>
                   <CardDescription>Distribution of your job applications by status</CardDescription>
@@ -429,7 +429,7 @@ export default function AnalyticsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="col-span-1 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="col-span-1 border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
                 <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
                   <CardTitle>Application Timeline</CardTitle>
                   <CardDescription>Your job application activity over time</CardDescription>
@@ -470,7 +470,7 @@ export default function AnalyticsPage() {
               </Card>
             </div>
 
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
                 <CardTitle>Recent Applications</CardTitle>
                 <CardDescription>Your most recent job applications and their status</CardDescription>
@@ -482,7 +482,7 @@ export default function AnalyticsPage() {
           </TabsContent>
 
           <TabsContent value="applications" className="mt-6">
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
                 <CardTitle>Application Analytics</CardTitle>
                 <CardDescription>Detailed analysis of your job applications</CardDescription>
@@ -510,7 +510,7 @@ export default function AnalyticsPage() {
           </TabsContent>
 
           <TabsContent value="interviews" className="mt-6">
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
                 <CardTitle>Interview Analytics</CardTitle>
                 <CardDescription>Track your interview performance and outcomes</CardDescription>
@@ -538,7 +538,7 @@ export default function AnalyticsPage() {
           </TabsContent>
 
           <TabsContent value="skills" className="mt-6">
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
                 <CardTitle>Skills Analysis</CardTitle>
                 <CardDescription>Analyze which skills are most in-demand for your target roles</CardDescription>

@@ -237,7 +237,7 @@ export default function ResumesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white">
+      <div className="relative overflow-hidden bg-white border border-gray-200 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:14px_24px] text-gray-900 rounded-3xl">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative px-6 py-16">
           <div className="mx-auto max-w-7xl">
@@ -249,7 +249,7 @@ export default function ResumesPage() {
                   </div>
                   <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">My Resumes</h1>
                 </div>
-                <p className="text-lg text-white/90 max-w-2xl">
+                <p className="text-lg text-gray-900/90 max-w-2xl">
                   Create, customize, and manage your professional resumes. AI-powered optimization for every job
                   application.
                 </p>
@@ -257,31 +257,31 @@ export default function ResumesPage() {
 
               {/* Stats Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 p-4 text-gray-900">
                   <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Total</span>
+                    <Target className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Total</span>
                   </div>
                   <div className="text-2xl font-bold">{stats.total}</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 p-4 text-gray-900">
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Recent</span>
+                    <Clock className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Recent</span>
                   </div>
                   <div className="text-2xl font-bold">{stats.recent}</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 p-4 text-gray-900">
                   <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">AI-Generated</span>
+                    <Sparkles className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">AI-Generated</span>
                   </div>
                   <div className="text-2xl font-bold">{stats.aiGenerated}</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 p-4 text-gray-900">
                   <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Job-Specific</span>
+                    <TrendingUp className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Job-Specific</span>
                   </div>
                   <div className="text-2xl font-bold">{stats.jobSpecific}</div>
                 </div>
@@ -291,10 +291,10 @@ export default function ResumesPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-6 py-8 rounded-2xl">
         {/* Action Bar */}
         <div className="mb-8">
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -415,7 +415,7 @@ export default function ResumesPage() {
                 {resumes.map((resume) => (
                   <Card
                     key={resume.id}
-                    className="overflow-hidden border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group"
+                    className="overflow-hidden border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group rounded-2xl"
                   >
                     <div className="relative">
                       <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
@@ -471,7 +471,7 @@ export default function ResumesPage() {
                   .map((resume) => (
                     <Card
                       key={resume.id}
-                      className="overflow-hidden border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group"
+                      className="overflow-hidden border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group rounded-2xl"
                     >
                       <div className="relative">
                         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
@@ -530,7 +530,7 @@ export default function ResumesPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Debug info card */}
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
                 <CardHeader>
                   <CardTitle>Resume Debug Info</CardTitle>
                   <CardDescription>Diagnostic information about your resumes</CardDescription>
@@ -549,7 +549,7 @@ export default function ResumesPage() {
               </Card>
 
               {/* Users with resumes card */}
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
                 <CardHeader>
                   <CardTitle>Users with Resumes</CardTitle>
                   <CardDescription>Transfer resumes from other users to your account</CardDescription>
@@ -620,7 +620,7 @@ export default function ResumesPage() {
 
             {/* Resume transfer card */}
             {debugInfo && debugInfo.resumes && debugInfo.resumes.length > 0 && (
-              <Card className="mt-6 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <Card className="mt-6 border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
                 <CardHeader>
                   <CardTitle>Resume Transfer</CardTitle>
                   <CardDescription>Transfer resumes to your account</CardDescription>

@@ -376,7 +376,7 @@ export default function CoverLettersPage() {
       </style>
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white">
+      <div className="relative overflow-hidden bg-white border border-gray-200 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:14px_24px] text-gray-900 rounded-3xl">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative px-6 py-16">
           <div className="mx-auto max-w-7xl">
@@ -388,38 +388,38 @@ export default function CoverLettersPage() {
                   </div>
                   <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Cover Letters</h1>
                 </div>
-                <p className="text-lg text-white/90 max-w-2xl">
+                <p className="text-lg text-gray-900/90 max-w-2xl">
                   Generate and manage tailored cover letters for your job applications with AI-powered customization.
                 </p>
               </div>
 
               {/* Stats Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Total</span>
+                    <Target className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Total</span>
                   </div>
                   <div className="text-2xl font-bold">{stats.total}</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Recent</span>
+                    <Clock className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Recent</span>
                   </div>
                   <div className="text-2xl font-bold">{stats.recent}</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">AI-Generated</span>
+                    <Sparkles className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">AI-Generated</span>
                   </div>
                   <div className="text-2xl font-bold">{stats.aiGenerated}</div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="h-4 w-4 text-white/80" />
-                    <span className="text-sm text-white/80">Job-Specific</span>
+                    <TrendingUp className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Job-Specific</span>
                   </div>
                   <div className="text-2xl font-bold">{stats.jobSpecific}</div>
                 </div>
@@ -429,10 +429,10 @@ export default function CoverLettersPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-6 py-8 rounded-2xl">
         {/* Action Bar */}
         <div className="mb-8">
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                 <div className="relative flex-1 max-w-md">
@@ -584,7 +584,7 @@ export default function CoverLettersPage() {
                 <Card
                   key={letter.id}
                   ref={letter.id === newCoverLetterId ? newCoverLetterRef : null}
-                  className={`border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group ${letter.id === newCoverLetterId ? "border-purple-500 animate-pulse-border" : ""}`}
+                  className={`border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group ${letter.id === newCoverLetterId ? "border-purple-500 animate-pulse-border" : ""} rounded-2xl`}
                 >
                   <div className="relative">
                     <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
@@ -649,7 +649,7 @@ export default function CoverLettersPage() {
           </TabsContent>
 
           <TabsContent value="list" className="mt-6">
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
                 <CardTitle>All Cover Letters</CardTitle>
                 <CardDescription>A detailed list view of all your cover letters.</CardDescription>
