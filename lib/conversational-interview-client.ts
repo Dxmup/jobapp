@@ -502,21 +502,16 @@ export class ConversationalInterviewClient {
       this.config.interviewType === "phone-screener"
         ? `
 
-IMPORTANT: The questions provided are designed for in-depth interviews, but this is a brief phone screening. You must adapt each question to be:
+🚨 CRITICAL: THIS IS A PHONE SCREENING - NOT A FULL INTERVIEW 🚨
 
-More concise: Reduce complex multi-part questions to single, focused questions
-Screen-appropriate: Focus on basic qualifications, interest level, and major red flags
-Time-efficient: Ask for brief examples rather than detailed stories
-High-level: Cover broad topics rather than deep technical details
+The questions you'll be asking are designed for full interviews, but you MUST adapt them for a brief 15-minute phone screening:
 
-Adaptation Examples:
-
-Instead of: "Walk me through a complex project where you had to overcome significant challenges..."
-Ask: "Can you briefly describe a recent project you're proud of?"
-Instead of: "Describe your approach to conflict resolution with detailed examples..."
-Ask: "How do you typically handle workplace disagreements?"
-
-Remember: Save detailed behavioral questions and technical deep-dives for later interview rounds. Focus on screening basics: qualifications, genuine interest, communication skills, and availability.
+- Ask simplified, high-level versions of questions
+- Focus on basic qualifications and interest level
+- Expect brief 30-60 second answers
+- Skip detailed behavioral examples
+- Ask "Do you have experience with..." instead of "Tell me about a time..."
+- Keep it conversational but efficient
 
 `
         : ""
@@ -542,21 +537,28 @@ OUTPUT: Speak the introduction directly without any stage directions or descript
       this.config.interviewType === "phone-screener"
         ? `
 
-IMPORTANT: The questions provided are designed for in-depth interviews, but this is a brief phone screening. You must adapt each question to be:
+🚨 CRITICAL: THIS IS A PHONE SCREENING - NOT A FULL INTERVIEW 🚨
 
-More concise: Reduce complex multi-part questions to single, focused questions
-Screen-appropriate: Focus on basic qualifications, interest level, and major red flags
-Time-efficient: Ask for brief examples rather than detailed stories
-High-level: Cover broad topics rather than deep technical details
+You MUST completely transform the provided question to be appropriate for a 15-minute phone screening. The original question is designed for in-depth interviews but you need to make it screening-appropriate.
 
-Adaptation Examples:
+MANDATORY ADAPTATIONS:
+1. SHORTEN: Convert multi-part questions into single, simple questions
+2. SCREEN-FOCUS: Ask about basic qualifications, not detailed examples
+3. HIGH-LEVEL: Ask "Do you have experience with X?" instead of "Tell me about a time when..."
+4. BRIEF: Expect 30-60 second answers, not 3-5 minute stories
+5. QUALIFYING: Focus on yes/no qualifications and basic interest level
 
-Instead of: "Walk me through a complex project where you had to overcome significant challenges..."
-Ask: "Can you briefly describe a recent project you're proud of?"
-Instead of: "Describe your approach to conflict resolution with detailed examples..."
-Ask: "How do you typically handle workplace disagreements?"
+TRANSFORMATION EXAMPLES:
+❌ WRONG (Full Interview): "Tell me about a challenging project where you had to overcome significant technical obstacles. Walk me through your problem-solving process, the stakeholders involved, and the final outcome."
+✅ CORRECT (Phone Screen): "Do you have experience working on challenging technical projects? Can you briefly mention one example?"
 
-Remember: Save detailed behavioral questions and technical deep-dives for later interview rounds. Focus on screening basics: qualifications, genuine interest, communication skills, and availability.
+❌ WRONG (Full Interview): "Describe a situation where you had to work with a difficult team member. How did you handle the conflict and what was the resolution?"
+✅ CORRECT (Phone Screen): "How do you typically handle disagreements with team members?"
+
+❌ WRONG (Full Interview): "Walk me through your approach to system design for a large-scale application, including your considerations for scalability, reliability, and performance."
+✅ CORRECT (Phone Screen): "Do you have experience with system design for large applications?"
+
+REMEMBER: This is a SCREENING to determine basic fit - save detailed behavioral and technical deep-dives for later rounds!
 
 `
         : ""
@@ -817,12 +819,14 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
 
   endInterview(): void {
     console.log("🔚 Ending conversational interview...")
+
+    // IMMEDIATE CLEANUP - Cancel everything first
     this.active = false
     this.isListeningForResponse = false
     this.isPlayingQuestion = false
 
-    // Cancel all active API requests
-    console.log(`🚫 Cancelling ${this.activeRequests.size} active API requests...`)
+    // Cancel all active API requests IMMEDIATELY
+    console.log(`🚫 Immediately cancelling ${this.activeRequests.size} active API requests...`)
     this.activeRequests.forEach((controller) => {
       try {
         controller.abort()
@@ -832,7 +836,7 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
     })
     this.activeRequests.clear()
 
-    // Clear all timers
+    // Clear all timers IMMEDIATELY
     if (this.timeoutId) {
       clearTimeout(this.timeoutId)
       this.timeoutId = null
@@ -847,6 +851,8 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
       clearInterval(this.voiceActivityMonitor)
       this.voiceActivityMonitor = null
     }
+
+    // Rest of cleanup continues...
 
     // Stop media recorder
     if (this.mediaRecorder) {
