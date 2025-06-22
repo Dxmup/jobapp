@@ -2,79 +2,109 @@ import { NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 
-/**
- * This endpoint retrieves all resumes available for customization for a specific job.
- * It returns all resumes belonging to the current user, with metadata about whether
- * they are baseline resumes or job-specific resumes.
- */
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
     const jobId = params.id
 
-    // Create Supabase client
+    if (!jobId) {
+      return NextResponse.json({ success: false, error: "Job ID is required" }, { status: 400 })
+    }
+
+    // Create Supabase server client
     const cookieStore = cookies()
     const supabase = createServerClient(cookieStore)
 
-    // Get user ID from cookie
-    const userId = cookieStore.get("user_id")?.value
+    // Check if user is authenticated
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
 
-    if (!userId) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 })
+    if (sessionError) {
+      console.error("Session error:", sessionError)
+      return NextResponse.json({ success: false, error: "Authentication error" }, { status: 401 })
     }
 
-    // Replace the job query section with this improved version that handles errors better
+    if (!session) {
+      console.error("No session found")
+      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 })
+    }
+
+    // Get user ID from session
+    const userId = session.user.id
 
     // Verify the job belongs to the user
-    const { data: jobData, error: jobError } = await supabase
+    const { data: job, error: jobError } = await supabase
       .from("jobs")
-      .select("id, title, company, description")
+      .select("id, title, company")
       .eq("id", jobId)
       .eq("user_id", userId)
+      .single()
 
-    // Handle job not found more gracefully
-    let job = null
     if (jobError) {
-      console.error("Error fetching job:", jobError)
-      // Continue without job data instead of returning an error
-    } else if (jobData && jobData.length > 0) {
-      job = jobData[0] // Take the first job if multiple are returned
+      console.error("Job verification error:", jobError)
+      return NextResponse.json({ success: false, error: "Job not found or access denied" }, { status: 403 })
     }
 
-    // Simple query to get ALL resumes for this user
-    const { data: resumes, error: resumesError } = await supabase
+    // Get all user's resumes
+    const { data: allResumes, error: resumesError } = await supabase
       .from("resumes")
-      .select("*")
+      .select("id, name, file_name, created_at, updated_at, is_ai_generated, job_title, company")
       .eq("user_id", userId)
-      .order("created_at", { ascending: false })
+      .order("updated_at", { ascending: false })
 
     if (resumesError) {
       console.error("Error fetching resumes:", resumesError)
-      return NextResponse.json({ error: "Failed to fetch resumes" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Failed to fetch resumes" }, { status: 500 })
     }
 
-    // Process resumes to add metadata
-    const processedResumes = resumes.map((resume) => ({
+    // Get resumes already associated with this job
+    const { data: associatedResumes, error: associatedError } = await supabase
+      .from("job_resumes")
+      .select("resume_id")
+      .eq("job_id", jobId)
+
+    if (associatedError) {
+      console.error("Error fetching associated resumes:", associatedError)
+      return NextResponse.json({ success: false, error: "Failed to fetch associated resumes" }, { status: 500 })
+    }
+
+    const associatedResumeIds = new Set(associatedResumes?.map((jr) => jr.resume_id) || [])
+
+    // Format resumes with association status
+    const formattedResumes = (allResumes || []).map((resume) => ({
       id: resume.id,
-      name: resume.name,
-      isBaseline: resume.job_id === null,
-      jobId: resume.job_id,
-      jobTitle: resume.job_title,
-      company: resume.company,
+      name: resume.name || resume.file_name || "Untitled Resume",
+      fileName: resume.file_name,
       createdAt: resume.created_at,
       updatedAt: resume.updated_at,
-      isForCurrentJob: resume.job_id === jobId,
-      isAiGenerated: resume.is_ai_generated,
+      isAiGenerated: resume.is_ai_generated || false,
+      jobTitle: resume.job_title,
+      company: resume.company,
+      isAssociated: associatedResumeIds.has(resume.id),
+      isForCurrentJob: associatedResumeIds.has(resume.id), // For backward compatibility
     }))
+
+    // Separate available (not associated) and associated resumes
+    const availableResumes = formattedResumes.filter((resume) => !resume.isAssociated)
+    const currentlyAssociated = formattedResumes.filter((resume) => resume.isAssociated)
 
     return NextResponse.json({
       success: true,
-      job,
-      resumes: processedResumes,
+      resumes: availableResumes, // Only return available resumes for import
+      allResumes: formattedResumes, // All resumes with association status
+      associatedResumes: currentlyAssociated, // Currently associated resumes
+      job: {
+        id: job.id,
+        title: job.title,
+        company: job.company,
+      },
     })
   } catch (error) {
-    console.error("Error in available-resumes API:", error)
+    console.error("Unexpected error:", error)
     return NextResponse.json(
       {
+        success: false,
         error: "Internal server error",
         details: error instanceof Error ? error.message : "Unknown error",
       },
