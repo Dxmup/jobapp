@@ -146,19 +146,21 @@ export class ConversationalInterviewClient {
   }
 
   private extractCandidateName(resumeContext: any): string {
-    // If a name was explicitly passed, use it first
+    // PRIORITY 1: Use explicitly passed name (from user profile/session)
     if (
       resumeContext?.name &&
       resumeContext.name !== "undefined" &&
+      resumeContext.name !== "the candidate" &&
       resumeContext.name.trim() &&
       !resumeContext.name.includes(".pdf") &&
-      !resumeContext.name.includes(".doc")
+      !resumeContext.name.includes(".doc") &&
+      !resumeContext.name.toLowerCase().includes("resume")
     ) {
-      console.log(`👤 Using provided name: ${resumeContext.name}`)
+      console.log(`👤 Using provided user name: ${resumeContext.name}`)
       return resumeContext.name.trim()
     }
 
-    // Try to extract name from resume content/text
+    // PRIORITY 2: Try to extract name from resume content/text (not filename)
     if (resumeContext?.content || resumeContext?.text) {
       const resumeText = resumeContext.content || resumeContext.text
 
@@ -184,7 +186,7 @@ export class ConversationalInterviewClient {
       }
     }
 
-    // Final fallback
+    // PRIORITY 3: Final fallback
     console.log(`⚠️ Could not extract user name, using fallback`)
     return "the candidate"
   }

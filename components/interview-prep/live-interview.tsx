@@ -139,6 +139,42 @@ export function LiveInterview({
     setRemainingTime(maxDuration)
   }, [maxDuration])
 
+  // Helper function to extract name from resume content, not filename
+  const extractUserNameFromResume = (resume: any): string | null => {
+    if (!resume) return null
+
+    // Don't use resume.name if it looks like a filename
+    if (
+      resume.name &&
+      !resume.name.includes(".pdf") &&
+      !resume.name.includes(".doc") &&
+      !resume.name.includes("resume")
+    ) {
+      return resume.name
+    }
+
+    // Try to extract from resume content/text instead
+    if (resume.content || resume.text) {
+      const resumeText = resume.content || resume.text
+      const namePatterns = [
+        /^([A-Z][a-z]+ [A-Z][a-z]+)/m, // First line with First Last
+        /Name:\s*([A-Z][a-z]+ [A-Z][a-z]+)/i, // "Name: First Last"
+      ]
+
+      for (const pattern of namePatterns) {
+        const match = resumeText.match(pattern)
+        if (match && match[1]) {
+          const extractedName = match[1].trim()
+          if (extractedName.length <= 50) {
+            return extractedName
+          }
+        }
+      }
+    }
+
+    return null
+  }
+
   // Start the conversational interview
   const startConversationalInterview = async () => {
     try {
@@ -153,7 +189,7 @@ export function LiveInterview({
       }
 
       const resumeContext = {
-        name: userName || resume?.name || "the candidate", // Use userName first
+        name: userName || extractUserNameFromResume(resume) || "the candidate", // Use userName prop first, then extract from resume content, not filename
         title: resume?.title,
         experience: resume?.experience,
       }
