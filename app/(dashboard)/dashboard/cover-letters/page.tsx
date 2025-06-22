@@ -133,10 +133,9 @@ export default function CoverLettersPage() {
         // Get user cover letters using the server action
         const result = await getUserCoverLetters()
 
-        debugLog += `Server action result: ${JSON.stringify(result)}
-`
+        debugLog += `Server action result: ${JSON.stringify(result, null, 2)}\n`
 
-        if (result.success && result.coverLetters) {
+        if (result.success && result.coverLetters && Array.isArray(result.coverLetters)) {
           setCoverLetters(result.coverLetters)
 
           // Calculate stats
@@ -160,11 +159,14 @@ export default function CoverLettersPage() {
           )
 
           setCompanies(uniqueCompanies as string[])
-          debugLog += `Found ${result.data.length} cover letters
-`
+          debugLog += `Found ${result.coverLetters.length} cover letters\n`
         } else {
-          debugLog += `Error: ${result.error || "Unknown error"}
-`
+          // Handle case where no cover letters or error
+          setCoverLetters([])
+          setStats({ total: 0, recent: 0, aiGenerated: 0, jobSpecific: 0 })
+          setCompanies([])
+
+          debugLog += `Error or no data: ${result.error || "No cover letters found"}\n`
           if (result.error) {
             toast({
               title: "Error",
@@ -174,9 +176,14 @@ export default function CoverLettersPage() {
           }
         }
       } catch (error) {
-        debugLog += `Error in fetchCoverLetters: ${error instanceof Error ? error.message : String(error)}
-`
+        debugLog += `Error in fetchCoverLetters: ${error instanceof Error ? error.message : String(error)}\n`
         console.error("Error fetching cover letters:", error)
+
+        // Reset state on error
+        setCoverLetters([])
+        setStats({ total: 0, recent: 0, aiGenerated: 0, jobSpecific: 0 })
+        setCompanies([])
+
         toast({
           title: "Error",
           description: "Failed to load cover letters",
@@ -333,7 +340,7 @@ export default function CoverLettersPage() {
       const textWidth = doc.internal.pageSize.width - margins.left - margins.right
 
       // Split text to fit within margins
-      const splitText = doc.splitTextToSize(letter.content, textWidth)
+      const splitText = doc.splitTextToSize(letter.content || "No content available", textWidth)
 
       // Add text to document (starting below the title)
       doc.text(splitText, margins.left, margins.top + 10)
@@ -342,6 +349,11 @@ export default function CoverLettersPage() {
       doc.save(`${letter.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.pdf`)
     } catch (error) {
       console.error("Error generating PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      })
     }
   }
 
@@ -430,6 +442,16 @@ export default function CoverLettersPage() {
       </div>
 
       <div className="mx-auto max-w-7xl px-6 py-8 rounded-2xl">
+        {/* Debug Info - Remove in production */}
+        {process.env.NODE_ENV === "development" && debugInfo && (
+          <div className="mb-4 p-4 bg-gray-100 rounded-lg text-xs">
+            <details>
+              <summary>Debug Info</summary>
+              <pre>{debugInfo}</pre>
+            </details>
+          </div>
+        )}
+
         {/* Action Bar */}
         <div className="mb-8">
           <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
