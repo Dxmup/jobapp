@@ -190,20 +190,6 @@ export function JobsCarousel() {
           ))}
         </div>
       </div>
-
-      {jobs.length > cardsPerView && (
-        <div className="flex justify-center gap-2 mt-4">
-          {Array.from({ length: Math.ceil(jobs.length / cardsPerView) }).map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                index === currentIndex ? "bg-purple-500" : "bg-white/20"
-              }`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   )
 }
