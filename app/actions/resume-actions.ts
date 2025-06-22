@@ -228,35 +228,10 @@ export async function getJobResumes(jobId: string): Promise<{
       return { success: false, error: "Failed to fetch job resumes" }
     }
 
-    // If no resumes are associated with the job, try to get all user resumes
+    // If no resumes are associated with the job, return empty array
     if (!jobResumes || jobResumes.length === 0) {
-      // Try with user_id field first
-      let { data: allResumes, error: allResumesError } = await supabase
-        .from("resumes")
-        .select("id, name, file_name, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-
-      // If no results with user_id, try with userId
-      if ((allResumesError || !allResumes || allResumes.length === 0) && userId) {
-        const { data: altResumes, error: altResumesError } = await supabase
-          .from("resumes")
-          .select("id, name, file_name, created_at")
-          .eq("userId", userId)
-          .order("created_at", { ascending: false })
-
-        if (!altResumesError && altResumes && altResumes.length > 0) {
-          allResumes = altResumes
-          allResumesError = null
-        }
-      }
-
-      if (allResumesError) {
-        console.error("Error fetching all user resumes:", allResumesError)
-        return { success: false, error: "Failed to fetch resumes" }
-      }
-
-      return { success: true, resumes: allResumes || [] }
+      console.log(`No resumes associated with job ${jobId}`)
+      return { success: true, resumes: [] }
     }
 
     // Get the actual resume details for associated resumes
