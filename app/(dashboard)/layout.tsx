@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { EnhancedDashboardHeader } from "@/components/dashboard/enhanced-dashboard-header"
 import { EnhancedDashboardSidebar } from "@/components/dashboard/enhanced-dashboard-sidebar"
 import { ContextualGuidance } from "@/components/contextual-guidance"
-import { QuickActionsMenu } from "@/components/dashboard/quick-actions-menu"
+// import { QuickActionsMenu } from "@/components/dashboard/quick-actions-menu"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -66,7 +66,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           <ContextualGuidance />
         </main>
       </div>
-      <QuickActionsMenu />
+      {/* <QuickActionsMenu /> */}
     </div>
   )
 }
