@@ -12,8 +12,6 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@chakra-ui/icons": "latest",
-    "@chakra-ui/react": "latest",
     "@emotion/is-prop-valid": "latest",
     "@emotion/react": "latest",
     "@emotion/styled": "latest",
@@ -21,6 +19,7 @@
     "@hookform/resolvers": "latest",
     "@jest/globals": "latest",
     "@modelcontextprotocol/sdk": "latest",
+    "@mui/icons-material": "latest",
     "@mui/material": "latest",
     "@mui/material-pigment-css": "latest",
     "@radix-ui/react-accordion": "latest",
@@ -87,6 +86,7 @@
     "recharts": "latest",
     "sonner": "latest",
     "stripe": "latest",
+    "swiper": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "latest",

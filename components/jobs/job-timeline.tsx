@@ -136,14 +136,8 @@ export function JobTimeline({ jobId }: JobTimelineProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader>
         <CardTitle>Timeline</CardTitle>
-        <Button asChild size="sm">
-          <Link href={`/jobs/${jobId}/add-event`}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Event
-          </Link>
-        </Button>
       </CardHeader>
       <CardContent>
         {events.length === 0 ? (
