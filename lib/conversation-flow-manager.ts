@@ -13,6 +13,13 @@ export type ConversationState =
   | "paused"
   | "error"
 
+export interface ConversationStep {
+  type: "question" | "followup" | "summary" | "complete"
+  message: string
+  questionIndex?: number
+  isComplete?: boolean
+}
+
 export interface ConversationOptions {
   responseDelay: number
   listeningStartDelay: number
@@ -456,6 +463,57 @@ export class ConversationFlowManager {
       setTimeout(() => {
         this.playCurrentQuestion()
       }, 1000)
+    }
+  }
+}
+
+export class InterviewFlowManager {
+  private jobDescription: string
+  private resume: any
+  private technicalQuestions: string[]
+  private behavioralQuestions: string[]
+  private userName: string
+  private currentQuestionIndex = 0
+  private allQuestions: string[] = []
+
+  constructor(config: {
+    jobDescription: string
+    resume: any
+    technicalQuestions: string[]
+    behavioralQuestions: string[]
+    userName: string
+  }) {
+    this.jobDescription = config.jobDescription
+    this.resume = config.resume
+    this.technicalQuestions = config.technicalQuestions
+    this.behavioralQuestions = config.behavioralQuestions
+    this.userName = config.userName
+    this.allQuestions = [...config.technicalQuestions, ...config.behavioralQuestions]
+  }
+
+  async start(): Promise<ConversationStep> {
+    return {
+      type: "question",
+      message: `Hello ${this.userName}! I'm excited to interview you for this position. Let's start with our first question: ${this.allQuestions[0]}`,
+      questionIndex: 0,
+    }
+  }
+
+  async processUserResponse(response: string, currentStep: ConversationStep): Promise<ConversationStep> {
+    this.currentQuestionIndex++
+
+    if (this.currentQuestionIndex >= this.allQuestions.length) {
+      return {
+        type: "complete",
+        message: `Thank you for your responses! This concludes our mock interview. You did great!`,
+        isComplete: true,
+      }
+    }
+
+    return {
+      type: "question",
+      message: `Great answer! Here's your next question: ${this.allQuestions[this.currentQuestionIndex]}`,
+      questionIndex: this.currentQuestionIndex,
     }
   }
 }
