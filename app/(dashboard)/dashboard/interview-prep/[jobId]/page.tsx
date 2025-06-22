@@ -44,6 +44,33 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
   // Use session user ID first, then fall back to cookie
   const currentUserId = userId || cookieUserId
 
+  // Get the user's actual name from session or profile
+  let userName = "the candidate"
+  if (session?.user) {
+    // Try to get name from user metadata first
+    userName =
+      session.user.user_metadata?.full_name ||
+      session.user.user_metadata?.name ||
+      session.user.email?.split("@")[0] ||
+      "the candidate"
+  }
+
+  // If we still don't have a good name, try to get it from user profile
+  if (userName === "the candidate" && currentUserId) {
+    const { data: userProfile } = await supabase
+      .from("user_profiles")
+      .select("full_name, first_name, last_name")
+      .eq("user_id", currentUserId)
+      .single()
+
+    if (userProfile) {
+      userName =
+        userProfile.full_name || `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() || userName
+    }
+  }
+
+  console.log(`👤 User name for interview: ${userName}`)
+
   console.log(`Looking for job ${jobId} for user ${currentUserId}`)
 
   // Try to get the job with both user_id and userId fields
@@ -169,7 +196,12 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
       </p>
     </div>
     <div className="flex-shrink-0">
-      <LiveInterview job={job} resume={resumeId} questions={initialQuestions} />
+      <LiveInterview 
+        job={job} 
+        resume={resumeId} 
+        questions={initialQuestions}
+        userName={userName}
+      />
     </div>
   </CardContent>
 </Card>

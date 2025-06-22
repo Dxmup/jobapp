@@ -36,6 +36,7 @@ interface LiveInterviewProps {
   }
   interviewType?: "phone-screener" | "first-interview"
   isPreloaded?: boolean
+  userName?: string // Add this new prop
 }
 
 type InterviewState =
@@ -58,6 +59,7 @@ export function LiveInterview({
   questions: initialQuestions,
   interviewType = "first-interview",
   isPreloaded = false,
+  userName, // Add this parameter
 }: LiveInterviewProps) {
   const [questions, setQuestions] = useState(initialQuestions)
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
@@ -151,7 +153,7 @@ export function LiveInterview({
       }
 
       const resumeContext = {
-        name: resume?.name || "the candidate",
+        name: userName || resume?.name || "the candidate", // Use userName first
         title: resume?.title,
         experience: resume?.experience,
       }
