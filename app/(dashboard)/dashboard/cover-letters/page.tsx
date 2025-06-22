@@ -138,24 +138,31 @@ export default function CoverLettersPage() {
         if (result.success && result.coverLetters && Array.isArray(result.coverLetters)) {
           setCoverLetters(result.coverLetters)
 
-          // Calculate stats
-          const total = result.coverLetters.length
-          const recent = result.coverLetters.filter((letter) => {
+          // Calculate stats with defensive checks
+          const coverLettersArray = result.coverLetters || []
+          const total = coverLettersArray.length
+          const recent = coverLettersArray.filter((letter) => {
+            if (!letter?.created_at) return false
             const createdDate = new Date(letter.created_at)
             const weekAgo = new Date()
             weekAgo.setDate(weekAgo.getDate() - 7)
             return createdDate > weekAgo
           }).length
-          const aiGenerated = result.coverLetters.filter(
-            (letter) => letter.name?.toLowerCase().includes("ai") || letter.name?.toLowerCase().includes("generated"),
+          const aiGenerated = coverLettersArray.filter(
+            (letter) => letter?.name?.toLowerCase().includes("ai") || letter?.name?.toLowerCase().includes("generated"),
           ).length
-          const jobSpecific = result.coverLetters.filter((letter) => letter.jobs?.title || letter.jobs?.company).length
+          const jobSpecific = coverLettersArray.filter((letter) => letter?.jobs?.title || letter?.jobs?.company).length
 
           setStats({ total, recent, aiGenerated, jobSpecific })
 
-          // Extract unique companies
+          // Extract unique companies with defensive checks
           const uniqueCompanies = Array.from(
-            new Set(result.coverLetters.filter((letter) => letter.jobs?.company).map((letter) => letter.jobs?.company)),
+            new Set(
+              coverLettersArray
+                .filter((letter) => letter?.jobs?.company)
+                .map((letter) => letter.jobs.company)
+                .filter(Boolean),
+            ),
           )
 
           setCompanies(uniqueCompanies as string[])
@@ -263,9 +270,11 @@ export default function CoverLettersPage() {
     }
   }, [userId])
 
-  // Filter and sort the cover letters
-  const filteredCoverLetters = coverLetters
+  // Filter and sort the cover letters with defensive checks
+  const filteredCoverLetters = (coverLetters || [])
     .filter((letter) => {
+      if (!letter) return false
+
       // Filter by company if a specific company is selected
       if (selectedCompany !== "all" && letter.jobs?.company !== selectedCompany) {
         return false
@@ -284,11 +293,17 @@ export default function CoverLettersPage() {
       return true
     })
     .sort((a, b) => {
+      if (!a || !b) return 0
+
       switch (sortOrder) {
         case "newest":
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+          return dateB - dateA
         case "oldest":
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          const dateA2 = a.created_at ? new Date(a.created_at).getTime() : 0
+          const dateB2 = b.created_at ? new Date(b.created_at).getTime() : 0
+          return dateA2 - dateB2
         case "name-asc":
           return (a.name || "").localeCompare(b.name || "")
         case "name-desc":
