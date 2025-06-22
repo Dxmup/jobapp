@@ -467,6 +467,7 @@ export class ConversationFlowManager {
   }
 }
 
+// Simple Interview Flow Manager for text-based interviews
 export class InterviewFlowManager {
   private jobDescription: string
   private resume: any

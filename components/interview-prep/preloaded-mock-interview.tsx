@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { InterviewFlowManager as ConversationFlowManager, type ConversationStep } from "@/lib/conversation-flow-manager"
+import { InterviewFlowManager, type ConversationStep } from "@/lib/conversation-flow-manager"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -18,7 +18,7 @@ interface PreloadedMockInterviewProps {
     technical: string[]
     behavioral: string[]
   }
-  userName?: string // Add this prop
+  userName?: string
 }
 
 export function PreloadedMockInterview({ job, resume, questions, userName }: PreloadedMockInterviewProps) {
@@ -31,7 +31,7 @@ export function PreloadedMockInterview({ job, resume, questions, userName }: Pre
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
   const { user } = useUser()
-  const [conversationFlowManager, setConversationFlowManager] = useState<ConversationFlowManager | null>(null)
+  const [conversationFlowManager, setConversationFlowManager] = useState<InterviewFlowManager | null>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export function PreloadedMockInterview({ job, resume, questions, userName }: Pre
       experience: resume?.experience,
     }
 
-    const flowManager = new ConversationFlowManager({
+    const flowManager = new InterviewFlowManager({
       jobDescription: job.description,
       resume: resumeContext,
       technicalQuestions: questions.technical,
@@ -62,24 +62,21 @@ export function PreloadedMockInterview({ job, resume, questions, userName }: Pre
 
     const firstStep = await flowManager.start()
     setCurrentStep(firstStep)
-    setConversationHistory([{ role: "interviewer", content: firstStep.message }, ...conversationHistory])
+    setConversationHistory([{ role: "interviewer", content: firstStep.message }])
   }
 
   const handleUserMessage = async () => {
     if (!userInput.trim()) return
 
     setLoading(true)
-    setConversationHistory([...conversationHistory, { role: "candidate", content: userInput }])
+    const newHistory = [...conversationHistory, { role: "candidate" as const, content: userInput }]
+    setConversationHistory(newHistory)
 
     if (conversationFlowManager && currentStep) {
       const nextStep = await conversationFlowManager.processUserResponse(userInput, currentStep)
 
       setCurrentStep(nextStep)
-      setConversationHistory([
-        ...conversationHistory,
-        { role: "candidate", content: userInput },
-        { role: "interviewer", content: nextStep.message },
-      ])
+      setConversationHistory([...newHistory, { role: "interviewer" as const, content: nextStep.message }])
     }
 
     setUserInput("")
