@@ -123,13 +123,19 @@ export function ResumeCard({ resume, onDelete, onDuplicate }: ResumeCardProps) {
               <Link href={`/dashboard/resumes/view/${resume.id}`}>View</Link>
             </Button>
             <Button size="sm" asChild>
-              <Link href={`/dashboard/customize-resume?resumeId=${resume.id}`}>Customize for Job</Link>
+              <Link href={`/dashboard/resumes/customize?resumeId=${resume.id}`}>Customize for Job</Link>
             </Button>
           </div>
         </CardFooter>
       </Card>
 
-      <AssociateJobDialog resumeId={resume.id} open={showAssociateDialog} onOpenChange={setShowAssociateDialog} />
+      {showAssociateDialog && (
+        <AssociateJobDialog
+          resumeId={resume.id}
+          onSuccess={() => setShowAssociateDialog(false)}
+          onCancel={() => setShowAssociateDialog(false)}
+        />
+      )}
     </>
   )
 }
