@@ -1,25 +1,36 @@
+"use server"
+
 import { getCurrentUserId } from "@/lib/auth-cookie"
+import { createClient } from "@/lib/supabase/server"
 
-// This is a placeholder file.  Replace with actual resume actions.
-// For example:
-
-export async function createResume(data: any) {
+export async function createResume(data: { title: string; content: string; file_url?: string }) {
   const userId = await getCurrentUserId()
 
   if (!userId) {
     throw new Error("Unauthorized")
   }
 
-  // Simulate creating a resume in a database
-  const newResume = {
-    ...data,
-    userId: userId,
-    createdAt: new Date(),
+  const supabase = createClient()
+
+  try {
+    const { data: resume, error } = await supabase
+      .from("resumes")
+      .insert({
+        title: data.title,
+        content: data.content,
+        file_url: data.file_url,
+        user_id: userId,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return { success: true, resume }
+  } catch (error) {
+    console.error("Error creating resume:", error)
+    throw new Error("Failed to create resume")
   }
-
-  console.log("Creating resume:", newResume)
-
-  return { success: true, resume: newResume }
 }
 
 export async function getResumes() {
@@ -29,13 +40,22 @@ export async function getResumes() {
     throw new Error("Unauthorized")
   }
 
-  // Simulate fetching resumes from a database
-  const resumes = [
-    { id: 1, title: "Resume 1", userId: userId, createdAt: new Date() },
-    { id: 2, title: "Resume 2", userId: userId, createdAt: new Date() },
-  ]
+  const supabase = createClient()
 
-  return resumes.filter((resume) => resume.userId === userId)
+  try {
+    const { data: resumes, error } = await supabase
+      .from("resumes")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return resumes || []
+  } catch (error) {
+    console.error("Error fetching resumes:", error)
+    throw new Error("Failed to fetch resumes")
+  }
 }
 
 export async function associateResumeWithJob(resumeId: string, jobId: string) {
@@ -45,16 +65,33 @@ export async function associateResumeWithJob(resumeId: string, jobId: string) {
     throw new Error("Unauthorized")
   }
 
+  const supabase = createClient()
+
   try {
-    // Simulate associating a resume with a job in the database
-    const association = {
-      resumeId,
-      jobId,
-      userId,
-      createdAt: new Date(),
+    // Check if association already exists
+    const { data: existing } = await supabase
+      .from("job_resumes")
+      .select("id")
+      .eq("resume_id", resumeId)
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+      .single()
+
+    if (existing) {
+      return { success: true, message: "Resume already associated with this job" }
     }
 
-    console.log("Associating resume with job:", association)
+    const { data: association, error } = await supabase
+      .from("job_resumes")
+      .insert({
+        resume_id: resumeId,
+        job_id: jobId,
+        user_id: userId,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
 
     return { success: true, association }
   } catch (error) {
@@ -70,25 +107,30 @@ export async function getJobResumes(jobId: string) {
     throw new Error("Unauthorized")
   }
 
-  try {
-    // Simulate fetching resumes associated with a job
-    const jobResumes = [
-      {
-        id: 1,
-        resumeId: "1",
-        jobId,
-        userId,
-        resume: {
-          id: "1",
-          title: "Software Engineer Resume",
-          content: "Sample resume content...",
-          createdAt: new Date(),
-        },
-        createdAt: new Date(),
-      },
-    ]
+  const supabase = createClient()
 
-    return jobResumes.filter((jr) => jr.userId === userId && jr.jobId === jobId)
+  try {
+    const { data: jobResumes, error } = await supabase
+      .from("job_resumes")
+      .select(`
+        id,
+        resume_id,
+        job_id,
+        created_at,
+        resumes (
+          id,
+          title,
+          content,
+          file_url,
+          created_at
+        )
+      `)
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+
+    if (error) throw error
+
+    return jobResumes || []
   } catch (error) {
     console.error("Error fetching job resumes:", error)
     throw new Error("Failed to fetch job resumes")
@@ -102,12 +144,102 @@ export async function disassociateResumeFromJob(resumeId: string, jobId: string)
     throw new Error("Unauthorized")
   }
 
+  const supabase = createClient()
+
   try {
-    console.log("Disassociating resume from job:", { resumeId, jobId, userId })
+    const { error } = await supabase
+      .from("job_resumes")
+      .delete()
+      .eq("resume_id", resumeId)
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+
+    if (error) throw error
 
     return { success: true }
   } catch (error) {
     console.error("Error disassociating resume from job:", error)
     throw new Error("Failed to disassociate resume from job")
+  }
+}
+
+export async function getResumeById(resumeId: string) {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const supabase = createClient()
+
+  try {
+    const { data: resume, error } = await supabase
+      .from("resumes")
+      .select("*")
+      .eq("id", resumeId)
+      .eq("user_id", userId)
+      .single()
+
+    if (error) throw error
+
+    return resume
+  } catch (error) {
+    console.error("Error fetching resume:", error)
+    throw new Error("Failed to fetch resume")
+  }
+}
+
+export async function updateResume(resumeId: string, data: { title?: string; content?: string; file_url?: string }) {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const supabase = createClient()
+
+  try {
+    const { data: resume, error } = await supabase
+      .from("resumes")
+      .update({
+        ...data,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", resumeId)
+      .eq("user_id", userId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return { success: true, resume }
+  } catch (error) {
+    console.error("Error updating resume:", error)
+    throw new Error("Failed to update resume")
+  }
+}
+
+export async function deleteResume(resumeId: string) {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const supabase = createClient()
+
+  try {
+    // First delete any job associations
+    await supabase.from("job_resumes").delete().eq("resume_id", resumeId).eq("user_id", userId)
+
+    // Then delete the resume
+    const { error } = await supabase.from("resumes").delete().eq("id", resumeId).eq("user_id", userId)
+
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting resume:", error)
+    throw new Error("Failed to delete resume")
   }
 }
