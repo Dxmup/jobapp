@@ -24,22 +24,28 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch job statistics" }, { status: 500 })
     }
 
-    // Get events for interviews
+    // Get events for interviews by joining with jobs table
     const { data: events, error: eventsError } = await supabase
       .from("job_events")
-      .select("event_type")
-      .eq("user_id", userId)
+      .select(`
+    event_type,
+    jobs!inner(user_id)
+  `)
+      .eq("jobs.user_id", userId)
       .in("event_type", ["interview", "interview_scheduled"])
 
+    let interviewsScheduled
+
     if (eventsError) {
-      console.error("Error fetching events for stats:", eventsError)
+      // Simplified approach - count jobs with interviewing status as proxy for interviews
+      interviewsScheduled = jobs?.filter((job) => job.status?.toLowerCase() === "interviewing").length || 0
+    } else {
+      interviewsScheduled = events?.length || 0
     }
 
     const totalApplications = jobs?.length || 0
     const activeApplications =
       jobs?.filter((job) => ["applied", "interviewing", "offer"].includes(job.status?.toLowerCase())).length || 0
-
-    const interviewsScheduled = events?.length || 0
 
     // Calculate response rate (simplified - interviews/applications)
     const responseRate = totalApplications > 0 ? Math.round((interviewsScheduled / totalApplications) * 100) : 0
