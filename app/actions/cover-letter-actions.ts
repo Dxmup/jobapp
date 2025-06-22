@@ -171,3 +171,36 @@ export async function getJobCoverLetters(jobId: string) {
     return { success: false, error: "Failed to fetch cover letters" }
   }
 }
+
+export async function getUserCoverLetters() {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const supabase = createServerSupabaseClient()
+
+  try {
+    const { data: coverLetters, error } = await supabase
+      .from("cover_letters")
+      .select(`
+        *,
+        jobs (
+          id,
+          title,
+          company,
+          status
+        )
+      `)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return { success: true, coverLetters: coverLetters || [] }
+  } catch (error) {
+    console.error("Error fetching user cover letters:", error)
+    return { success: false, error: "Failed to fetch cover letters" }
+  }
+}
