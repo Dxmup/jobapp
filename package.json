@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@auth/core": "latest",
-    "@clerk/nextjs": "latest",
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
     "@hookform/resolvers": "latest",

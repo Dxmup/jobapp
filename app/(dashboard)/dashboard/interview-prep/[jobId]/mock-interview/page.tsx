@@ -1,7 +1,7 @@
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { PreloadedMockInterview } from "@/components/interview-prep/preloaded-mock-interview"
+import { LiveInterview } from "@/components/interview-prep/live-interview"
 
 interface Props {
   params: {
@@ -70,22 +70,13 @@ const MockInterviewPage = async ({ params: { jobId } }: Props) => {
 
   console.log(`👤 User name for mock interview: ${userName}`)
 
-  return (
-    <PreloadedMockInterview
-      job={job}
-      resume={resume}
-      preloadedQuestions={
-        questions
-          ? {
-              technical: questions.filter((q) => q.type === "technical").map((q) => q.question),
-              behavioral: questions.filter((q) => q.type === "behavioral").map((q) => q.question),
-            }
-          : null
-      }
-      shouldPreload={true}
-      interviewType="first-interview"
-    />
-  )
+  // Format questions for the live interview
+  const formattedQuestions = {
+    technical: questions?.filter((q) => q.type === "technical").map((q) => q.question) || [],
+    behavioral: questions?.filter((q) => q.type === "behavioral").map((q) => q.question) || [],
+  }
+
+  return <LiveInterview jobId={jobId} resumeId={resume?.id} questions={formattedQuestions} userName={userName} />
 }
 
 export default MockInterviewPage
