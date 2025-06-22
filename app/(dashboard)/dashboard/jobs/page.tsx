@@ -15,7 +15,6 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { NewJobForm } from "@/components/jobs/new-job-form"
-import { getDashboardStats } from "@/app/actions/dashboard-actions"
 import { Badge } from "@/components/ui/badge"
 
 export default function JobsPage() {
@@ -216,12 +215,16 @@ export default function JobsPage() {
     }
   }, [highlightId, jobs])
 
+  // Check for jobs via API call instead of server action
   useEffect(() => {
     async function checkForJobs() {
       try {
-        const result = await getDashboardStats()
-        if (result.success) {
-          setHasJobs(result.stats.activeApplications > 0)
+        const response = await fetch("/api/dashboard/stats")
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success) {
+            setHasJobs(result.stats.activeApplications > 0)
+          }
         }
       } catch (error) {
         console.error("Error checking for jobs:", error)
