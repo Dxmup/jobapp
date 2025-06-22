@@ -67,7 +67,7 @@ export async function createResume(data: { title: string; content: string; file_
     const { data: resume, error } = await supabase
       .from("resumes")
       .insert({
-        name: data.title, // Use 'name' column instead of 'title'
+        name: data.title,
         content: data.content,
         file_url: data.file_url,
         user_id: userId,
@@ -177,53 +177,124 @@ export async function associateResumeWithJob(resumeId: string, jobId: string) {
   }
 }
 
-export async function getJobResumes(jobId: string) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
+// Use the same pattern as interview-prep-actions.ts
+export async function getJobResumes(jobId: string): Promise<{
+  success: boolean
+  resumes?: any[]
+  error?: string
+}> {
   try {
-    const { data: jobResumes, error } = await supabase
+    const supabase = createServerSupabaseClient()
+    const userId = await getCurrentUserId()
+
+    console.log(`Getting resumes for job: ${jobId}, user: ${userId}`)
+
+    // First, verify the job belongs to the user - try both user_id and userId fields
+    let { data: job, error: jobError } = await supabase
+      .from("jobs")
+      .select("id")
+      .eq("id", jobId)
+      .eq("user_id", userId)
+      .single()
+
+    // If not found with user_id, try with userId
+    if (jobError && jobError.message && jobError.message.includes("Results contain 0 rows")) {
+      const { data: altJob, error: altJobError } = await supabase
+        .from("jobs")
+        .select("id")
+        .eq("id", jobId)
+        .eq("userId", userId)
+        .single()
+
+      if (!altJobError) {
+        job = altJob
+        jobError = null
+      }
+    }
+
+    if (jobError || !job) {
+      console.error("Error verifying job ownership:", jobError)
+      return { success: false, error: "Job not found or access denied" }
+    }
+
+    // Get resume IDs associated with the job
+    const { data: jobResumes, error: jobResumesError } = await supabase
       .from("job_resumes")
-      .select(`
-        id,
-        resume_id,
-        job_id,
-        created_at,
-        resumes (
-          id,
-          name,
-          file_name,
-          content,
-          file_url,
-          created_at,
-          is_ai_generated
-        )
-      `)
+      .select("resume_id")
       .eq("job_id", jobId)
 
-    if (error) throw error
+    if (jobResumesError) {
+      console.error("Error fetching job resumes:", jobResumesError)
+      return { success: false, error: "Failed to fetch job resumes" }
+    }
 
-    // Transform the data to match expected format
-    const resumes =
-      jobResumes?.map((jr: any) => ({
-        id: jr.resumes.id,
-        name: jr.resumes.name,
-        title: jr.resumes.name, // Map name to title for compatibility
-        content: jr.resumes.content,
-        file_url: jr.resumes.file_url,
-        created_at: jr.resumes.created_at,
-        is_ai_generated: jr.resumes.is_ai_generated || false,
-      })) || []
+    // If no resumes are associated with the job, try to get all user resumes
+    if (!jobResumes || jobResumes.length === 0) {
+      // Try with user_id field first
+      let { data: allResumes, error: allResumesError } = await supabase
+        .from("resumes")
+        .select("id, name, file_name, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
 
-    return { success: true, resumes }
+      // If no results with user_id, try with userId
+      if ((allResumesError || !allResumes || allResumes.length === 0) && userId) {
+        const { data: altResumes, error: altResumesError } = await supabase
+          .from("resumes")
+          .select("id, name, file_name, created_at")
+          .eq("userId", userId)
+          .order("created_at", { ascending: false })
+
+        if (!altResumesError && altResumes && altResumes.length > 0) {
+          allResumes = altResumes
+          allResumesError = null
+        }
+      }
+
+      if (allResumesError) {
+        console.error("Error fetching all user resumes:", allResumesError)
+        return { success: false, error: "Failed to fetch resumes" }
+      }
+
+      return { success: true, resumes: allResumes || [] }
+    }
+
+    // Get the actual resume details for associated resumes
+    const resumeIds = jobResumes.map((jr) => jr.resume_id)
+
+    // Try with user_id field first
+    let { data: resumes, error: resumesError } = await supabase
+      .from("resumes")
+      .select("id, name, file_name, created_at")
+      .in("id", resumeIds)
+      .eq("user_id", userId) // Ensure we only get resumes owned by the user
+
+    // If no results with user_id, try with userId
+    if ((resumesError || !resumes || resumes.length === 0) && userId) {
+      const { data: altResumes, error: altResumesError } = await supabase
+        .from("resumes")
+        .select("id, name, file_name, created_at")
+        .in("id", resumeIds)
+        .eq("userId", userId)
+
+      if (!altResumesError && altResumes && altResumes.length > 0) {
+        resumes = altResumes
+        resumesError = null
+      }
+    }
+
+    if (resumesError) {
+      console.error("Error fetching resumes:", resumesError)
+      return { success: false, error: "Failed to fetch resumes" }
+    }
+
+    return { success: true, resumes: resumes || [] }
   } catch (error) {
     console.error("Error fetching job resumes:", error)
-    return { success: false, error: "Failed to fetch job resumes" }
+    return {
+      success: false,
+      error: `Failed to fetch job resumes: ${error instanceof Error ? error.message : String(error)}`,
+    }
   }
 }
 
