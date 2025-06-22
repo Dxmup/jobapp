@@ -382,28 +382,28 @@ export default function JobsPage() {
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-white bg-[linear-gradient(to_right,#8b5cf6_1px,transparent_1px),linear-gradient(to_bottom,#8b5cf6_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/80 via-pink-600/60 to-cyan-600/80"></div>
+        <div className="absolute inset-0 bg-white"></div>
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30"></div>
 
-        <div className="relative px-6 py-16">
+        <div className="relative px-6 py-16 rounded-3xl">
           <div className="mx-auto max-w-7xl">
             <div className="text-center mb-12">
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 mb-6 border border-white/20">
                 <Sparkles className="h-5 w-5 text-yellow-300 animate-pulse" />
-                <span className="text-white/90 font-medium">Your Dream Job Awaits</span>
+                <span className="text-gray-700 font-medium">Your Dream Job Awaits</span>
                 <Rocket className="h-5 w-5 text-cyan-300 animate-bounce" />
               </div>
 
               <h1 className="text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6">
-                <span className="bg-gradient-to-r from-white via-cyan-200 to-pink-200 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 bg-clip-text text-transparent">
                   Job Applications
                 </span>
               </h1>
 
-              <p className="text-xl lg:text-2xl text-white/80 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
                 Manage and track all your job applications in one place.
-                <span className="text-cyan-200 font-semibold"> Stay organized</span> and
-                <span className="text-pink-200 font-semibold"> never miss an opportunity</span>.
+                <span className="text-cyan-600 font-semibold"> Stay organized</span> and
+                <span className="text-pink-600 font-semibold"> never miss an opportunity</span>.
               </p>
             </div>
 
@@ -417,7 +417,7 @@ export default function JobsPage() {
               ].map((stat, index) => (
                 <div
                   key={stat.label}
-                  className="group relative bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+                  className="group relative bg-gray-50 backdrop-blur-xl rounded-2xl p-6 border border-gray-200 hover:bg-gray-100 transition-all duration-300 hover:scale-105 hover:shadow-2xl"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-cyan-500/5"></div>
@@ -426,9 +426,9 @@ export default function JobsPage() {
                       <div className={`p-2 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
                         <stat.icon className="h-5 w-5 text-white" />
                       </div>
-                      <span className="text-white/80 font-medium">{stat.label}</span>
+                      <span className="text-gray-600 font-medium">{stat.label}</span>
                     </div>
-                    <div className="text-3xl lg:text-4xl font-bold text-white group-hover:scale-110 transition-transform duration-300">
+                    <div className="text-3xl lg:text-4xl font-bold text-gray-800 group-hover:scale-110 transition-transform duration-300">
                       {stat.value}
                     </div>
                   </div>
