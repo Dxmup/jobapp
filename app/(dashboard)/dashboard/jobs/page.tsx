@@ -381,9 +381,9 @@ export default function JobsPage() {
 
       {/* Hero Section */}
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 via-transparent to-cyan-900/50"></div>
-        <div className="absolute inset-0 opacity-30">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-blue-900/20"></div>
+        <div className="absolute inset-0 opacity-10">
           <div
             className="absolute inset-0"
             style={{
@@ -393,7 +393,7 @@ export default function JobsPage() {
           ></div>
         </div>
 
-        <div className="relative px-6 py-20">
+        <div className="relative px-6 py-16">
           <div className="mx-auto max-w-7xl">
             <div className="text-center mb-12">
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 mb-6 border border-white/20">
