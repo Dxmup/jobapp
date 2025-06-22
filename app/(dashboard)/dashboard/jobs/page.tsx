@@ -383,8 +383,16 @@ export default function JobsPage() {
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600"></div>
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 via-transparent to-cyan-900/50"></div>
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg%3E%3Cg fill=\"none\" fillRule=\"evenodd\"%3E%3Cg fill=\"%23ffffff\" fillOpacity=\"0.05\"%3E%3Ccircle cx=\"30\" cy=\"30\" r=\"2\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-30"></div>
-        
+        <div className="absolute inset-0 opacity-30">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fillRule='evenodd'%3E%3Cg fill='%23ffffff' fillOpacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: "60px 60px",
+            }}
+          ></div>
+        </div>
+
         <div className="relative px-6 py-20">
           <div className="mx-auto max-w-7xl">
             <div className="text-center mb-12">
@@ -393,16 +401,16 @@ export default function JobsPage() {
                 <span className="text-white/90 font-medium">Your Dream Job Awaits</span>
                 <Rocket className="h-5 w-5 text-cyan-300 animate-bounce" />
               </div>
-              
+
               <h1 className="text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6">
                 <span className="bg-gradient-to-r from-white via-cyan-200 to-pink-200 bg-clip-text text-transparent">
                   Job Applications
                 </span>
               </h1>
-              
+
               <p className="text-xl lg:text-2xl text-white/80 max-w-3xl mx-auto leading-relaxed">
-                Manage and track all your job applications in one place. 
-                <span className="text-cyan-200 font-semibold"> Stay organized</span> and 
+                Manage and track all your job applications in one place.
+                <span className="text-cyan-200 font-semibold"> Stay organized</span> and
                 <span className="text-pink-200 font-semibold"> never miss an opportunity</span>.
               </p>
             </div>
@@ -509,7 +517,10 @@ export default function JobsPage() {
                   Showing <span className="text-purple-600 font-bold">{filteredJobs.length}</span> of{" "}
                   <span className="text-purple-600 font-bold">{jobs.length}</span> applications
                 </span>
-                <Badge variant="outline" className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200 font-semibold">
+                <Badge
+                  variant="outline"
+                  className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200 font-semibold"
+                >
                   {filteredJobs.length} results
                 </Badge>
               </div>
