@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2, FileText, Clipboard, Wand2, Info, Upload } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase/client"
 
 interface NewResumeFormProps {
   onSuccess?: () => void
@@ -42,42 +41,24 @@ export function NewResumeForm({ onSuccess, onCancel }: NewResumeFormProps) {
     setError(null)
 
     try {
-      // Get the current user
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session?.user) {
-        throw new Error("You must be logged in to create a resume")
-      }
-
-      // Get the user ID from our users table
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("auth_id", session.user.id)
-        .single()
-
-      if (userError || !userData) {
-        throw new Error("Failed to get user information")
-      }
-
-      // Insert the resume
-      const { data, error } = await supabase
-        .from("resumes")
-        .insert({
-          user_id: userData.id,
+      // Use the API endpoint instead of direct Supabase calls
+      const response = await fetch("/api/resumes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           name: newResumeName,
-          file_name: "manual-entry.txt",
           content: newResumeContent,
-          is_ai_generated: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select()
+          fileName: `${newResumeName.replace(/\s+/g, "-").toLowerCase()}.txt`,
+          isAiGenerated: false,
+        }),
+      })
 
-      if (error) {
-        throw new Error("Failed to create resume: " + error.message)
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create resume")
       }
 
       // Reset form
@@ -85,17 +66,17 @@ export function NewResumeForm({ onSuccess, onCancel }: NewResumeFormProps) {
       setNewResumeContent("")
 
       // Set the new resume ID in localStorage for highlighting
-      if (data && data[0]) {
-        localStorage.setItem("newResumeId", data[0].id)
-        localStorage.setItem("newResumeName", data[0].name)
+      if (result.resume) {
+        localStorage.setItem("newResumeId", result.resume.id)
+        localStorage.setItem("newResumeName", result.resume.name)
         localStorage.setItem("resumeSuccess", "true")
       }
 
-      // Show success message - second condition
+      // Show success message
       toast({
         title: "Success!",
         description: "Your resume is saved.",
-        duration: 3000, // 3 seconds
+        duration: 3000,
       })
 
       // Call onSuccess callback if provided
@@ -111,7 +92,7 @@ export function NewResumeForm({ onSuccess, onCancel }: NewResumeFormProps) {
         } else {
           router.refresh()
         }
-      }, 3000) // Match the toast duration
+      }, 3000)
     } catch (error) {
       console.error("Error creating resume:", error)
       setError(error instanceof Error ? error.message : "Failed to create resume")
