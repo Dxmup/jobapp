@@ -439,7 +439,7 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-6 py-12">
+      <div className="relative mx-auto max-w-7xl px-6 py-12 rounded-3xl">
         {/* Enhanced Action Bar */}
         <div className="mb-12">
           <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl relative overflow-hidden">
