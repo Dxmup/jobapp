@@ -14,10 +14,12 @@ interface UserProfile {
   name: string
   email: string
   created_at: string
-  first_name?: string
-  last_name?: string
+  full_name?: string
   phone?: string
-  location?: string
+  address?: string
+  city?: string
+  state?: string
+  zip_code?: string
 }
 
 export default function ProfilePage() {
@@ -28,10 +30,13 @@ export default function ProfilePage() {
 
   // Form state
   const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
+    full_name: "",
+    email: "",
     phone: "",
-    location: "",
+    address: "",
+    city: "",
+    state: "",
+    zip_code: "",
   })
 
   useEffect(() => {
@@ -47,10 +52,13 @@ export default function ProfilePage() {
       if (response.ok && data.profile) {
         setProfile(data.profile)
         setFormData({
-          first_name: data.profile.first_name || "",
-          last_name: data.profile.last_name || "",
+          full_name: data.profile.full_name || data.profile.name || "",
+          email: data.profile.email || "",
           phone: data.profile.phone || "",
-          location: data.profile.location || "",
+          address: data.profile.address || "",
+          city: data.profile.city || "",
+          state: data.profile.state || "",
+          zip_code: data.profile.zip_code || "",
         })
       }
     } catch (error) {
@@ -173,44 +181,70 @@ export default function ProfilePage() {
             <CardDescription>Update your personal information.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">First Name</Label>
-                <Input
-                  id="first_name"
-                  value={formData.first_name}
-                  onChange={(e) => handleInputChange("first_name", e.target.value)}
-                  placeholder="Enter your first name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="last_name">Last Name</Label>
-                <Input
-                  id="last_name"
-                  value={formData.last_name}
-                  onChange={(e) => handleInputChange("last_name", e.target.value)}
-                  placeholder="Enter your last name"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => handleInputChange("full_name", e.target.value)}
+                placeholder="Enter your full name"
+              />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange("email", e.target.value)}
+                placeholder="Enter your email address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+                placeholder="Enter your phone number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => handleInputChange("address", e.target.value)}
+                placeholder="Enter your street address"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="city">City</Label>
                 <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
-                  placeholder="Enter your phone number"
+                  id="city"
+                  value={formData.city}
+                  onChange={(e) => handleInputChange("city", e.target.value)}
+                  placeholder="City"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="state">State</Label>
                 <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange("location", e.target.value)}
-                  placeholder="City, State/Country"
+                  id="state"
+                  value={formData.state}
+                  onChange={(e) => handleInputChange("state", e.target.value)}
+                  placeholder="State"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="zip_code">ZIP Code</Label>
+                <Input
+                  id="zip_code"
+                  value={formData.zip_code}
+                  onChange={(e) => handleInputChange("zip_code", e.target.value)}
+                  placeholder="ZIP Code"
                 />
               </div>
             </div>

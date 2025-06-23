@@ -48,39 +48,40 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
-      full_name,
-      first_name,
-      last_name,
-      phone,
-      location,
-      bio,
-      job_title,
-      company,
-      linkedin_url,
-      github_url,
-      website_url,
-    } = body
+    const { full_name, email, phone, address, city, state, zip_code } = body
 
     const supabase = createServerSupabaseClient()
 
-    // Update or insert user profile
+    // Update user email and name in users table
+    if (email || full_name) {
+      const userUpdates: any = {
+        updated_at: new Date().toISOString(),
+      }
+
+      if (email) userUpdates.email = email
+      if (full_name) userUpdates.name = full_name
+
+      const { error: userError } = await supabase.from("users").update(userUpdates).eq("id", userId)
+
+      if (userError) {
+        console.error("Error updating user:", userError)
+        return NextResponse.json({ error: "Failed to update user information" }, { status: 500 })
+      }
+    }
+
+    // Update or insert user profile (using the actual column names from the existing API)
     const { data, error } = await supabase
       .from("user_profiles")
       .upsert(
         {
           user_id: userId,
-          full_name,
-          first_name,
-          last_name,
-          phone,
-          location,
-          bio,
-          job_title,
-          company,
-          linkedin_url,
-          github_url,
-          website_url,
+          full_name: full_name || null,
+          email: email || null,
+          phone: phone || null,
+          address: address || null,
+          city: city || null,
+          state: state || null,
+          zip_code: zip_code || null,
           updated_at: new Date().toISOString(),
         },
         {
@@ -93,17 +94,6 @@ export async function PUT(request: NextRequest) {
     if (error) {
       console.error("Error updating profile:", error)
       return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
-    }
-
-    // Also update the user's name in the users table if full_name is provided
-    if (full_name) {
-      await supabase
-        .from("users")
-        .update({
-          name: full_name,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId)
     }
 
     return NextResponse.json({ success: true, profile: data })
