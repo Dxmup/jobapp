@@ -828,12 +828,12 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
   endInterview(): void {
     console.log("🔚 Ending conversational interview...")
 
-    // IMMEDIATE CLEANUP - Cancel everything first
+    // STEP 1: IMMEDIATE STATE CHANGES - Stop everything first
     this.active = false
     this.isListeningForResponse = false
     this.isPlayingQuestion = false
 
-    // Cancel all active API requests IMMEDIATELY
+    // STEP 2: CANCEL ALL ACTIVE REQUESTS IMMEDIATELY
     console.log(`🚫 Immediately cancelling ${this.activeRequests.size} active API requests...`)
     this.activeRequests.forEach((controller) => {
       try {
@@ -844,7 +844,7 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
     })
     this.activeRequests.clear()
 
-    // Clear all timers IMMEDIATELY
+    // STEP 3: CLEAR ALL TIMERS IMMEDIATELY
     if (this.timeoutId) {
       clearTimeout(this.timeoutId)
       this.timeoutId = null
@@ -860,12 +860,11 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
       this.voiceActivityMonitor = null
     }
 
-    // Rest of cleanup continues...
-
-    // Stop media recorder
+    // STEP 4: STOP MEDIA RECORDING IMMEDIATELY
     if (this.mediaRecorder) {
       try {
         if (this.mediaRecorder.state === "recording") {
+          console.log("🛑 Stopping media recorder...")
           this.mediaRecorder.stop()
         }
       } catch (error) {
@@ -874,9 +873,10 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
       this.mediaRecorder = null
     }
 
-    // Disconnect audio nodes
+    // STEP 5: DISCONNECT ALL AUDIO NODES
     if (this.microphoneSource) {
       try {
+        console.log("🔌 Disconnecting microphone source...")
         this.microphoneSource.disconnect()
       } catch (error) {
         console.warn("Error disconnecting microphone source:", error)
@@ -886,6 +886,7 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
 
     if (this.audioAnalyzer) {
       try {
+        console.log("🔌 Disconnecting audio analyzer...")
         this.audioAnalyzer.disconnect()
       } catch (error) {
         console.warn("Error disconnecting audio analyzer:", error)
@@ -893,42 +894,58 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
       this.audioAnalyzer = null
     }
 
-    // Stop all media stream tracks
+    // STEP 6: STOP ALL MEDIA STREAM TRACKS (CRITICAL FOR MICROPHONE)
     if (this.stream) {
-      this.stream.getTracks().forEach((track) => {
+      console.log("🎤 Stopping all media stream tracks...")
+      this.stream.getTracks().forEach((track, index) => {
         try {
+          console.log(`🛑 Stopping track ${index}: ${track.kind} (${track.label})`)
           track.stop()
         } catch (error) {
-          console.warn("Error stopping track:", error)
+          console.warn(`Error stopping track ${index}:`, error)
         }
       })
       this.stream = null
     }
 
-    // Clear audio queue and free memory
-    this.questionQueue.forEach((question) => {
+    // STEP 7: ABORT ALL QUEUED AUDIO GENERATION
+    console.log("🚫 Aborting all queued audio generation...")
+    this.questionQueue.forEach((question, index) => {
+      if (question.abortController) {
+        try {
+          console.log(`🚫 Aborting audio generation for question ${index + 1}`)
+          question.abortController.abort()
+        } catch (error) {
+          console.warn(`Error aborting question ${index + 1}:`, error)
+        }
+      }
+      // Clear audio data immediately
       if (question.audioData) {
         question.audioData = undefined
       }
       if (question.audioFormatInfo) {
         question.audioFormatInfo = undefined
       }
-      if (question.abortController) {
-        try {
-          question.abortController.abort()
-        } catch (error) {
-          // Ignore abort errors during cleanup
-        }
-      }
     })
+
+    // STEP 8: CLEAR AUDIO QUEUE AND MEMORY
     this.questionQueue = []
     this.totalAudioMemoryMB = 0
+    this.generatingAudioCount = 0
 
-    // Close audio context
+    // STEP 9: CLOSE AUDIO CONTEXT (CRITICAL)
     if (this.audioContext) {
       try {
+        console.log(`🔊 Closing audio context (state: ${this.audioContext.state})...`)
         if (this.audioContext.state !== "closed") {
-          this.audioContext.close()
+          this.audioContext
+            .close()
+            .then(() => {
+              console.log("✅ Audio context closed successfully")
+            })
+            .catch((error) => {
+              console.warn("Error closing audio context:", error)
+            })
         }
       } catch (error) {
         console.warn("Error closing audio context:", error)
@@ -936,17 +953,52 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
       this.audioContext = null
     }
 
-    // Force garbage collection hint
+    // STEP 10: FORCE GARBAGE COLLECTION
     if (typeof window !== "undefined" && "gc" in window) {
       try {
         ;(window as any).gc()
+        console.log("🗑️ Forced garbage collection")
       } catch (error) {
         // Ignore if gc is not available
       }
     }
 
-    console.log("✅ Interview cleanup completed")
+    console.log("✅ Interview cleanup completed - all resources should be released")
     this.callbacks.onDisconnected()
+  }
+
+  forceCleanup(): void {
+    console.log("🧹 FORCE CLEANUP - Aggressively cleaning up interview client...")
+
+    // Set flags to stop all operations
+    this.active = false
+    this.isListeningForResponse = false
+    this.isPlayingQuestion = false
+
+    // Call the main cleanup
+    this.endInterview()
+
+    // Additional aggressive cleanup
+    setTimeout(() => {
+      // Double-check stream cleanup after a delay
+      if (this.stream) {
+        console.log("🚨 Stream still exists after cleanup, force stopping...")
+        this.stream.getTracks().forEach((track) => {
+          if (track.readyState === "live") {
+            console.log(`🛑 Force stopping live track: ${track.kind}`)
+            track.stop()
+          }
+        })
+        this.stream = null
+      }
+
+      // Double-check audio context
+      if (this.audioContext && this.audioContext.state !== "closed") {
+        console.log("🚨 Audio context still open after cleanup, force closing...")
+        this.audioContext.close()
+        this.audioContext = null
+      }
+    }, 1000)
   }
 
   isActive(): boolean {
@@ -1019,5 +1071,28 @@ OUTPUT: Speak the closing statement directly without any stage directions or des
 
   getInterviewerName(): string {
     return this.interviewerName
+  }
+
+  // Add this method to help debug resource cleanup
+  debugResourceStatus(): void {
+    console.log("🔍 RESOURCE DEBUG STATUS:")
+    console.log("- Active:", this.active)
+    console.log("- Audio Context:", this.audioContext?.state || "null")
+    console.log("- Stream tracks:", this.stream?.getTracks().length || 0)
+    console.log("- Media Recorder:", this.mediaRecorder?.state || "null")
+    console.log("- Voice Activity Monitor:", !!this.voiceActivityMonitor)
+    console.log("- Silence Timer:", !!this.silenceTimer)
+    console.log("- Timeout ID:", !!this.timeoutId)
+    console.log("- Active Requests:", this.activeRequests.size)
+    console.log("- Question Queue:", this.questionQueue.length)
+    console.log("- Is Playing Question:", this.isPlayingQuestion)
+    console.log("- Is Listening:", this.isListeningForResponse)
+
+    // Check if any tracks are still live
+    if (this.stream) {
+      this.stream.getTracks().forEach((track, index) => {
+        console.log(`- Track ${index}: ${track.kind} - ${track.readyState} - ${track.label}`)
+      })
+    }
   }
 }

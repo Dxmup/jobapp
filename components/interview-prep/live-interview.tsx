@@ -309,18 +309,39 @@ export function LiveInterview({
 
   // End interview manually
   const endInterview = () => {
+    console.log("🔚 User manually ending interview...")
+
     if (clientRef.current) {
       setInterviewState("ending")
-      clientRef.current.endInterview()
+
+      // Force immediate cleanup
+      clientRef.current.forceCleanup()
+
+      // Clear the ref immediately
+      clientRef.current = null
     }
+
+    // Clean up local timers
+    if (durationTimerRef.current) {
+      clearInterval(durationTimerRef.current)
+      durationTimerRef.current = null
+    }
+
+    // Set final state
+    setTimeout(() => {
+      setInterviewState("completed")
+    }, 1000)
   }
 
   // Restart interview
   const restartInterview = () => {
     console.log("🔄 Restarting interview...")
 
+    // AGGRESSIVE CLEANUP FIRST
     if (clientRef.current) {
+      console.log("🧹 Force cleaning up existing client...")
       clientRef.current.forceCleanup()
+      clientRef.current = null
     }
 
     if (durationTimerRef.current) {
@@ -328,40 +349,35 @@ export function LiveInterview({
       durationTimerRef.current = null
     }
 
-    // Reset all state
-    setInterviewClient(null)
-    setInterviewState("ready")
-    setError(null)
-    setDuration(0)
-    setRemainingTime(maxDuration)
-    setCurrentQuestion("")
-    setCurrentQuestionIndex(0)
-    setTotalQuestions(0)
-    setQueueStatus({ queued: 0, ready: 0, generating: 0 })
-    setMemoryStatus({ queueSize: 0, audioDataSize: 0, estimatedMemoryMB: 0 })
+    // Wait a moment for cleanup to complete
+    setTimeout(() => {
+      // Reset all state
+      setInterviewClient(null)
+      setInterviewState("ready")
+      setError(null)
+      setDuration(0)
+      setRemainingTime(maxDuration)
+      setCurrentQuestion("")
+      setCurrentQuestionIndex(0)
+      setTotalQuestions(0)
+      setQueueStatus({ queued: 0, ready: 0, generating: 0 })
+      setMemoryStatus({ queueSize: 0, audioDataSize: 0, estimatedMemoryMB: 0 })
 
-    clientRef.current = null
-
-    // Force garbage collection
-    if (typeof window !== "undefined" && "gc" in window) {
-      try {
-        ;(window as any).gc()
-      } catch (error) {
-        // Ignore if gc is not available
-      }
-    }
-
-    console.log("✅ Interview restart completed")
+      console.log("✅ Interview restart completed")
+    }, 1500) // Give more time for cleanup
   }
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log("🧹 Component unmounting - cleaning up interview...")
       if (clientRef.current) {
-        clientRef.current.endInterview()
+        clientRef.current.forceCleanup()
+        clientRef.current = null
       }
       if (durationTimerRef.current) {
         clearInterval(durationTimerRef.current)
+        durationTimerRef.current = null
       }
     }
   }, [])
@@ -370,17 +386,18 @@ export function LiveInterview({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && clientRef.current && clientRef.current.isActive()) {
-        console.log("👁️ Page hidden, pausing interview...")
-        // Don't end the interview, but log that it's still running
+        console.log("👁️ Page hidden during active interview - WARNING user...")
+        // Could show a warning that the interview is still running
       }
     }
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (clientRef.current && clientRef.current.isActive()) {
-        console.log("🚪 Page unloading, cleaning up interview...")
+        console.log("🚪 Page unloading during active interview - force cleanup...")
         clientRef.current.forceCleanup()
+        clientRef.current = null
         e.preventDefault()
-        e.returnValue = ""
+        e.returnValue = "Interview is still active. Are you sure you want to leave?"
       }
     }
 
@@ -726,6 +743,40 @@ export function LiveInterview({
               </Button>
             )}
           </div>
+
+          {/* Debug Controls - Remove in production */}
+          {process.env.NODE_ENV === "development" && (isInterviewActive || isCompleted) && (
+            <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+              <h4 className="text-sm font-medium mb-2">Debug Controls</h4>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    if (clientRef.current) {
+                      clientRef.current.debugResourceStatus()
+                    }
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  Debug Status
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (clientRef.current) {
+                      console.log("🧹 Manual force cleanup triggered...")
+                      clientRef.current.forceCleanup()
+                      clientRef.current = null
+                      setInterviewState("completed")
+                    }
+                  }}
+                  size="sm"
+                  variant="destructive"
+                >
+                  Force Cleanup
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
