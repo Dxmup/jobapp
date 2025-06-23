@@ -1,118 +1,351 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { ProfileAvatar } from "@/components/dashboard/profile-avatar"
-import { ProfileSkills } from "@/components/dashboard/profile-skills"
-import { ProfileSocialLinks } from "@/components/dashboard/profile-social-links"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useToast } from "@/hooks/use-toast"
+import { Loader2, Save, User, Mail, Calendar, Briefcase } from "lucide-react"
+
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  created_at: string
+  full_name?: string
+  first_name?: string
+  last_name?: string
+  phone?: string
+  location?: string
+  bio?: string
+  job_title?: string
+  company?: string
+  linkedin_url?: string
+  github_url?: string
+  website_url?: string
+}
 
 export default function ProfilePage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
-        <p className="text-muted-foreground">
-          Manage your personal information and how it appears across the platform.
-        </p>
-      </div>
-      <Separator />
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const { toast } = useToast()
 
-      <div className="grid gap-6 md:grid-cols-[1fr_250px]">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Update your personal details and contact information.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="first-name">First name</Label>
-                  <Input id="first-name" defaultValue="John" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last-name">Last name</Label>
-                  <Input id="last-name" defaultValue="Doe" />
-                </div>
+  // Form state
+  const [formData, setFormData] = useState({
+    full_name: "",
+    first_name: "",
+    last_name: "",
+    phone: "",
+    location: "",
+    bio: "",
+    job_title: "",
+    company: "",
+    linkedin_url: "",
+    github_url: "",
+    website_url: "",
+  })
+
+  useEffect(() => {
+    fetchProfile()
+  }, [])
+
+  const fetchProfile = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch("/api/user/profile")
+      const data = await response.json()
+
+      if (response.ok && data.profile) {
+        setProfile(data.profile)
+        setFormData({
+          full_name: data.profile.full_name || "",
+          first_name: data.profile.first_name || "",
+          last_name: data.profile.last_name || "",
+          phone: data.profile.phone || "",
+          location: data.profile.location || "",
+          bio: data.profile.bio || "",
+          job_title: data.profile.job_title || "",
+          company: data.profile.company || "",
+          linkedin_url: data.profile.linkedin_url || "",
+          github_url: data.profile.github_url || "",
+          website_url: data.profile.website_url || "",
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load profile data.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true)
+      const response = await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Profile updated successfully!",
+        })
+        // Refresh profile data
+        await fetchProfile()
+      } else {
+        throw new Error("Failed to update profile")
+      }
+    } catch (error) {
+      console.error("Error saving profile:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const getUserInitials = (name: string | null, email: string | null) => {
+    if (name) {
+      return name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    }
+    if (email) {
+      return email[0].toUpperCase()
+    }
+    return "U"
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto py-8 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Profile Settings</h1>
+        <p className="text-muted-foreground">Manage your account information and preferences.</p>
+      </div>
+
+      <div className="grid gap-6">
+        {/* Profile Header */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <Avatar className="w-20 h-20">
+                <AvatarImage src="/placeholder.svg" alt="Profile picture" />
+                <AvatarFallback className="text-lg">
+                  {getUserInitials(profile?.name || null, profile?.email || null)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <CardTitle className="text-2xl">{profile?.name || "User"}</CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  {profile?.email}
+                </CardDescription>
+                <CardDescription className="flex items-center gap-2 mt-1">
+                  <Calendar className="w-4 h-4" />
+                  Member since {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "Unknown"}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Basic Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Basic Information
+            </CardTitle>
+            <CardDescription>Update your personal information.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="first_name">First Name</Label>
+                <Input
+                  id="first_name"
+                  value={formData.first_name}
+                  onChange={(e) => handleInputChange("first_name", e.target.value)}
+                  placeholder="Enter your first name"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" defaultValue="john.doe@example.com" />
+                <Label htmlFor="last_name">Last Name</Label>
+                <Input
+                  id="last_name"
+                  value={formData.last_name}
+                  onChange={(e) => handleInputChange("last_name", e.target.value)}
+                  placeholder="Enter your last name"
+                />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => handleInputChange("full_name", e.target.value)}
+                placeholder="Enter your full name"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone number</Label>
-                <Input id="phone" type="tel" defaultValue="+1 (555) 123-4567" />
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  placeholder="Enter your phone number"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="location">Location</Label>
-                <Input id="location" defaultValue="San Francisco, CA" />
+                <Input
+                  id="location"
+                  value={formData.location}
+                  onChange={(e) => handleInputChange("location", e.target.value)}
+                  placeholder="City, State/Country"
+                />
               </div>
-            </CardContent>
-            <CardFooter>
-              <Button>Save Changes</Button>
-            </CardFooter>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Professional Summary</CardTitle>
-              <CardDescription>Write a brief summary of your professional background and career goals.</CardDescription>
-            </CardHeader>
-            <CardContent>
+        {/* Professional Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5" />
+              Professional Information
+            </CardTitle>
+            <CardDescription>Update your professional details.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="job_title">Job Title</Label>
+                <Input
+                  id="job_title"
+                  value={formData.job_title}
+                  onChange={(e) => handleInputChange("job_title", e.target.value)}
+                  placeholder="e.g. Software Engineer"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="company">Company</Label>
+                <Input
+                  id="company"
+                  value={formData.company}
+                  onChange={(e) => handleInputChange("company", e.target.value)}
+                  placeholder="Current or target company"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
               <Textarea
-                className="min-h-[150px]"
-                placeholder="Write your professional summary here..."
-                defaultValue="Experienced Frontend Developer with 5+ years of experience building responsive and performant web applications. Specialized in React, Next.js, and modern JavaScript frameworks with a strong focus on accessibility and user experience."
+                id="bio"
+                value={formData.bio}
+                onChange={(e) => handleInputChange("bio", e.target.value)}
+                placeholder="Tell us about yourself and your career goals..."
+                rows={4}
               />
-              <p className="text-xs text-muted-foreground mt-2">
-                This summary will be used as a starting point for AI-generated cover letters.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button>Save Summary</Button>
-            </CardFooter>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <ProfileSkills />
-          <ProfileSocialLinks />
-        </div>
+        {/* Social Links */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Social Links</CardTitle>
+            <CardDescription>Add your professional social media profiles.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="linkedin_url">LinkedIn URL</Label>
+              <Input
+                id="linkedin_url"
+                type="url"
+                value={formData.linkedin_url}
+                onChange={(e) => handleInputChange("linkedin_url", e.target.value)}
+                placeholder="https://linkedin.com/in/yourprofile"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="github_url">GitHub URL</Label>
+              <Input
+                id="github_url"
+                type="url"
+                value={formData.github_url}
+                onChange={(e) => handleInputChange("github_url", e.target.value)}
+                placeholder="https://github.com/yourusername"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="website_url">Personal Website</Label>
+              <Input
+                id="website_url"
+                type="url"
+                value={formData.website_url}
+                onChange={(e) => handleInputChange("website_url", e.target.value)}
+                placeholder="https://yourwebsite.com"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="space-y-6">
-          <ProfileAvatar />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Plan</span>
-                <span className="text-sm">Free</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Member Since</span>
-                <span className="text-sm">April 15, 2023</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Applications</span>
-                <span className="text-sm">2/3 used</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Storage</span>
-                <span className="text-sm">15MB/100MB</span>
-              </div>
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-purple-600 w-[15%]" />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="w-full" asChild>
-                <a href="/dashboard/subscription">Upgrade Plan</a>
-              </Button>
-            </CardFooter>
-          </Card>
+        {/* Save Button */}
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={isSaving} className="min-w-[120px]">
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save Changes
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </div>
