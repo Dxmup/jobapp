@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Menu, X, UserIcon, LogOut, Settings, Search, Zap } from "lucide-react"
+import { Menu, X, UserIcon, LogOut, Search, Zap } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
@@ -345,26 +345,13 @@ export function EnhancedDashboardHeader() {
                   variant="ghost"
                   className="w-full justify-start"
                   onClick={() => {
-                    console.log("Profile clicked")
+                    console.log("Profile & Settings clicked")
                     router.push("/dashboard/profile")
                     setIsProfileDialogOpen(false)
                   }}
                 >
                   <UserIcon className="mr-2 h-4 w-4" />
-                  Profile
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    console.log("Settings clicked")
-                    router.push("/dashboard/settings")
-                    setIsProfileDialogOpen(false)
-                  }}
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  Profile & Settings
                 </Button>
 
                 <Button
