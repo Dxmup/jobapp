@@ -5,14 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Menu, X, UserIcon, LogOut, Settings, Search, Zap } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -38,6 +31,8 @@ export function EnhancedDashboardHeader() {
   const [isSearching, setIsSearching] = useState(false)
   const debouncedSearchQuery = useDebounce(searchQuery, 300)
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
   // Fetch current user on component mount
   useEffect(() => {
@@ -317,68 +312,77 @@ export function EnhancedDashboardHeader() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative h-8 w-8 rounded-full hover:bg-white/10 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400"
-                disabled={isLoadingUser}
-                onClick={() => console.log("Profile dropdown clicked")}
-              >
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white font-medium shadow-lg">
-                  {isLoadingUser ? "..." : getUserInitials(user?.name || null, user?.email || null)}
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              className="w-56 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 shadow-lg rounded-md"
-              align="end"
-              sideOffset={5}
+        <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              className="relative h-8 w-8 rounded-full hover:bg-white/10 transition-all duration-200"
+              disabled={isLoadingUser}
+              onClick={() => setIsProfileDialogOpen(true)}
             >
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    {isLoadingUser ? "Loading..." : user?.name || "User"}
-                  </p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {isLoadingUser ? "..." : user?.email || "user@example.com"}
-                  </p>
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white font-medium shadow-lg">
+                {isLoadingUser ? "..." : getUserInitials(user?.name || null, user?.email || null)}
+              </div>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Account Menu</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white font-medium">
+                  {getUserInitials(user?.name || null, user?.email || null)}
                 </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  console.log("Profile clicked")
-                  router.push("/dashboard/profile")
-                }}
-                className="cursor-pointer"
-              >
-                <UserIcon className="mr-2 h-4 w-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  console.log("Settings clicked")
-                  router.push("/dashboard/settings")
-                }}
-                className="cursor-pointer"
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={handleLogout}
-                className="text-red-600 focus:text-red-600 cursor-pointer"
-                disabled={isLoggingOut}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+                <div>
+                  <p className="font-medium">{user?.name || "User"}</p>
+                  <p className="text-sm text-muted-foreground">{user?.email || "user@example.com"}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    console.log("Profile clicked")
+                    router.push("/dashboard/profile")
+                    setIsProfileDialogOpen(false)
+                  }}
+                >
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  Profile
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    console.log("Settings clicked")
+                    router.push("/dashboard/settings")
+                    setIsProfileDialogOpen(false)
+                  }}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-red-600 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => {
+                    handleLogout()
+                    setIsProfileDialogOpen(false)
+                  }}
+                  disabled={isLoggingOut}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  {isLoggingOut ? "Logging out..." : "Log out"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {isMobileMenuOpen && (
