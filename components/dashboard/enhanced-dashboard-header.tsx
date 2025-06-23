@@ -318,11 +318,11 @@ export function EnhancedDashboardHeader() {
         </div>
 
         <div className="flex items-center gap-3">
-          <DropdownMenu onOpenChange={(open) => console.log("Dropdown open:", open)}>
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="relative h-8 w-8 rounded-full hover:bg-white/10 transition-all duration-200"
+                className="relative h-8 w-8 rounded-full hover:bg-white/10 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400"
                 disabled={isLoadingUser}
                 onClick={() => console.log("Profile dropdown clicked")}
               >
@@ -332,27 +332,27 @@ export function EnhancedDashboardHeader() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-56 bg-slate-900/95 border-white/10 backdrop-blur-xl z-[9999]"
+              className="w-56 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 shadow-lg rounded-md"
               align="end"
-              forceMount
+              sideOffset={5}
             >
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none text-white">
+                  <p className="text-sm font-medium leading-none">
                     {isLoadingUser ? "Loading..." : user?.name || "User"}
                   </p>
-                  <p className="text-xs leading-none text-white/60">
+                  <p className="text-xs leading-none text-muted-foreground">
                     {isLoadingUser ? "..." : user?.email || "user@example.com"}
                   </p>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {
                   console.log("Profile clicked")
                   router.push("/dashboard/profile")
                 }}
-                className="text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+                className="cursor-pointer"
               >
                 <UserIcon className="mr-2 h-4 w-4" />
                 <span>Profile</span>
@@ -362,15 +362,15 @@ export function EnhancedDashboardHeader() {
                   console.log("Settings clicked")
                   router.push("/dashboard/settings")
                 }}
-                className="text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+                className="cursor-pointer"
               >
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleLogout}
-                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                className="text-red-600 focus:text-red-600 cursor-pointer"
                 disabled={isLoggingOut}
               >
                 <LogOut className="mr-2 h-4 w-4" />
