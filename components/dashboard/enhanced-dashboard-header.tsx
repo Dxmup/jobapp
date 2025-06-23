@@ -4,8 +4,7 @@ import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ModeToggle } from "@/components/mode-toggle"
-import { Bell, Menu, X, User, LogOut, Settings, Search, Zap } from "lucide-react"
+import { Menu, X, User, LogOut, Settings, Search, Zap } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,28 +45,24 @@ export function EnhancedDashboardHeader() {
 
     setIsSearching(true)
     try {
-      // Fetch all data from existing APIs (without search parameters)
       const [jobsRes, resumesRes, coverLettersRes] = await Promise.all([
         fetch("/api/jobs"),
         fetch("/api/direct-resumes"),
         fetch("/api/cover-letters"),
       ])
 
-      // Parse responses with proper error handling
       const [jobsData, resumesData, coverLettersData] = await Promise.all([
         jobsRes.ok ? jobsRes.json().catch(() => ({ jobs: [] })) : { jobs: [] },
         resumesRes.ok ? resumesRes.json().catch(() => ({ resumes: [] })) : { resumes: [] },
         coverLettersRes.ok ? coverLettersRes.json().catch(() => ({ coverLetters: [] })) : { coverLetters: [] },
       ])
 
-      // Extract arrays from API responses
       const jobs = Array.isArray(jobsData) ? jobsData : jobsData.jobs || jobsData.data || []
       const resumes = Array.isArray(resumesData) ? resumesData : resumesData.resumes || resumesData.data || []
       const coverLetters = Array.isArray(coverLettersData)
         ? coverLettersData
         : coverLettersData.coverLetters || coverLettersData.data || []
 
-      // Perform client-side search filtering
       const queryLower = query.toLowerCase()
 
       const filteredJobs = jobs.filter(
@@ -93,7 +88,6 @@ export function EnhancedDashboardHeader() {
           letter.jobs?.title?.toLowerCase().includes(queryLower),
       )
 
-      // Format results for display
       const results = [
         ...filteredJobs.slice(0, 3).map((job: any) => ({
           id: job.id,
@@ -161,7 +155,6 @@ export function EnhancedDashboardHeader() {
           <button
             onClick={() => {
               setIsMobileMenuOpen(!isMobileMenuOpen)
-              // If you need to communicate with parent layout, you can use a prop
             }}
             className="inline-flex items-center justify-center rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white transition-all duration-200"
           >
@@ -193,7 +186,6 @@ export function EnhancedDashboardHeader() {
             }
           }}
         >
-          {/* Search Bar - Hidden on mobile */}
           <div className="hidden md:flex flex-1 max-w-md mx-8">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 w-4 h-4" />
@@ -206,7 +198,6 @@ export function EnhancedDashboardHeader() {
                 className="w-full pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:bg-white/15 focus:border-purple-400/50 transition-all duration-200"
               />
 
-              {/* Search Results Dropdown */}
               {isSearchOpen && (searchQuery || searchResults.length > 0) && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 border border-white/10 rounded-lg shadow-xl backdrop-blur-xl z-50 max-h-96 overflow-y-auto">
                   {isSearching ? (
@@ -255,17 +246,6 @@ export function EnhancedDashboardHeader() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
-          >
-            <Bell size={18} />
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 text-[10px] font-medium text-white flex items-center justify-center animate-pulse">
-              3
-            </span>
-          </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -308,15 +288,12 @@ export function EnhancedDashboardHeader() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <ModeToggle />
         </div>
       </div>
 
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-white/10 bg-slate-900/95 backdrop-blur-xl">
           <div className="p-4">
-            {/* Mobile Search */}
             <div className="mb-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 w-4 h-4" />

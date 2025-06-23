@@ -15,7 +15,6 @@ import {
   Calendar,
   Zap,
   Star,
-  User,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
@@ -25,12 +24,6 @@ const sidebarItems = [
     href: "/dashboard",
     icon: LayoutDashboard,
     gradient: "from-blue-500 to-cyan-500",
-  },
-  {
-    title: "Profile",
-    href: "/dashboard/profile",
-    icon: User,
-    gradient: "from-pink-500 to-rose-500",
   },
   {
     title: "Jobs",

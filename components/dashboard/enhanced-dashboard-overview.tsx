@@ -1,23 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Skeleton } from "@/components/ui/skeleton"
-import {
-  TrendingUp,
-  Calendar,
-  FileText,
-  Target,
-  Sparkles,
-  Plus,
-  ArrowRight,
-  Users,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-} from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { TrendingUp, FileText, Calendar, Zap, Target, ArrowRight, Sparkles, BarChart3, PlusCircle } from "lucide-react"
 import Link from "next/link"
 import { JobsCarousel } from "./jobs-carousel"
 
@@ -30,100 +17,112 @@ interface DashboardStats {
   weeklyProgress: number
 }
 
-interface UserProfile {
-  full_name?: string
-  first_name?: string
-  last_name?: string
-  email?: string
-}
-
 export function EnhancedDashboardOverview() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [jobs, setJobs] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [userName, setUserName] = useState<string>("")
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchStats = async () => {
       try {
-        const [statsRes, profileRes, jobsRes] = await Promise.all([
-          fetch("/api/dashboard/stats"),
-          fetch("/api/user/profile"),
-          fetch("/api/jobs"),
-        ])
+        console.log("Fetching dashboard stats from API...")
+        const response = await fetch("/api/dashboard/stats")
+        console.log("Dashboard stats response status:", response.status)
 
-        if (statsRes.ok) {
-          const statsData = await statsRes.json()
-          setStats(statsData)
-        }
-
-        if (profileRes.ok) {
-          const profileData = await profileRes.json()
-          setUserProfile(profileData)
-        }
-
-        if (jobsRes.ok) {
-          const jobsData = await jobsRes.json()
-          setJobs(Array.isArray(jobsData) ? jobsData : jobsData.jobs || [])
+        if (response.ok) {
+          const data = await response.json()
+          console.log("Dashboard stats data received:", data)
+          setStats(data)
+        } else {
+          console.error("Dashboard stats API error:", response.status, response.statusText)
+          // Fallback to zeros if API fails
+          setStats({
+            totalApplications: 0,
+            activeApplications: 0,
+            interviewsScheduled: 0,
+            responseRate: 0,
+            weeklyGoal: 5,
+            weeklyProgress: 0,
+          })
         }
       } catch (error) {
-        console.error("Error fetching dashboard data:", error)
+        console.error("Failed to fetch dashboard stats:", error)
+        // Fallback to zeros
+        setStats({
+          totalApplications: 0,
+          activeApplications: 0,
+          interviewsScheduled: 0,
+          responseRate: 0,
+          weeklyGoal: 5,
+          weeklyProgress: 0,
+        })
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
-    fetchData()
+    fetchStats()
+
+    // Fetch user name
+    const fetchUserName = async () => {
+      try {
+        const response = await fetch("/api/user/profile")
+        if (response.ok) {
+          const userData = await response.json()
+          const name = userData.full_name || userData.first_name || userData.email?.split("@")[0] || ""
+          setUserName(name)
+        }
+      } catch (error) {
+        console.error("Failed to fetch user name:", error)
+      }
+    }
+
+    fetchUserName()
   }, [])
 
-  const getUserDisplayName = () => {
-    if (!userProfile) return ""
+  const quickActions = [
+    {
+      title: "Add New Job",
+      description: "Track a new application",
+      icon: PlusCircle,
+      href: "/dashboard/jobs/new",
+      gradient: "from-blue-500 to-cyan-500",
+    },
+    {
+      title: "Build Resume",
+      description: "Create or customize",
+      icon: FileText,
+      href: "/dashboard/build-resume",
+      gradient: "from-green-500 to-emerald-500",
+    },
+    {
+      title: "Interview Prep",
+      description: "Practice questions",
+      icon: Target,
+      href: "/dashboard/interview-prep",
+      gradient: "from-purple-500 to-violet-500",
+    },
+    {
+      title: "Schedule Event",
+      description: "Add to calendar",
+      icon: Calendar,
+      href: "/dashboard/schedule",
+      gradient: "from-orange-500 to-red-500",
+    },
+  ]
 
-    if (userProfile.full_name) {
-      return userProfile.full_name
-    }
-
-    if (userProfile.first_name || userProfile.last_name) {
-      return `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim()
-    }
-
-    if (userProfile.email) {
-      return userProfile.email.split("@")[0]
-    }
-
-    return ""
-  }
-
-  const userName = getUserDisplayName()
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6 sm:p-8">
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-48" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-32" />
-          ))}
-        </div>
-      </div>
-    )
+  if (isLoading || !stats) {
+    return <DashboardSkeleton />
   }
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6 sm:p-8 border border-white/10">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 via-transparent to-cyan-600/20" />
-        <div className="absolute top-4 right-4 opacity-20">
-          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-purple-400 to-cyan-400 blur-3xl" />
-        </div>
-
+    <div className="space-y-6 lg:space-y-8 max-w-full overflow-hidden">
+      {/* Welcome Section */}
+      <div className="relative overflow-hidden rounded-2xl lg:rounded-3xl bg-gradient-to-br from-slate-900 via-purple-900/50 to-slate-900 border border-white/10 p-4 sm:p-6 lg:p-8 max-w-full">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 via-cyan-500/5 to-purple-600/10" />
         <div className="relative">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center shadow-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 lg:mb-6">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl lg:rounded-2xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
               <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div className="min-w-0">
@@ -131,163 +130,147 @@ export function EnhancedDashboardOverview() {
                 Welcome back{userName ? `, ${userName}` : ""}!
               </h1>
               <p className="text-white/60 text-sm sm:text-base">Ready to land your dream job?</p>
-              {!userName && (
-                <Link href="/dashboard/profile">
-                  <Button variant="link" className="text-cyan-400 hover:text-cyan-300 p-0 h-auto text-sm">
-                    Complete your profile →
-                  </Button>
-                </Link>
-              )}
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 mt-4 lg:mt-6 max-w-full">
+            {[
+              { label: "Applications", value: stats.totalApplications, icon: FileText },
+              { label: "Active", value: stats.activeApplications, icon: TrendingUp },
+              { label: "Interviews", value: stats.interviewsScheduled, icon: Calendar },
+              { label: "Response Rate", value: `${stats.responseRate}%`, icon: BarChart3 },
+            ].map((stat, index) => (
+              <div
+                key={index}
+                className="bg-white/5 backdrop-blur-sm rounded-lg lg:rounded-xl p-2 sm:p-3 lg:p-4 border border-white/10 min-w-0"
+              >
+                <div className="flex items-center gap-1 sm:gap-2 lg:gap-3">
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md lg:rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                    <stat.icon className="w-3 h-3 sm:w-4 sm:h-4 text-white/70" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold text-white truncate">
+                      {stat.value}
+                    </p>
+                    <p className="text-xs text-white/60 truncate">{stat.label}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-white/10 bg-gradient-to-br from-slate-900/50 to-slate-800/50 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">Total Applications</CardTitle>
-            <FileText className="h-4 w-4 text-purple-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{stats?.totalApplications || 0}</div>
-            <p className="text-xs text-white/60">{stats?.activeApplications || 0} active</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/10 bg-gradient-to-br from-slate-900/50 to-slate-800/50 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">Interviews</CardTitle>
-            <Calendar className="h-4 w-4 text-cyan-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{stats?.interviewsScheduled || 0}</div>
-            <p className="text-xs text-white/60">scheduled this month</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/10 bg-gradient-to-br from-slate-900/50 to-slate-800/50 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">Response Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{stats?.responseRate || 0}%</div>
-            <p className="text-xs text-white/60">above average</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/10 bg-gradient-to-br from-slate-900/50 to-slate-800/50 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">Weekly Goal</CardTitle>
-            <Target className="h-4 w-4 text-orange-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {stats?.weeklyProgress || 0}/{stats?.weeklyGoal || 5}
-            </div>
-            <Progress value={((stats?.weeklyProgress || 0) / (stats?.weeklyGoal || 5)) * 100} className="mt-2 h-2" />
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Jobs Carousel */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Recent Applications</h2>
-          <Link href="/dashboard/jobs">
-            <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">
-              View All
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-        <JobsCarousel jobs={jobs} />
-      </div>
+      <JobsCarousel />
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-white/10 bg-gradient-to-br from-purple-900/20 to-purple-800/20 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Quick Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Link href="/dashboard/jobs/new">
-              <Button className="w-full justify-start" variant="ghost">
-                Add New Job
-              </Button>
-            </Link>
-            <Link href="/dashboard/resumes">
-              <Button className="w-full justify-start" variant="ghost">
-                Upload Resume
-              </Button>
-            </Link>
-            <Link href="/dashboard/interview-prep">
-              <Button className="w-full justify-start" variant="ghost">
-                Practice Interview
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">Quick Actions</h2>
+          <Badge className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white border-0 w-fit">
+            <Zap className="w-3 h-3 mr-1" />
+            Boost productivity
+          </Badge>
+        </div>
 
-        <Card className="border-white/10 bg-gradient-to-br from-cyan-900/20 to-cyan-800/20 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              This Week
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-400" />
-                <span className="text-sm text-white/80">2 applications sent</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-orange-400" />
-                <span className="text-sm text-white/80">1 interview tomorrow</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-blue-400" />
-                <span className="text-sm text-white/80">3 follow-ups due</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/10 bg-gradient-to-br from-green-900/20 to-green-800/20 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Goals
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-white/80">Weekly Applications</span>
-                  <span className="text-white">
-                    {stats?.weeklyProgress || 0}/{stats?.weeklyGoal || 5}
-                  </span>
-                </div>
-                <Progress value={((stats?.weeklyProgress || 0) / (stats?.weeklyGoal || 5)) * 100} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-white/80">Interview Rate</span>
-                  <span className="text-white">{stats?.responseRate || 0}%</span>
-                </div>
-                <Progress value={stats?.responseRate || 0} className="h-2" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {quickActions.map((action, index) => (
+            <Link key={index} href={action.href} className="block">
+              <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm hover:from-white/10 hover:to-white/5 transition-all duration-300 hover:scale-105 hover:shadow-2xl h-full">
+                <div
+                  className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
+                />
+                <CardContent className="relative p-4 sm:p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div
+                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg lg:rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center shadow-lg flex-shrink-0`}
+                    >
+                      <action.icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors ml-auto" />
+                  </div>
+                  <h3 className="font-semibold text-foreground group-hover:text-foreground transition-colors text-sm sm:text-base">
+                    {action.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">{action.description}</p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
+
+      {/* Weekly Progress */}
+      <Card className="border-0 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Target className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 flex-shrink-0" />
+                Weekly Goal Progress
+              </CardTitle>
+              <CardDescription className="text-sm">
+                {stats.weeklyProgress} of {stats.weeklyGoal} applications this week
+              </CardDescription>
+            </div>
+            <Badge
+              className={`${
+                stats.weeklyProgress >= stats.weeklyGoal
+                  ? "bg-gradient-to-r from-green-500 to-emerald-500"
+                  : "bg-gradient-to-r from-orange-500 to-red-500"
+              } text-white border-0 w-fit`}
+            >
+              {stats.weeklyProgress && stats.weeklyGoal
+                ? Math.round((stats.weeklyProgress / stats.weeklyGoal) * 100)
+                : 0}
+              %
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-6 pt-0">
+          <div className="space-y-4">
+            <div className="h-2 sm:h-3 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full transition-all duration-1000 ease-out"
+                style={{
+                  width: `${stats.weeklyProgress && stats.weeklyGoal ? Math.min((stats.weeklyProgress / stats.weeklyGoal) * 100, 100) : 0}%`,
+                }}
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm">
+              <span className="text-muted-foreground">
+                {stats.weeklyGoal && stats.weeklyProgress
+                  ? stats.weeklyGoal - stats.weeklyProgress > 0
+                    ? `${stats.weeklyGoal - stats.weeklyProgress} more to reach your goal`
+                    : "Goal achieved! 🎉"
+                  : "No goal set"}
+              </span>
+              <Button variant="outline" size="sm" asChild className="w-fit">
+                <Link href="/dashboard/jobs/new">
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  Add Application
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 lg:space-y-8">
+      <div className="h-32 sm:h-40 lg:h-48 rounded-2xl lg:rounded-3xl bg-gradient-to-br from-muted/50 to-muted/20 animate-pulse" />
+      <div className="h-24 sm:h-32 rounded-xl bg-muted/50 animate-pulse" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-24 sm:h-32 rounded-xl bg-muted/50 animate-pulse" />
+        ))}
+      </div>
+      <div className="h-32 sm:h-40 rounded-xl bg-muted/50 animate-pulse" />
     </div>
   )
 }
