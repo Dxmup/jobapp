@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Menu, X, User, LogOut, Settings, Search, Zap } from "lucide-react"
+import { Menu, X, UserIcon, LogOut, Settings, Search, Zap } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,8 +17,18 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useDebounce } from "@/hooks/use-debounce"
 
+interface EnhancedDashboardHeaderUser {
+  id: string
+  name: string
+  email: string
+  created_at: string
+}
+
 export function EnhancedDashboardHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [user, setUser] = useState<EnhancedDashboardHeaderUser | null>(null)
+  const [isLoadingUser, setIsLoadingUser] = useState(true)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -29,12 +39,58 @@ export function EnhancedDashboardHeader() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const handleLogout = () => {
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-    })
-    router.push("/")
+  // Fetch current user on component mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await fetch("/api/user/current")
+        const data = await response.json()
+        setUser(data.user)
+      } catch (error) {
+        console.error("Error fetching user:", error)
+        setUser(null)
+      } finally {
+        setIsLoadingUser(false)
+      }
+    }
+
+    fetchUser()
+  }, [])
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+
+    setIsLoggingOut(true)
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Logged out",
+          description: "You have been successfully logged out.",
+        })
+        // Clear user state
+        setUser(null)
+        // Redirect to login
+        router.push("/login")
+      } else {
+        throw new Error("Logout failed")
+      }
+    } catch (error) {
+      console.error("Logout error:", error)
+      toast({
+        title: "Logout Error",
+        description: "There was an error logging out. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   const performSearch = async (query: string) => {
@@ -146,6 +202,22 @@ export function EnhancedDashboardHeader() {
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [])
 
+  // Get user initials for avatar
+  const getUserInitials = (name: string | null, email: string | null) => {
+    if (name) {
+      return name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    }
+    if (email) {
+      return email[0].toUpperCase()
+    }
+    return "U"
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-gradient-to-r from-slate-900/95 via-purple-900/95 to-slate-900/95 backdrop-blur-xl supports-[backdrop-filter]:bg-gradient-to-r supports-[backdrop-filter]:from-slate-900/60 supports-[backdrop-filter]:via-purple-900/60 supports-[backdrop-filter]:to-slate-900/60">
       <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-cyan-500/10 to-purple-600/10 opacity-50" />
@@ -251,9 +323,10 @@ export function EnhancedDashboardHeader() {
               <Button
                 variant="ghost"
                 className="relative h-8 w-8 rounded-full hover:bg-white/10 transition-all duration-200"
+                disabled={isLoadingUser}
               >
                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white font-medium shadow-lg">
-                  U
+                  {isLoadingUser ? "..." : getUserInitials(user?.name || null, user?.email || null)}
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -264,14 +337,18 @@ export function EnhancedDashboardHeader() {
             >
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none text-white">User</p>
-                  <p className="text-xs leading-none text-white/60">user@example.com</p>
+                  <p className="text-sm font-medium leading-none text-white">
+                    {isLoadingUser ? "Loading..." : user?.name || "User"}
+                  </p>
+                  <p className="text-xs leading-none text-white/60">
+                    {isLoadingUser ? "..." : user?.email || "user@example.com"}
+                  </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem asChild className="text-white/80 hover:text-white hover:bg-white/10">
                 <Link href="/dashboard/profile">
-                  <User className="mr-2 h-4 w-4" />
+                  <UserIcon className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </Link>
               </DropdownMenuItem>
@@ -282,9 +359,13 @@ export function EnhancedDashboardHeader() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                disabled={isLoggingOut}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+                <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
