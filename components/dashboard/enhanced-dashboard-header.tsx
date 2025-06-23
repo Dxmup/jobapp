@@ -318,12 +318,13 @@ export function EnhancedDashboardHeader() {
         </div>
 
         <div className="flex items-center gap-3">
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => console.log("Dropdown open:", open)}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 className="relative h-8 w-8 rounded-full hover:bg-white/10 transition-all duration-200"
                 disabled={isLoadingUser}
+                onClick={() => console.log("Profile dropdown clicked")}
               >
                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white font-medium shadow-lg">
                   {isLoadingUser ? "..." : getUserInitials(user?.name || null, user?.email || null)}
@@ -331,7 +332,7 @@ export function EnhancedDashboardHeader() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-56 bg-slate-900/95 border-white/10 backdrop-blur-xl"
+              className="w-56 bg-slate-900/95 border-white/10 backdrop-blur-xl z-[9999]"
               align="end"
               forceMount
             >
@@ -346,17 +347,25 @@ export function EnhancedDashboardHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem asChild className="text-white/80 hover:text-white hover:bg-white/10">
-                <Link href="/dashboard/profile">
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </Link>
+              <DropdownMenuItem
+                onClick={() => {
+                  console.log("Profile clicked")
+                  router.push("/dashboard/profile")
+                }}
+                className="text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <UserIcon className="mr-2 h-4 w-4" />
+                <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild className="text-white/80 hover:text-white hover:bg-white/10">
-                <Link href="/dashboard/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </Link>
+              <DropdownMenuItem
+                onClick={() => {
+                  console.log("Settings clicked")
+                  router.push("/dashboard/settings")
+                }}
+                className="text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem
