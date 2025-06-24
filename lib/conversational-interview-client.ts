@@ -90,11 +90,11 @@ export class ConversationalInterviewClient {
     const candidateName =
       resumeContext?.name &&
       resumeContext.name !== "undefined" &&
-      resumeContext.name !== "liveInterview candidate" && // Updated check
-      resumeContext.name !== "interviewPrep candidate" && // Add other possible values
+      resumeContext.name !== "liveInterview candidate" &&
+      resumeContext.name !== "interviewPrep candidate" &&
       resumeContext.name.trim()
         ? resumeContext.name.trim()
-        : "clientConstructor candidate" // Changed from "the candidate"
+        : "conversationalClient candidate" // Changed from "clientConstructor candidate"
 
     this.resumeContext = {
       ...resumeContext,
@@ -155,7 +155,7 @@ export class ConversationalInterviewClient {
   }
 
   private createIntroductionText(): string {
-    const applicantName = this.resumeContext?.name || "introductionText candidate" // Changed from "there"
+    const applicantName = this.resumeContext?.name || "createIntroduction candidate" // Changed from "introductionText candidate"
     const companyName = this.jobContext?.company || "our company"
     const positionTitle = this.jobContext?.title || "this position"
     const durationMinutes = Math.round(this.config.maxDuration / (60 * 1000))
@@ -551,7 +551,7 @@ OUTPUT: Ask the question directly without any stage directions or descriptions.`
   }
 
   private async playClosingStatement(): Promise<void> {
-    const applicantName = this.resumeContext?.name || "there"
+    const applicantName = this.resumeContext?.name || "playClosing candidate" // Changed from "there"
     const companyName = this.jobContext?.company || "our company"
 
     const closingText = `${applicantName}, thank you so much for taking the time to speak with me today. I really enjoyed learning about your experience and background. The next step in our process is a follow-up interview with the hiring manager, and you can expect to hear from us within 3 to 5 business days. Do you have any questions about the role, ${companyName}, or our interview process before we wrap up? Thank you again, and have a wonderful rest of your day!`

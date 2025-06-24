@@ -12,6 +12,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@auth/core": "latest",
     "@clerk/nextjs": "latest",
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
@@ -46,6 +47,7 @@
     "@radix-ui/react-toggle": "latest",
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
+    "@react-pdf/renderer": "latest",
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/supabase-js": "latest",
     "autoprefixer": "^10.4.20",
@@ -68,8 +70,10 @@
     "mammoth": "latest",
     "nanoid": "latest",
     "next": "14.2.16",
+    "next-auth": "latest",
     "next-themes": "latest",
     "node-notifier": "latest",
+    "nodemailer": "latest",
     "otplib": "latest",
     "path": "latest",
     "qrcode.react": "latest",

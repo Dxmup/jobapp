@@ -1,105 +1,119 @@
-"use client"
+import { Suspense } from "react"
+import { notFound } from "next/navigation"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { getInterviewQuestions } from "@/app/actions/interview-prep-actions"
+import { cookies } from "next/headers"
+import { PreloadedMockInterview } from "@/components/interview-prep/preloaded-mock-interview"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@clerk/nextjs"
-import { toast } from "react-hot-toast"
+interface MockInterviewPageProps {
+  params: {
+    jobId: string
+  }
+  searchParams: {
+    resumeId?: string
+    preload?: string
+    interviewType?: "phone-screener" | "first-interview"
+  }
+}
 
-import { useSearchParams } from "next/navigation"
-import type { Job } from "@/types"
-import { getJob } from "@/lib/actions/job.actions"
-import MockInterviewComponent from "@/components/MockInterviewComponent"
+export default async function MockInterviewPage({ params, searchParams }: MockInterviewPageProps) {
+  const { jobId } = params
+  const { resumeId, preload, interviewType = "first-interview" } = searchParams
+  const shouldPreload = preload === "true"
 
-const MockInterviewPage = () => {
-  const router = useRouter()
-  const { userId, getToken } = useAuth()
-  const searchParams = useSearchParams()
-  const jobId = searchParams.get("jobId")
+  // Verify job exists and belongs to the user
+  const supabase = createServerSupabaseClient()
+  const { data: session } = await supabase.auth.getSession()
 
-  const [job, setJob] = useState<Job | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [firstName, setFirstName] = useState<string>("the candidate")
+  // Get the user ID from session or cookie
+  const userId = session?.user?.id
+  const cookieStore = cookies()
+  const cookieUserId = cookieStore.get("user_id")?.value
 
-  useEffect(() => {
-    if (!jobId) {
-      toast.error("Job ID is missing.")
-      router.push("/(dashboard)/dashboard/interview-prep")
-      return
-    }
+  // Use session user ID first, then fall back to cookie
+  const currentUserId = userId || cookieUserId
 
-    const fetchJobDetails = async () => {
-      setIsLoading(true)
-      try {
-        const jobDetails = await getJob(jobId)
-        if (jobDetails) {
-          setJob(jobDetails)
-        } else {
-          toast.error("Failed to fetch job details.")
-          router.push("/(dashboard)/dashboard/interview-prep")
-        }
-      } catch (error: any) {
-        console.error("Error fetching job details:", error)
-        toast.error(error.message || "An error occurred while fetching job details.")
-        router.push("/(dashboard)/dashboard/interview-prep")
-      } finally {
-        setIsLoading(false)
+  console.log(`Looking for job ${jobId} for user ${currentUserId}`)
+
+  // Try to get the job with both user_id and userId fields
+  let job = null
+
+  if (currentUserId) {
+    // Try with user_id field first
+    const { data: jobData, error: error1 } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("id", jobId)
+      .eq("user_id", currentUserId)
+      .single()
+
+    if (!error1 && jobData) {
+      job = jobData
+      console.log(`Found job with user_id: ${jobData.title}`)
+    } else {
+      console.log(`No job found with user_id, trying userId field`)
+      // Try with userId field
+      const { data: altJobData, error: error2 } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("id", jobId)
+        .eq("userId", currentUserId)
+        .single()
+
+      if (!error2 && altJobData) {
+        job = altJobData
+        console.log(`Found job with userId: ${altJobData.title}`)
       }
     }
-
-    fetchJobDetails()
-  }, [jobId, router])
-
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!userId) {
-        return
-      }
-
-      try {
-        const token = await getToken({ template: "supabase" })
-
-        const res = await fetch("/api/getUserProfile", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ userId }),
-        })
-
-        if (res.ok) {
-          const profileResult = await res.json()
-          const firstName =
-            profileResult.profile?.first_name || profileResult.profile?.fullName?.split(" ")[0] || "the candidate"
-          setFirstName(firstName)
-          console.log("👤 User first name extracted:", firstName, "from first_name:", profileResult.profile?.first_name)
-        } else {
-          console.error("Failed to fetch user profile")
-          setFirstName("the candidate")
-        }
-      } catch (error) {
-        console.error("Error fetching user profile:", error)
-        setFirstName("the candidate")
-      }
-    }
-
-    fetchUserProfile()
-  }, [userId, getToken])
-
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>
   }
 
   if (!job) {
-    return <div className="flex justify-center items-center h-screen">Job not found.</div>
+    console.log(`Job not found, redirecting to not found page`)
+    return notFound()
+  }
+
+  // Get resume data if resumeId is provided
+  let resume = null
+  if (resumeId && currentUserId) {
+    const { data: resumeData } = await supabase
+      .from("resumes")
+      .select("*")
+      .eq("id", resumeId)
+      .eq("user_id", currentUserId)
+      .single()
+
+    if (resumeData) {
+      resume = resumeData
+      console.log(`Found resume: ${resumeData.name}`)
+    }
+  }
+
+  // Preload interview questions if requested
+  let preloadedQuestions = null
+  if (shouldPreload) {
+    console.log("🚀 Preloading interview questions...")
+    const questionsResult = await getInterviewQuestions(jobId, resumeId)
+    if (questionsResult.success && questionsResult.questions) {
+      preloadedQuestions = questionsResult.questions
+      console.log(
+        `✅ Preloaded ${preloadedQuestions.technical.length} technical + ${preloadedQuestions.behavioral.length} behavioral questions`,
+      )
+    } else {
+      console.warn("⚠️ Failed to preload questions:", questionsResult.error)
+    }
   }
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-semibold mb-4">Mock Interview for {job.title}</h1>
-      <MockInterviewComponent jobId={jobId} jobTitle={job.title} candidateFirstName={firstName} />
+    <div className="container py-6">
+      <Suspense fallback={<div>Loading mock interview...</div>}>
+        <PreloadedMockInterview
+          job={job}
+          resume={resume}
+          preloadedQuestions={preloadedQuestions}
+          shouldPreload={shouldPreload}
+          interviewType={interviewType}
+        />
+      </Suspense>
     </div>
   )
 }
-
-export default MockInterviewPage
