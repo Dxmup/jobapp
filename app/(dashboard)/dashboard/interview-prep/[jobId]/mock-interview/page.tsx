@@ -1,82 +1,105 @@
-import { Suspense } from "react"
-import { notFound } from "next/navigation"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getInterviewQuestions } from "@/app/actions/interview-prep-actions"
-import { MockInterview } from "@/components/interview-prep/mock-interview"
-import { cookies } from "next/headers"
+"use client"
 
-interface MockInterviewPageProps {
-  params: {
-    jobId: string
-  }
-  searchParams: {
-    resumeId?: string
-  }
-}
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@clerk/nextjs"
+import { toast } from "react-hot-toast"
 
-export default async function MockInterviewPage({ params, searchParams }: MockInterviewPageProps) {
-  const { jobId } = params
-  const { resumeId } = searchParams
+import { useSearchParams } from "next/navigation"
+import type { Job } from "@/types"
+import { getJob } from "@/lib/actions/job.actions"
+import MockInterviewComponent from "@/components/MockInterviewComponent"
 
-  // Verify job exists and belongs to the user
-  const supabase = createServerSupabaseClient()
-  const { data: session } = await supabase.auth.getSession()
+const MockInterviewPage = () => {
+  const router = useRouter()
+  const { userId, getToken } = useAuth()
+  const searchParams = useSearchParams()
+  const jobId = searchParams.get("jobId")
 
-  // Get the user ID from session or cookie
-  const userId = session?.user?.id
-  const cookieStore = cookies()
-  const cookieUserId = cookieStore.get("user_id")?.value
-  const currentUserId = userId || cookieUserId
+  const [job, setJob] = useState<Job | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [firstName, setFirstName] = useState<string>("the candidate")
 
-  // Get the job
-  let job = null
-  if (currentUserId) {
-    const { data: jobData } = await supabase
-      .from("jobs")
-      .select("*")
-      .eq("id", jobId)
-      .eq("user_id", currentUserId)
-      .single()
-
-    if (!jobData) {
-      // Try with userId field
-      const { data: altJobData } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("id", jobId)
-        .eq("userId", currentUserId)
-        .single()
-      job = altJobData
-    } else {
-      job = jobData
+  useEffect(() => {
+    if (!jobId) {
+      toast.error("Job ID is missing.")
+      router.push("/(dashboard)/dashboard/interview-prep")
+      return
     }
+
+    const fetchJobDetails = async () => {
+      setIsLoading(true)
+      try {
+        const jobDetails = await getJob(jobId)
+        if (jobDetails) {
+          setJob(jobDetails)
+        } else {
+          toast.error("Failed to fetch job details.")
+          router.push("/(dashboard)/dashboard/interview-prep")
+        }
+      } catch (error: any) {
+        console.error("Error fetching job details:", error)
+        toast.error(error.message || "An error occurred while fetching job details.")
+        router.push("/(dashboard)/dashboard/interview-prep")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchJobDetails()
+  }, [jobId, router])
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!userId) {
+        return
+      }
+
+      try {
+        const token = await getToken({ template: "supabase" })
+
+        const res = await fetch("/api/getUserProfile", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId }),
+        })
+
+        if (res.ok) {
+          const profileResult = await res.json()
+          const firstName =
+            profileResult.profile?.first_name || profileResult.profile?.fullName?.split(" ")[0] || "the candidate"
+          setFirstName(firstName)
+          console.log("👤 User first name extracted:", firstName, "from first_name:", profileResult.profile?.first_name)
+        } else {
+          console.error("Failed to fetch user profile")
+          setFirstName("the candidate")
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error)
+        setFirstName("the candidate")
+      }
+    }
+
+    fetchUserProfile()
+  }, [userId, getToken])
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>
   }
 
   if (!job) {
-    return notFound()
+    return <div className="flex justify-center items-center h-screen">Job not found.</div>
   }
-
-  // Get resume if specified
-  let resume = null
-  if (resumeId && currentUserId) {
-    const { data: resumeData } = await supabase
-      .from("resumes")
-      .select("*")
-      .eq("id", resumeId)
-      .eq("user_id", currentUserId)
-      .single()
-    resume = resumeData
-  }
-
-  // Get interview questions
-  const questionsResult = await getInterviewQuestions(jobId, resumeId)
-  const questions = questionsResult.success ? questionsResult.questions : { technical: [], behavioral: [] }
 
   return (
-    <div className="container py-6">
-      <Suspense fallback={<div>Loading mock interview...</div>}>
-        <MockInterview job={job} resume={resume} questions={questions} />
-      </Suspense>
+    <div className="p-4">
+      <h1 className="text-2xl font-semibold mb-4">Mock Interview for {job.title}</h1>
+      <MockInterviewComponent jobId={jobId} jobTitle={job.title} candidateFirstName={firstName} />
     </div>
   )
 }
+
+export default MockInterviewPage

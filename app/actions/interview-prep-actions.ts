@@ -1,49 +1,23 @@
 "use server"
 
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
+import { getCurrentUserId } from "@/lib/auth-cookie"
 
-// Helper function to get the current user ID - with improved debugging
-async function getCurrentUserId(): Promise<string> {
-  const supabase = createServerSupabaseClient()
-  const cookieStore = cookies()
+// Simple in-memory cache for request deduplication
+const requestCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_TTL = 5000 // 5 seconds
 
-  // Try to get user from session first
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  // Log session information for debugging
-  console.log(
-    "Session info:",
-    session
-      ? {
-          sessionId: session.id,
-          userId: session.user?.id,
-          hasUser: !!session.user,
-        }
-      : "No session",
-  )
-
-  if (session?.user?.id) {
-    console.log("Using user ID from session:", session.user.id)
-    return session.user.id
+function getCachedResult<T>(key: string): T | null {
+  const cached = requestCache.get(key)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data as T
   }
+  requestCache.delete(key) // Clean up expired cache
+  return null
+}
 
-  // Fallback to cookie
-  const userId = cookieStore.get("user_id")?.value
-
-  // Log cookie information for debugging
-  console.log("Cookie user_id:", userId || "Not found")
-
-  if (!userId) {
-    console.log("No user ID found, redirecting to login")
-    // If no user ID is found, redirect to login
-    redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
-  }
-
-  return userId
+function setCachedResult<T>(key: string, data: T): void {
+  requestCache.set(key, { data, timestamp: Date.now() })
 }
 
 // Function to get job details including associated resume and cover letter
@@ -312,24 +286,32 @@ export async function generateInterviewQuestions(
   error?: string
 }> {
   try {
-    console.log(`Generating interview questions for job: ${jobId}, resumeId: ${resumeId || "none"}`)
+    console.log(`🚀 Generating interview questions for job: ${jobId}, resumeId: ${resumeId || "none"}`)
 
     // Get job details, resume, and cover letter
     const jobDetails = await getJobDetailsForInterview(jobId, resumeId)
 
     if (!jobDetails.success) {
+      console.error("❌ Failed to get job details:", jobDetails.error)
       return { success: false, error: jobDetails.error || "Failed to fetch job details" }
     }
 
     const { job, resume, coverLetter } = jobDetails
 
-    console.log(`Job details retrieved: ${job.title} at ${job.company}`)
-    console.log(`Resume found: ${resume ? "Yes" : "No"}`)
-    console.log(`Cover letter found: ${coverLetter ? "Yes" : "No"}`)
+    console.log(`📋 Job details retrieved: ${job.title} at ${job.company}`)
+    console.log(`📄 Resume found: ${resume ? "Yes" : "No"}`)
+    console.log(`📝 Cover letter found: ${coverLetter ? "Yes" : "No"}`)
 
     // Determine if this is a refresh (we have existing questions)
     const isRefresh =
       existingQuestions && (existingQuestions.technical.length > 0 || existingQuestions.behavioral.length > 0)
+
+    console.log(`🔄 Is refresh: ${isRefresh}`)
+    if (isRefresh) {
+      console.log(
+        `📊 Existing questions - Technical: ${existingQuestions.technical.length}, Behavioral: ${existingQuestions.behavioral.length}`,
+      )
+    }
 
     // Construct the prompt for Gemini
     let prompt = `You are a headhunter preparing your client for an interview at the job in the job description. 
@@ -360,20 +342,20 @@ export async function generateInterviewQuestions(
 
     // Add resume content if available
     if (resume && resume.content) {
-      console.log("Adding resume content to prompt")
+      console.log("📄 Adding resume content to prompt")
       prompt += `\n\nResume Content: ${resume.content}`
     } else if (resume && resume.text_content) {
-      console.log("Adding resume text_content to prompt")
+      console.log("📄 Adding resume text_content to prompt")
       prompt += `\n\nResume Content: ${resume.text_content}`
     } else if (resume) {
-      console.log("Resume found but no content available")
+      console.log("📄 Resume found but no content available")
       // Log available fields for debugging
       console.log("Available resume fields:", Object.keys(resume))
     }
 
     // Add cover letter content if available
     if (coverLetter && coverLetter.content) {
-      console.log("Adding cover letter content to prompt")
+      console.log("📝 Adding cover letter content to prompt")
       prompt += `\n\nCover Letter Content: ${coverLetter.content}`
     }
 
@@ -393,48 +375,52 @@ export async function generateInterviewQuestions(
         "\n\nPlease generate entirely new questions that are more challenging and probe deeper into the candidate's experience and knowledge."
     }
 
-    console.log("Calling Gemini API with prompt length:", prompt.length)
+    console.log(`📏 Calling Gemini API with prompt length: ${prompt.length}`)
+    console.log(`🔑 API Key available: ${!!process.env.GOOGLE_AI_API_KEY}`)
 
     // Call Gemini API
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": process.env.GOOGLE_AI_API_KEY || "",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: isRefresh ? 0.8 : 0.7, // Higher temperature for refreshed questions to get more variety
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 8192,
-          },
-        }),
+    const apiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent"
+    console.log(`🌐 Making API call to: ${apiUrl}`)
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": process.env.GOOGLE_AI_API_KEY || "",
       },
-    )
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: isRefresh ? 0.8 : 0.7, // Higher temperature for refreshed questions to get more variety
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+        },
+      }),
+    })
+
+    console.log(`📡 Gemini API response status: ${response.status} ${response.statusText}`)
 
     if (!response.ok) {
       const errorData = await response.text()
-      console.error("Gemini API error:", errorData)
+      console.error("❌ Gemini API error:", errorData)
       return { success: false, error: `Gemini API error: ${response.status} ${response.statusText}` }
     }
 
     const data = await response.json()
-    console.log("Gemini API response received")
+    console.log("✅ Gemini API response received successfully")
 
     // Extract the text from the response
     const responseText = data.candidates[0].content.parts[0].text
+    console.log(`📝 Response text length: ${responseText.length}`)
 
     // Parse the JSON response
     try {
@@ -443,10 +429,12 @@ export async function generateInterviewQuestions(
         .replace(/```json/g, "")
         .replace(/```/g, "")
         .trim()
+
+      console.log("🔍 Parsing JSON response...")
       const questions = JSON.parse(jsonText)
 
       console.log(
-        `Successfully parsed questions: ${questions.technical.length} technical, ${questions.behavioral.length} behavioral`,
+        `✅ Successfully parsed questions: ${questions.technical?.length || 0} technical, ${questions.behavioral?.length || 0} behavioral`,
       )
 
       return {
@@ -457,12 +445,12 @@ export async function generateInterviewQuestions(
         },
       }
     } catch (parseError) {
-      console.error("Error parsing Gemini response:", parseError)
-      console.log("Raw response:", responseText)
+      console.error("❌ Error parsing Gemini response:", parseError)
+      console.log("📄 Raw response:", responseText)
       return { success: false, error: "Failed to parse interview questions" }
     }
   } catch (error) {
-    console.error("Error generating interview questions:", error)
+    console.error("❌ Error generating interview questions:", error)
     return {
       success: false,
       error: `Failed to generate interview questions: ${error instanceof Error ? error.message : String(error)}`,
@@ -555,39 +543,63 @@ export async function getInterviewQuestions(
     const { data, error } = await supabase.storage.from("user_data").download(key)
 
     if (error) {
-      // If not found, return empty arrays
-      if (error.message.includes("Not Found") || error.message.includes("The specified key does not exist")) {
-        console.log(`No saved questions found for key: ${key}`)
+      // If not found, return empty arrays (this is normal for first-time users)
+      if (
+        error.message?.includes("Not Found") ||
+        error.message?.includes("The specified key does not exist") ||
+        error.message?.includes("Object not found")
+      ) {
+        console.log(`No saved questions found for key: ${key} - this is normal for new users`)
         return {
           success: true,
           questions: { technical: [], behavioral: [] },
         }
       }
 
-      console.error("Error fetching interview questions:", error)
+      // For other errors, log them but still return empty arrays to allow the app to continue
+      console.error("Storage error fetching interview questions:", error)
       return {
-        success: false,
-        error: `Failed to fetch interview questions: ${error.message}`,
+        success: true,
+        questions: { technical: [], behavioral: [] },
+        error: `Storage error: ${error.message || "Unknown storage error"}`,
+      }
+    }
+
+    if (!data) {
+      console.log(`No data returned for key: ${key}`)
+      return {
+        success: true,
+        questions: { technical: [], behavioral: [] },
       }
     }
 
     // Parse the JSON data
-    const text = await data.text()
-    const questionData = JSON.parse(text)
+    try {
+      const text = await data.text()
+      const questionData = JSON.parse(text)
 
-    return {
-      success: true,
-      questions: {
-        technical: questionData.technical_questions || [],
-        behavioral: questionData.behavioral_questions || [],
-      },
+      return {
+        success: true,
+        questions: {
+          technical: questionData.technical_questions || [],
+          behavioral: questionData.behavioral_questions || [],
+        },
+      }
+    } catch (parseError) {
+      console.error("Error parsing question data:", parseError)
+      return {
+        success: true,
+        questions: { technical: [], behavioral: [] },
+        error: `Parse error: ${parseError instanceof Error ? parseError.message : "Unknown parse error"}`,
+      }
     }
   } catch (error) {
-    console.error("Error fetching interview questions:", error)
+    console.error("Unexpected error fetching interview questions:", error)
+    // Always return success: true to allow the app to continue with empty questions
     return {
-      success: true, // Return true to allow the app to continue
+      success: true,
       questions: { technical: [], behavioral: [] },
-      error: `Error: ${error instanceof Error ? error.message : String(error)}`,
+      error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }
@@ -711,10 +723,18 @@ export async function getUserJobs(): Promise<{
   error?: string
 }> {
   try {
-    const supabase = createServerSupabaseClient()
     const userId = await getCurrentUserId()
+    const cacheKey = `user_jobs_${userId}`
 
-    console.log(`Getting all jobs for user: ${userId}`)
+    // Check cache first
+    const cached = getCachedResult<{ success: boolean; jobs?: any[]; error?: string }>(cacheKey)
+    if (cached) {
+      console.log(`Returning cached jobs for user: ${userId}`)
+      return cached
+    }
+
+    const supabase = createServerSupabaseClient()
+    console.log(`Fetching fresh jobs for user: ${userId}`)
 
     // Try with user_id field first
     let { data, error } = await supabase
@@ -738,12 +758,12 @@ export async function getUserJobs(): Promise<{
       }
     }
 
-    if (error) {
-      console.error("Error fetching user jobs:", error)
-      return { success: false, error: "Failed to fetch jobs" }
-    }
+    const result = error ? { success: false, error: "Failed to fetch jobs" } : { success: true, jobs: data || [] }
 
-    return { success: true, jobs: data || [] }
+    // Cache the result
+    setCachedResult(cacheKey, result)
+
+    return result
   } catch (error) {
     console.error("Error fetching user jobs:", error)
     return {
@@ -798,6 +818,85 @@ export async function getUserResumes(): Promise<{
     return {
       success: false,
       error: `Failed to fetch resumes: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
+
+// Add this new function after the existing functions
+export async function getUserProfile(): Promise<{
+  success: boolean
+  profile?: {
+    firstName: string
+    fullName: string
+    email: string
+  }
+  error?: string
+}> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const userId = await getCurrentUserId()
+
+    console.log(`Getting user profile for: ${userId}`)
+
+    // First try to get from user_profiles table
+    const { data: profileData, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("first_name, last_name, full_name")
+      .eq("user_id", userId)
+      .single()
+
+    if (!profileError && profileData) {
+      const firstName = profileData.first_name || profileData.full_name?.split(" ")[0] || "the candidate"
+      const fullName = profileData.full_name || `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim()
+
+      return {
+        success: true,
+        profile: {
+          firstName,
+          fullName,
+          email: "", // We'll get this from auth if needed
+        },
+      }
+    }
+
+    // Fallback: try to get from auth user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (!userError && user) {
+      const firstName =
+        user.user_metadata?.first_name ||
+        user.user_metadata?.full_name?.split(" ")[0] ||
+        user.email?.split("@")[0] ||
+        "the candidate"
+
+      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || firstName
+
+      return {
+        success: true,
+        profile: {
+          firstName,
+          fullName,
+          email: user.email || "",
+        },
+      }
+    }
+
+    return {
+      success: true,
+      profile: {
+        firstName: "the candidate",
+        fullName: "the candidate",
+        email: "",
+      },
+    }
+  } catch (error) {
+    console.error("Error fetching user profile:", error)
+    return {
+      success: false,
+      error: `Failed to fetch user profile: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }

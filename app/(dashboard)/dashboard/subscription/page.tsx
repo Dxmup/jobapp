@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Check, CreditCard, Loader2, AlertTriangle } from "lucide-react"
-import { formatPrice } from "@/lib/stripe"
+import { formatPrice, isStripeConfigured } from "@/lib/stripe"
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,7 @@ export default function SubscriptionPage() {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [isStripeReady, setIsStripeReady] = useState(false)
 
   const success = searchParams.get("success")
   const canceled = searchParams.get("canceled")
@@ -88,6 +89,10 @@ export default function SubscriptionPage() {
     }
 
     fetchSubscription()
+  }, [])
+
+  useEffect(() => {
+    setIsStripeReady(isStripeConfigured())
   }, [])
 
   const plans = [
@@ -244,6 +249,21 @@ export default function SubscriptionPage() {
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : !isStripeReady ? (
+        <Card className="bg-yellow-50 dark:bg-yellow-900/30">
+          <CardHeader>
+            <CardTitle className="flex items-center text-yellow-800 dark:text-yellow-200">
+              <AlertTriangle className="h-5 w-5 mr-2" />
+              Stripe Configuration Required
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-yellow-700 dark:text-yellow-300">
+              Subscription features are currently unavailable. Please contact support if you need to manage your
+              subscription.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <Tabs defaultValue="plans" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:w-auto">

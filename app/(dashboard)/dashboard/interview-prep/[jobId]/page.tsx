@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Phone } from "lucide-react"
 import { cookies } from "next/headers"
 import { debugJobAccess } from "@/lib/debug-utils"
+import { getUserProfile } from "@/app/actions/user-actions" // Import getUserProfile function
 
 interface JobInterviewPrepPageProps {
   params: {
@@ -43,6 +44,43 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
 
   // Use session user ID first, then fall back to cookie
   const currentUserId = userId || cookieUserId
+
+  // Get the user's actual name from session or profile
+  let userName = "interviewPrep candidate" // Changed from "the candidate"
+  if (session?.user) {
+    // Try to get name from user metadata first
+    userName =
+      session.user.user_metadata?.full_name ||
+      session.user.user_metadata?.name ||
+      session.user.email?.split("@")[0] ||
+      "sessionMetadata candidate" // Changed from "the candidate"
+  }
+
+  // If we still don't have a good name, try to get it from user profile
+  let userProfile = null
+  if (userName === "interviewPrep candidate" && currentUserId) {
+    const profileResult = await getUserProfile(currentUserId)
+    if (profileResult.success && profileResult.profile) {
+      userProfile = profileResult.profile
+      userName =
+        userProfile.full_name ||
+        `${userProfile.user_first_name || ""} ${userProfile.last_name || ""}`.trim() ||
+        "userProfile candidate" // Changed from userName
+    }
+  }
+
+  console.log(`👤 User name for interview: ${userName}`)
+
+  // Extract first name for LiveInterview component
+  const userFirstName =
+    userProfile?.user_first_name ||
+    (userName !== "interviewPrep candidate" &&
+    userName !== "sessionMetadata candidate" &&
+    userName !== "userProfile candidate"
+      ? userName.split(" ")[0]
+      : undefined)
+
+  console.log(`👤 User first name for interview: ${userFirstName || "firstNameExtraction candidate"}`)
 
   console.log(`Looking for job ${jobId} for user ${currentUserId}`)
 
@@ -114,8 +152,8 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
 
   // Build the mock interview URL with job ID and resume ID
   const mockInterviewUrl = resumeId
-    ? `/dashboard/interview-prep/${jobId}/mock-interview?resumeId=${resumeId}`
-    : `/dashboard/interview-prep/${jobId}/mock-interview`
+    ? `/dashboard/interview-prep/${jobId}/mock-interview?resumeId=${resumeId}&preload=true`
+    : `/dashboard/interview-prep/${jobId}/mock-interview?preload=true`
 
   return (
     <div className="container py-6 space-y-8">
@@ -144,6 +182,9 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
                   Simulate a real phone interview with our AI interviewer based on this job description
                   {resumeId ? " and your resume" : ""}.
                 </p>
+                <p className="text-sm text-purple-600 mt-1">
+                  ✨ Questions will be pre-loaded for faster interview start
+                </p>
               </div>
               <Link href={mockInterviewUrl}>
                 <Button size="lg" className="bg-purple-600 hover:bg-purple-700">
@@ -153,6 +194,30 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
               </Link>
             </CardContent>
           </Card>
+
+          {/* Live AI Interview Button - Temporarily hidden */}
+          {/* 
+<Card className="bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+  <CardContent className="flex flex-col md:flex-row items-center justify-between p-6">
+    <div className="mb-4 md:mb-0">
+      <h3 className="text-xl font-bold text-emerald-800">🎙️ Live AI Interview (Beta)</h3>
+      <p className="text-emerald-700">
+        Experience a real-time conversation with an AI interviewer. This is the most realistic interview
+        practice available.
+      </p>
+    </div>
+    <div className="flex-shrink-0">
+      <LiveInterview 
+        job={job} 
+        resume={resumeId} 
+        questions={initialQuestions}
+        userName={userName}
+        userFirstName={userFirstName}
+      />
+    </div>
+  </CardContent>
+</Card>
+*/}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">

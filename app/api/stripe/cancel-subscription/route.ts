@@ -4,6 +4,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
   try {
+    // Check if Stripe is properly configured
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error("Stripe not configured: STRIPE_SECRET_KEY missing")
+      return NextResponse.json({ error: "Payment processing is currently unavailable" }, { status: 503 })
+    }
+
     const { subscriptionId } = await request.json()
 
     // Get the current user
