@@ -822,7 +822,7 @@ export async function getUserResumes(): Promise<{
   }
 }
 
-// Add this new function after the existing functions
+// FIXED getUserProfile function with extensive debugging
 export async function getUserProfile(): Promise<{
   success: boolean
   profile?: {
@@ -836,64 +836,123 @@ export async function getUserProfile(): Promise<{
     const supabase = createServerSupabaseClient()
     const userId = await getCurrentUserId()
 
-    console.log(`Getting user profile for: ${userId}`)
+    console.log(`🔍 DEBUG: Getting user profile for: ${userId}`)
 
     // First try to get from user_profiles table
+    console.log(`🔍 DEBUG: Checking user_profiles table...`)
     const { data: profileData, error: profileError } = await supabase
       .from("user_profiles")
-      .select("first_name, last_name, full_name")
+      .select("first_name, last_name, full_name, user_first_name")
       .eq("user_id", userId)
       .single()
 
-    if (!profileError && profileData) {
-      const firstName = profileData.first_name || profileData.full_name?.split(" ")[0] || "the candidate"
-      const fullName = profileData.full_name || `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim()
+    console.log(`🔍 DEBUG: user_profiles query result:`, { profileData, profileError })
 
-      return {
-        success: true,
-        profile: {
-          firstName,
-          fullName,
-          email: "", // We'll get this from auth if needed
-        },
+    if (!profileError && profileData) {
+      // Try multiple field names for first name
+      const firstName =
+        profileData.user_first_name || profileData.first_name || profileData.full_name?.split(" ")[0] || null
+
+      const fullName =
+        profileData.full_name ||
+        `${profileData.first_name || profileData.user_first_name || ""} ${profileData.last_name || ""}`.trim() ||
+        null
+
+      console.log(`🔍 DEBUG: Extracted from user_profiles - firstName: ${firstName}, fullName: ${fullName}`)
+
+      if (firstName && firstName !== "null" && firstName.trim()) {
+        return {
+          success: true,
+          profile: {
+            firstName: firstName.trim(),
+            fullName: fullName || firstName.trim(),
+            email: "", // We'll get this from auth if needed
+          },
+        }
       }
     }
 
     // Fallback: try to get from auth user
+    console.log(`🔍 DEBUG: Checking auth user metadata...`)
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser()
 
+    console.log(`🔍 DEBUG: Auth user result:`, {
+      user: user
+        ? {
+            id: user.id,
+            email: user.email,
+            user_metadata: user.user_metadata,
+          }
+        : null,
+      userError,
+    })
+
     if (!userError && user) {
       const firstName =
         user.user_metadata?.first_name ||
         user.user_metadata?.full_name?.split(" ")[0] ||
+        user.user_metadata?.name?.split(" ")[0] ||
         user.email?.split("@")[0] ||
-        "the candidate"
+        null
 
-      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || firstName
+      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || firstName || null
 
-      return {
-        success: true,
-        profile: {
-          firstName,
-          fullName,
-          email: user.email || "",
-        },
+      console.log(`🔍 DEBUG: Extracted from auth - firstName: ${firstName}, fullName: ${fullName}`)
+
+      if (firstName && firstName !== "null" && firstName.trim()) {
+        return {
+          success: true,
+          profile: {
+            firstName: firstName.trim(),
+            fullName: fullName || firstName.trim(),
+            email: user?.email || "",
+          },
+        }
       }
     }
 
+    // Try to get from users table as last resort
+    console.log(`🔍 DEBUG: Checking users table...`)
+    const { data: userData, error: userDataError } = await supabase
+      .from("users")
+      .select("name, email")
+      .eq("id", userId)
+      .single()
+
+    console.log(`🔍 DEBUG: users table result:`, { userData, userDataError })
+
+    if (!userDataError && userData && userData.name) {
+      const firstName = userData.name.split(" ")[0]
+
+      console.log(`🔍 DEBUG: Extracted from users table - firstName: ${firstName}`)
+
+      if (firstName && firstName !== "null" && firstName.trim()) {
+        return {
+          success: true,
+          profile: {
+            firstName: firstName.trim(),
+            fullName: userData.name,
+            email: userData.email || "",
+          },
+        }
+      }
+    }
+
+    // If we get here, we couldn't find any name data
+    console.log(`🔍 DEBUG: No name data found anywhere, using fallback`)
     return {
       success: true,
       profile: {
-        firstName: "the candidate",
-        fullName: "the candidate",
-        email: "",
+        firstName: "User", // Changed from "the candidate"
+        fullName: "User",
+        email: user?.email || "",
       },
     }
   } catch (error) {
-    console.error("Error fetching user profile:", error)
+    console.error("🔍 DEBUG: Error fetching user profile:", error)
     return {
       success: false,
       error: `Failed to fetch user profile: ${error instanceof Error ? error.message : String(error)}`,
