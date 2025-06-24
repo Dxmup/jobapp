@@ -58,21 +58,28 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
 
   // If we still don't have a good name, try to get it from user profile
   let userProfile = null
-  if (userName === "interviewPrep candidate" && currentUserId) {
+  let userFirstName = "the candidate"
+
+  if (currentUserId) {
     const profileResult = await getUserProfile(currentUserId)
+    console.log(`👤 Profile result:`, profileResult)
+
     if (profileResult.success && profileResult.profile) {
       userProfile = profileResult.profile
-      userName =
-        userProfile.full_name ||
-        `${userProfile.user_first_name || ""} ${userProfile.last_name || ""}`.trim() ||
-        "userProfile candidate" // Changed from userName
+      // Try to get the first name from various fields
+      userFirstName =
+        userProfile.user_first_name || userProfile.first_name || userProfile.full_name?.split(" ")[0] || "the candidate"
+
+      console.log(`✅ Extracted first name: "${userFirstName}"`)
+    } else {
+      console.log(`❌ Failed to get profile:`, profileResult.error)
     }
   }
 
   console.log(`👤 User name for interview: ${userName}`)
 
   // Extract first name for LiveInterview component
-  const userFirstName =
+  const userFirstNameOld =
     userProfile?.user_first_name ||
     (userName !== "interviewPrep candidate" &&
     userName !== "sessionMetadata candidate" &&
