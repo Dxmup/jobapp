@@ -7,10 +7,12 @@ import { JobTimeline } from "@/components/jobs/job-timeline"
 import { ResumeList } from "@/components/jobs/resume-list"
 import { CoverLetterList } from "@/components/jobs/cover-letter-list"
 import Link from "next/link"
-import { FileText, Calendar, Sparkles } from "lucide-react"
+import { Calendar, Sparkles } from "lucide-react"
 import { getJobById } from "@/lib/jobs"
 import { cookies } from "next/headers"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Phone, FileText } from "lucide-react"
 
 export default async function JobPage({ params }: { params: { id: string } }) {
   const jobId = params.id
@@ -86,6 +88,7 @@ export default async function JobPage({ params }: { params: { id: string } }) {
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="resumes">Resumes</TabsTrigger>
           <TabsTrigger value="cover-letters">Cover Letters</TabsTrigger>
+          <TabsTrigger value="interview-prep">Interview Prep</TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="space-y-4">
           <JobDetails job={job} />
@@ -108,16 +111,48 @@ export default async function JobPage({ params }: { params: { id: string } }) {
           </Suspense>
         </TabsContent>
         <TabsContent value="cover-letters" className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Cover Letters</h2>
-            <Button asChild>
-              <Link href={`/jobs/${jobId}/generate-cover-letter`}>
-                <FileText className="mr-2 h-4 w-4" />
-                Generate Cover Letter
-              </Link>
-            </Button>
-          </div>
           <CoverLetterList jobId={jobId} />
+        </TabsContent>
+        <TabsContent value="interview-prep" className="space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Interview Preparation</h2>
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Practice for your interview</CardTitle>
+              <CardDescription>
+                Prepare for your interview with AI-powered mock interviews and practice questions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-medium">Mock Phone Interview</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Practice with our AI interviewer in a realistic phone interview simulation
+                  </p>
+                  <Button asChild className="mt-2">
+                    <Link href={`/dashboard/interview-prep/${jobId}/mock-interview`}>
+                      <Phone className="mr-2 h-4 w-4" />
+                      Start Mock Interview
+                    </Link>
+                  </Button>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-medium">Interview Questions</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Review job-specific interview questions and prepare your answers
+                  </p>
+                  <Button asChild variant="outline" className="mt-2">
+                    <Link href={`/dashboard/interview-prep/${jobId}`}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Interview Questions
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

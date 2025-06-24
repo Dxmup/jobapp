@@ -11,8 +11,8 @@ import {
   CreditCard,
   Settings,
   HelpCircle,
-  BarChart,
   MessageSquare,
+  Calendar,
 } from "lucide-react"
 
 const sidebarItems = [
@@ -37,9 +37,14 @@ const sidebarItems = [
     icon: FileEdit,
   },
   {
-    title: "Analytics",
-    href: "/dashboard/analytics",
-    icon: BarChart,
+    title: "Interview Prep",
+    href: "/dashboard/interview-prep",
+    icon: MessageSquare,
+  },
+  {
+    title: "Schedule",
+    href: "/dashboard/schedule",
+    icon: Calendar,
   },
   {
     title: "Subscription",
@@ -55,11 +60,6 @@ const sidebarItems = [
     title: "Help & Support",
     href: "/dashboard/help",
     icon: HelpCircle,
-  },
-  {
-    title: "Interview Prep",
-    href: "/dashboard/interview-prep",
-    icon: MessageSquare,
   },
 ]
 
