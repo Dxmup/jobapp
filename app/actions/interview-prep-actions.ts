@@ -836,7 +836,7 @@ export async function getUserProfile(): Promise<{
     const supabase = createServerSupabaseClient()
     const userId = await getCurrentUserId()
 
-    console.log(`Getting user profile for: ${userId}`)
+    console.log(`🔍 TRACE: getUserProfile called for userId: ${userId}`)
 
     // First try to get from user_profiles table
     const { data: profileData, error: profileError } = await supabase
@@ -845,9 +845,13 @@ export async function getUserProfile(): Promise<{
       .eq("user_id", userId)
       .single()
 
+    console.log(`🔍 TRACE: user_profiles query result:`, { profileData, profileError })
+
     if (!profileError && profileData) {
       const firstName = profileData.first_name || profileData.full_name?.split(" ")[0] || "the candidate"
       const fullName = profileData.full_name || `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim()
+
+      console.log(`🔍 TRACE: Extracted from user_profiles - firstName: "${firstName}", fullName: "${fullName}"`)
 
       return {
         success: true,
@@ -859,11 +863,24 @@ export async function getUserProfile(): Promise<{
       }
     }
 
+    console.log(`🔍 TRACE: user_profiles failed, trying auth user fallback`)
+
     // Fallback: try to get from auth user
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser()
+
+    console.log(`🔍 TRACE: auth.getUser result:`, {
+      user: user
+        ? {
+            id: user.id,
+            email: user.email,
+            user_metadata: user.user_metadata,
+          }
+        : null,
+      userError,
+    })
 
     if (!userError && user) {
       const firstName =
@@ -873,6 +890,9 @@ export async function getUserProfile(): Promise<{
         "the candidate"
 
       const fullName = user.user_metadata?.full_name || user.user_metadata?.name || firstName
+
+      console.log(`🔍 TRACE: Extracted from auth user - firstName: "${firstName}", fullName: "${fullName}"`)
+      console.log(`🔍 TRACE: Auth user metadata:`, user.user_metadata)
 
       return {
         success: true,
@@ -884,6 +904,8 @@ export async function getUserProfile(): Promise<{
       }
     }
 
+    console.log(`🔍 TRACE: All profile sources failed, returning default "the candidate"`)
+
     return {
       success: true,
       profile: {
@@ -893,7 +915,7 @@ export async function getUserProfile(): Promise<{
       },
     }
   } catch (error) {
-    console.error("Error fetching user profile:", error)
+    console.error("🔍 TRACE: getUserProfile error:", error)
     return {
       success: false,
       error: `Failed to fetch user profile: ${error instanceof Error ? error.message : String(error)}`,

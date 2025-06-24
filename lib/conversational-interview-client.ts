@@ -86,6 +86,8 @@ export class ConversationalInterviewClient {
     // Select random interviewer name
     this.interviewerName = INTERVIEWER_NAMES[Math.floor(Math.random() * INTERVIEWER_NAMES.length)]
 
+    console.log("🔍 TRACE: ConversationalInterviewClient constructor received resumeContext:", resumeContext)
+
     // Use the provided userFirstName directly, with fallback
     const candidateName =
       resumeContext?.name &&
@@ -95,6 +97,12 @@ export class ConversationalInterviewClient {
       resumeContext.name.trim()
         ? resumeContext.name.trim()
         : "conversationalClient candidate" // Changed from "clientConstructor candidate"
+
+    console.log("🔍 TRACE: ConversationalInterviewClient name resolution:", {
+      originalName: resumeContext?.name,
+      finalCandidateName: candidateName,
+      wasFiltered: candidateName === "conversationalClient candidate",
+    })
 
     this.resumeContext = {
       ...resumeContext,
@@ -159,6 +167,13 @@ export class ConversationalInterviewClient {
     const companyName = this.jobContext?.company || "our company"
     const positionTitle = this.jobContext?.title || "this position"
     const durationMinutes = Math.round(this.config.maxDuration / (60 * 1000))
+
+    console.log("🔍 TRACE: createIntroductionText using:", {
+      applicantName,
+      resumeContextName: this.resumeContext?.name,
+      companyName,
+      positionTitle,
+    })
 
     return `Hello ${applicantName}, this is ${this.interviewerName} calling from ${companyName}. Thank you for taking the time to speak with me today about the ${positionTitle} role. I hope you're doing well. Before we dive into the questions, I want to let you know this should take about ${durationMinutes} minutes, and I'm excited to learn more about your background and experience. Are you ready to begin?`
   }

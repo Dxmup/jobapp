@@ -47,7 +47,7 @@ interface ResumeProviderProps {
   children: React.ReactNode
 }
 
-export const ResumeProvider: React.FC<ResumeProviderProps> = ({ children }) => {
+const ResumeProvider: React.FC<ResumeProviderProps> = ({ children }) => {
   const [resumeData, setResumeData] = useState<ResumeContextType>({
     name: "liveInterviewContext candidate", // Changed from "the candidate"
     email: "candidate@example.com",
@@ -85,7 +85,7 @@ export const ResumeProvider: React.FC<ResumeProviderProps> = ({ children }) => {
 }
 
 // Custom hook to consume context
-export const useResume = () => {
+const useResume = () => {
   const context = useContext(ResumeContext)
   if (!context) {
     throw new Error("useResume must be used within a ResumeProvider")
@@ -93,13 +93,47 @@ export const useResume = () => {
   return context
 }
 
+interface LiveInterviewProps {
+  job: any // Replace 'any' with the actual type of 'job'
+  resume: any // Replace 'any' with the actual type of 'resume'
+  questions: any // Replace 'any' with the actual type of 'questions'
+  interviewType?: string
+  isPreloaded?: boolean
+  userFirstName?: string
+}
+
 // LiveInterview component
-const LiveInterview: React.FC = () => {
+const LiveInterview = ({
+  job,
+  resume,
+  questions: initialQuestions,
+  interviewType = "first-interview",
+  isPreloaded = false,
+  userFirstName,
+}: LiveInterviewProps) => {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [userProfile, setUserProfile] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [questions, setQuestions] = useState(initialQuestions)
+  const [hasEnoughQuestions, setHasEnoughQuestions] = useState(true)
+  const [interviewState, setInterviewState] = useState("idle")
+
+  // Debug logging
+  useEffect(() => {
+    console.log("🔍 TRACE: LiveInterview props received:", {
+      technical: questions.technical.length,
+      behavioral: questions.behavioral.length,
+      total: questions.technical.length + questions.behavioral.length,
+      interviewType,
+      hasEnoughQuestions,
+      isPreloaded,
+      userFirstName: userFirstName || "NOT PROVIDED",
+      jobTitle: job?.title,
+      resumeName: resume?.name,
+    })
+  }, [questions, interviewType, hasEnoughQuestions, isPreloaded, userFirstName, job?.title, resume?.name])
 
   useEffect(() => {
     if (status === "loading") return
@@ -140,10 +174,11 @@ const LiveInterview: React.FC = () => {
       setUserProfile(profileData)
 
       // Extract user's first name from profile data
-      const userFirstName = profileData?.first_name || profileData?.name?.split(" ")[0] || "liveInterview candidate"
+      const userFirstNameLocal =
+        profileData?.first_name || profileData?.name?.split(" ")[0] || "liveInterview candidate"
 
       // Create resume context with the fetched user data
-      createResumeContext(userFirstName, profileData?.email || "candidate@example.com")
+      createResumeContext(userFirstNameLocal, profileData?.email || "candidate@example.com")
     } catch (e: any) {
       setError(e.message)
       toast.error(`Error fetching profile: ${e.message}`)
@@ -157,14 +192,13 @@ const LiveInterview: React.FC = () => {
     const newResumeData: ResumeContextType = {
       name: userFirstName || "liveInterviewContext candidate", // Changed from "the candidate"
       email: userEmail || "candidate@example.com",
-      phone: userProfile?.phone || "123-456-7890",
-      linkedin: userProfile?.linkedin || "linkedin.com/in/candidate",
-      github: userProfile?.github || "github.com/candidate",
+      phone: "123-456-7890",
+      linkedin: "linkedin.com/in/candidate",
+      github: "github.com/candidate",
       objective:
-        userProfile?.objective ||
         "To obtain a challenging position where I can utilize my skills and contribute to the company's growth.",
-      skills: userProfile?.skills || ["JavaScript", "React", "Node.js", "HTML", "CSS"],
-      experience: userProfile?.experience || [
+      skills: ["JavaScript", "React", "Node.js", "HTML", "CSS"],
+      experience: [
         {
           title: "Software Engineer",
           company: "Tech Company",
@@ -172,7 +206,7 @@ const LiveInterview: React.FC = () => {
           description: "Developed and maintained web applications using React and Node.js.",
         },
       ],
-      education: userProfile?.education || [
+      education: [
         {
           institution: "University of Example",
           degree: "Bachelor of Science in Computer Science",
@@ -180,7 +214,7 @@ const LiveInterview: React.FC = () => {
           description: "Relevant coursework included data structures, algorithms, and software engineering.",
         },
       ],
-      projects: userProfile?.projects || [
+      projects: [
         {
           name: "Personal Website",
           description: "A personal website built with React and hosted on Netlify.",
@@ -275,6 +309,39 @@ const LiveInterview: React.FC = () => {
         </Page>
       </Document>
     )
+  }
+
+  const startConversationalInterview = async () => {
+    try {
+      setError(null)
+      setInterviewState("initializing")
+
+      // Prepare job and resume context
+      const jobContext = {
+        company: job.company,
+        title: job.title,
+        description: job.description,
+      }
+
+      const resumeContext = {
+        name: userFirstName || "liveInterview candidate", // Changed from "the candidate"
+        title: resume?.title,
+        experience: resume?.experience,
+      }
+
+      console.log("🔍 TRACE: startConversationalInterview contexts:", {
+        jobContext,
+        resumeContext,
+        userFirstNameProp: userFirstName || "NOT PROVIDED",
+        finalCandidateName: resumeContext.name,
+      })
+
+      // ... rest of function ...
+    } catch (error: any) {
+      console.error("❌ Failed to start conversational interview:", error)
+      setError(`Failed to start interview: ${error.message}`)
+      setInterviewState("error")
+    }
   }
 
   if (isLoading) return <div>Loading...</div>
