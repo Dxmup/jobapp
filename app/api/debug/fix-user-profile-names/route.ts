@@ -7,171 +7,107 @@ export async function GET() {
 
     console.log("🔍 Starting user profile names fix...")
 
-    // Step 1: Check current table schema
-    console.log("📋 Step 1: Checking current user_profiles table schema...")
-
-    const { data: columns, error: schemaError } = await supabase.rpc("exec_sql", {
-      sql: `
-          SELECT column_name, data_type 
-          FROM information_schema.columns 
-          WHERE table_name = 'user_profiles' 
-          ORDER BY ordinal_position;
-        `,
-    })
-
-    if (schemaError) {
-      console.error("❌ Error checking schema:", schemaError)
-      return NextResponse.json({
-        success: false,
-        error: "Failed to check table schema",
-        details: schemaError,
-      })
-    }
-
-    console.log("📊 Current user_profiles columns:", columns)
-
-    // Check if first_name or user_first_name exists
-    const hasFirstName = columns?.some((col: any) => col.column_name === "first_name")
-    const hasUserFirstName = columns?.some((col: any) => col.column_name === "user_first_name")
-
-    console.log(`🔍 Has first_name: ${hasFirstName}, Has user_first_name: ${hasUserFirstName}`)
-
-    // Step 2: Add missing columns if needed
-    if (!hasFirstName && !hasUserFirstName) {
-      console.log("➕ Step 2: Adding user_first_name column...")
-
-      const { error: addColumnError } = await supabase.rpc("exec_sql", {
-        sql: `
-            ALTER TABLE user_profiles 
-            ADD COLUMN IF NOT EXISTS user_first_name VARCHAR(100);
-            
-            CREATE INDEX IF NOT EXISTS idx_user_profiles_first_name 
-            ON user_profiles(user_first_name);
-          `,
-      })
-
-      if (addColumnError) {
-        console.error("❌ Error adding column:", addColumnError)
-        return NextResponse.json({
-          success: false,
-          error: "Failed to add user_first_name column",
-          details: addColumnError,
-        })
-      }
-
-      console.log("✅ Added user_first_name column")
-    }
-
-    // Step 3: Check current user_profiles data
-    console.log("📋 Step 3: Checking current user_profiles data...")
+    // Step 1: Check current user_profiles data
+    console.log("📋 Step 1: Checking current user_profiles data...")
 
     const { data: profiles, error: profilesError } = await supabase
       .from("user_profiles")
-      .select("user_id, full_name, user_first_name")
-      .limit(10)
+      .select("user_id, full_name")
+      .limit(5)
 
     if (profilesError) {
       console.error("❌ Error fetching profiles:", profilesError)
-    } else {
-      console.log("👥 Current profiles sample:", profiles)
-    }
-
-    // Step 4: Populate user_first_name from full_name where missing
-    console.log("🔄 Step 4: Populating user_first_name from full_name...")
-
-    const { error: updateError } = await supabase.rpc("exec_sql", {
-      sql: `
-          UPDATE user_profiles 
-          SET user_first_name = CASE
-            WHEN full_name IS NOT NULL AND trim(full_name) != '' THEN
-              trim(split_part(full_name, ' ', 1))
-            ELSE NULL
-          END
-          WHERE user_first_name IS NULL OR user_first_name = '';
-        `,
-    })
-
-    if (updateError) {
-      console.error("❌ Error updating user_first_name:", updateError)
       return NextResponse.json({
         success: false,
-        error: "Failed to populate user_first_name",
-        details: updateError,
+        error: "Failed to fetch user profiles",
+        details: profilesError,
       })
     }
 
-    console.log("✅ Populated user_first_name from full_name")
+    console.log("👥 Current profiles sample:", profiles)
 
-    // Step 5: Check the results
-    console.log("📋 Step 5: Checking updated data...")
+    // Step 2: Get current user to test with
+    console.log("🔍 Step 2: Getting current user...")
 
-    const { data: updatedProfiles, error: updatedError } = await supabase
-      .from("user_profiles")
-      .select("user_id, full_name, user_first_name")
-      .limit(10)
-
-    if (updatedError) {
-      console.error("❌ Error fetching updated profiles:", updatedError)
-    } else {
-      console.log("👥 Updated profiles sample:", updatedProfiles)
-    }
-
-    // Step 6: Test getUserProfile function for the current user
-    console.log("🧪 Step 6: Testing getUserProfile function...")
-
-    // Get current user ID from auth
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
-    if (authError || !user) {
-      console.log("⚠️ No authenticated user to test with")
+    if (authError) {
+      console.error("❌ Auth error:", authError)
       return NextResponse.json({
-        success: true,
-        message: "User profile names fix completed successfully!",
-        steps: [
-          "✅ Checked table schema",
-          hasFirstName || hasUserFirstName
-            ? "✅ user_first_name column already existed"
-            : "✅ Added user_first_name column",
-          "✅ Populated user_first_name from full_name",
-          "⚠️ Could not test with current user (not authenticated)",
-        ],
-        data: {
-          columns,
-          sampleProfiles: updatedProfiles,
-        },
+        success: false,
+        error: "Failed to get current user",
+        details: authError,
       })
     }
 
-    // Test the profile lookup for current user
-    const { data: testProfile, error: testError } = await supabase
-      .from("user_profiles")
-      .select("user_id, full_name, user_first_name")
-      .eq("user_id", user.id)
-      .single()
+    console.log("👤 Current user ID:", user?.id)
 
-    console.log("🧪 Test profile result:", { testProfile, testError })
+    // Step 3: Check if current user has a profile
+    let userProfile = null
+    if (user?.id) {
+      const { data: profile, error: profileError } = await supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
+
+      if (profileError) {
+        console.log("⚠️ No profile found for current user:", profileError.message)
+      } else {
+        userProfile = profile
+        console.log("👤 Current user profile:", profile)
+      }
+    }
+
+    // Step 4: Check auth user metadata
+    console.log("🔍 Step 4: Checking auth user metadata...")
+    console.log("👤 User metadata:", user?.user_metadata)
+    console.log("👤 User email:", user?.email)
+
+    // Step 5: Test the getUserProfile logic manually
+    console.log("🧪 Step 5: Testing getUserProfile logic...")
+
+    let testResult = "No name found"
+
+    if (userProfile?.full_name) {
+      testResult = userProfile.full_name.split(" ")[0]
+      console.log("✅ Found name from profile full_name:", testResult)
+    } else if (user?.user_metadata?.full_name) {
+      testResult = user.user_metadata.full_name.split(" ")[0]
+      console.log("✅ Found name from auth metadata full_name:", testResult)
+    } else if (user?.user_metadata?.first_name) {
+      testResult = user.user_metadata.first_name
+      console.log("✅ Found name from auth metadata first_name:", testResult)
+    } else if (user?.email) {
+      testResult = user.email.split("@")[0]
+      console.log("✅ Found name from email:", testResult)
+    } else {
+      console.log("❌ No name source found, would default to 'the candidate'")
+    }
 
     return NextResponse.json({
       success: true,
-      message: "User profile names fix completed successfully!",
-      steps: [
-        "✅ Checked table schema",
-        hasFirstName || hasUserFirstName
-          ? "✅ user_first_name column already existed"
-          : "✅ Added user_first_name column",
-        "✅ Populated user_first_name from full_name",
-        testProfile
-          ? `✅ Test user profile: ${testProfile.user_first_name || "No first name found"}`
-          : "⚠️ No profile found for current user",
-      ],
+      message: "User profile debug completed!",
       data: {
-        columns,
-        sampleProfiles: updatedProfiles,
-        testProfile,
-        currentUserId: user.id,
+        currentUserId: user?.id,
+        userEmail: user?.email,
+        userMetadata: user?.user_metadata,
+        userProfile: userProfile,
+        profilesCount: profiles?.length || 0,
+        sampleProfiles: profiles,
+        testResult: testResult,
+        nameSource: userProfile?.full_name
+          ? "profile.full_name"
+          : user?.user_metadata?.full_name
+            ? "auth.metadata.full_name"
+            : user?.user_metadata?.first_name
+              ? "auth.metadata.first_name"
+              : user?.email
+                ? "email"
+                : "none (would default to 'the candidate')",
       },
     })
   } catch (error) {
