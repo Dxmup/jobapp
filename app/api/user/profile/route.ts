@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     // Get user profile data
     const { data: profile, error: profileError } = await supabase
       .from("user_profiles")
-      .select("full_name, first_name, phone, address, city, state, zip_code")
+      .select("full_name, user_first_name, phone, address, city, state, zip_code")
       .eq("user_id", userId)
       .single()
 
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       name: user.name,
       created_at: user.created_at,
       full_name: profile?.full_name || user.name || "",
-      first_name: profile?.first_name || "",
+      first_name: profile?.user_first_name || "",
       phone: profile?.phone || "",
       address: profile?.address || "",
       city: profile?.city || "",
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       .upsert({
         user_id: userId,
         full_name: fullName,
-        first_name: firstName,
+        user_first_name: firstName,
         phone,
         address,
         city,
