@@ -104,10 +104,11 @@ export class ConversationalInterviewClient {
       interviewerName: this.interviewerName,
     }
 
-    this.firstName = firstName || "the candidate"
+    this.firstName = firstName || "DEBUG_NO_FIRSTNAME"
 
     console.log(`🎭 Selected interviewer: ${this.interviewerName}`)
     console.log(`👤 Using candidate name: ${candidateName}`)
+    console.log(`👤 Using firstName parameter: ${this.firstName}`) // Add this line
   }
 
   static async create(
@@ -542,16 +543,16 @@ REMEMBER: This is a SCREENING to determine basic fit - save detailed behavioral 
 
     return `ROLE: You are ${this.interviewerName}, a professional phone interviewer conducting a ${this.config.interviewType === "phone-screener" ? "screening interview" : "first-round interview"} for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
 
-CANDIDATE: The candidate's name is ${this.firstName}.
+CANDIDATE: The candidate's name is ${this.firstName === "DEBUG_NO_FIRSTNAME" ? "the applicant" : this.firstName}.
 
 ${phoneScreenerInstructions}
-INSTRUCTION: Ask this interview question naturally and professionally. You may use the candidate's name naturally in conversation when appropriate.
+INSTRUCTION: Ask this interview question naturally and professionally. ${this.firstName !== "DEBUG_NO_FIRSTNAME" ? `You may use the candidate's name "${this.firstName}" naturally in conversation when appropriate.` : "You may refer to the candidate as 'you' or 'the applicant'."}
 
 QUESTION: "${questionText}"
 
 DELIVERY REQUIREMENTS:
 1. Ask this question with a professional, encouraging tone
-2. You may naturally use "${this.firstName}" in your response when appropriate
+2. ${this.firstName !== "DEBUG_NO_FIRSTNAME" ? `You may naturally use "${this.firstName}" in your response when appropriate` : "Refer to the candidate professionally"}
 3. Include natural pauses and speak clearly for phone audio quality
 4. Sound engaged and interested in their response
 5. DO NOT include any stage directions, parenthetical instructions, or descriptions
