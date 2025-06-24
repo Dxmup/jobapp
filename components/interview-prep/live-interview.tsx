@@ -170,7 +170,6 @@ export function LiveInterview({
         questions,
         jobContext,
         resumeContext,
-        userFirstName || "the candidate", // Add this line
         {
           voice: selectedVoice,
           maxDuration: maxDuration,
