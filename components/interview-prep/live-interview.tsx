@@ -184,6 +184,9 @@ export function LiveInterview({ job, resume, questions, userName, userFirstName 
       console.log("🚀 Starting live interview...")
       console.log(`👤 Using candidate name: "${candidateName}"`)
 
+      console.log(`🚀 Starting live interview with candidate name: "${userFirstName || candidateName}"`)
+      console.log(`📋 Resume context will use name: "${userFirstName || candidateName}"`)
+
       // Create the interview client with proper context
       const client = await ConversationalInterviewClient.create(
         job.id,
@@ -195,7 +198,7 @@ export function LiveInterview({ job, resume, questions, userName, userFirstName 
           description: job.description,
         },
         {
-          name: candidateName, // This is the key - pass the actual name here
+          name: userFirstName || candidateName, // Ensure we use the actual first name
           resumeId: resume,
         },
         config,

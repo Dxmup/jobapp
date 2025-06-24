@@ -2,375 +2,356 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { AlertCircle, CheckCircle, Loader2, Zap, Clock } from "lucide-react"
-import { LiveInterview } from "./live-interview" // Fixed import path
-import { generateInterviewQuestions, getUserProfile } from "@/app/actions/interview-prep-actions"
+import {
+  Phone,
+  PhoneCall,
+  Rocket,
+  User,
+  Briefcase,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  ArrowLeft,
+  Zap,
+} from "lucide-react"
+import Link from "next/link"
+import { LiveInterview } from "./live-interview"
+import { generateInterviewQuestions } from "@/app/actions/interview-prep-actions"
 
 interface PreloadedMockInterviewProps {
   job: any
-  resume?: any
-  preloadedQuestions?: {
+  resume?: string
+  questions: {
     technical: string[]
     behavioral: string[]
-  } | null
-  shouldPreload: boolean
-  interviewType?: "phone-screener" | "first-interview"
+  }
+  questionsError?: string | null
+  isPreloaded?: boolean
+  userFirstName?: string
+  userName?: string
 }
 
 export function PreloadedMockInterview({
   job,
   resume,
-  preloadedQuestions,
-  shouldPreload,
-  interviewType = "first-interview",
+  questions: initialQuestions,
+  questionsError: initialQuestionsError,
+  isPreloaded = false,
+  userFirstName = "the candidate",
+  userName = "the candidate",
 }: PreloadedMockInterviewProps) {
-  const [questions, setQuestions] = useState(preloadedQuestions || { technical: [], behavioral: [] })
-  const [isLoading, setIsLoading] = useState(true) // Always start loading
-  const [loadingProgress, setLoadingProgress] = useState(0)
-  const [loadingStage, setLoadingStage] = useState<string>("Initializing...")
-  const [error, setError] = useState<string | null>(null)
-  const [isPreparingInterview, setIsPreparingInterview] = useState(false)
-  const [userProfile, setUserProfile] = useState<{ firstName: string; fullName: string } | null>(null)
-  const [shouldAutoStart, setShouldAutoStart] = useState(false)
+  const [questions, setQuestions] = useState(initialQuestions)
+  const [questionsError, setQuestionsError] = useState(initialQuestionsError)
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
+  const [showInterview, setShowInterview] = useState(false)
 
-  const hasQuestions = questions.technical.length > 0 || questions.behavioral.length > 0
-  const hasEnoughQuestions = questions.technical.length + questions.behavioral.length >= 3
-  const totalQuestions = questions.technical.length + questions.behavioral.length
+  console.log(`🎭 PreloadedMockInterview received props:`, {
+    jobTitle: job?.title,
+    userFirstName,
+    userName,
+    isPreloaded,
+    questionsCount: questions.technical.length + questions.behavioral.length,
+  })
 
-  // Auto-load and generate questions on mount
+  // Update questions when props change
   useEffect(() => {
-    autoLoadQuestions()
-  }, [])
+    setQuestions(initialQuestions)
+    setQuestionsError(initialQuestionsError)
+  }, [initialQuestions, initialQuestionsError])
 
-  const autoLoadQuestions = async () => {
+  const totalQuestions = questions.technical.length + questions.behavioral.length
+  const hasEnoughQuestions = totalQuestions >= 3
+
+  // Auto-start interview if preloaded and has enough questions
+  useEffect(() => {
+    if (isPreloaded && hasEnoughQuestions && !questionsError) {
+      console.log(`🚀 Auto-starting preloaded interview with ${totalQuestions} questions`)
+      setShowInterview(true)
+    }
+  }, [isPreloaded, hasEnoughQuestions, questionsError, totalQuestions])
+
+  const handleGenerateQuestions = async () => {
+    setIsGeneratingQuestions(true)
+    setQuestionsError(null)
+
     try {
-      setIsLoading(true)
-      setLoadingProgress(5)
-      setLoadingStage("Getting your profile information...")
-      setError(null)
+      console.log("🔄 Generating questions for job:", job.id, "resume:", resume)
 
-      console.log("🚀 Auto-loading interview questions...")
+      const result = await generateInterviewQuestions(job.id, resume)
 
-      // First, get user profile for personalization
-      setLoadingProgress(10)
-      const profileResult = await getUserProfile()
-      if (profileResult.success && profileResult.profile) {
-        setUserProfile({
-          firstName: profileResult.profile.firstName,
-          fullName: profileResult.profile.fullName,
-        })
-        console.log(`👤 Using user name: ${profileResult.profile.firstName}`)
-      }
-
-      // Always generate new questions (default behavior)
-      console.log("📝 Generating new interview questions...")
-      setLoadingProgress(25)
-      setLoadingStage("Generating personalized questions...")
-
-      // Simulate progress during generation
-      const progressInterval = setInterval(() => {
-        setLoadingProgress((prev) => {
-          if (prev < 70) return prev + 2
-          return prev
-        })
-      }, 300)
-
-      const generateResult = await generateInterviewQuestions(job.id, resume?.id)
-      clearInterval(progressInterval)
-
-      if (generateResult.success && generateResult.questions) {
-        setQuestions(generateResult.questions)
-        setLoadingProgress(75)
-        setLoadingStage("Questions generated! Preparing interview...")
-
-        console.log(
-          `✅ Generated ${generateResult.questions.technical.length} technical + ${generateResult.questions.behavioral.length} behavioral questions`,
-        )
-
-        // Start preparing the interview immediately and auto-start
-        await prepareInterview(generateResult.questions)
-        // setShouldAutoStart(true) // This will trigger auto-start
+      if (result.success && result.questions) {
+        console.log("✅ Questions generated successfully:", result.questions)
+        setQuestions(result.questions)
       } else {
-        throw new Error(generateResult.error || "Failed to generate questions")
+        console.error("❌ Failed to generate questions:", result.error)
+        setQuestionsError(result.error || "Failed to generate questions")
       }
     } catch (err: any) {
-      console.error("❌ Failed to auto-load questions:", err)
-      setError(err.message)
-      setLoadingProgress(0)
-      setLoadingStage("Error occurred")
+      console.error("❌ Error generating questions:", err)
+      setQuestionsError(err.message || "Failed to generate questions")
     } finally {
-      setIsLoading(false)
+      setIsGeneratingQuestions(false)
     }
   }
 
-  const prepareInterview = async (questionsToUse: { technical: string[]; behavioral: string[] }) => {
-    try {
-      setIsPreparingInterview(true)
-      setLoadingProgress(80)
-      setLoadingStage("Preparing interview system...")
-
-      // Simulate interview preparation (this would be where we pre-generate audio, etc.)
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      setLoadingProgress(95)
-      setLoadingStage("Optimizing audio generation...")
-
-      // Another brief delay for final preparations
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      setLoadingProgress(100)
-      setLoadingStage("Ready to start!")
-
-      console.log("🎯 Interview preparation complete - ready for user to start!")
-
-      // Brief pause to show completion
-      setTimeout(() => {
-        setIsPreparingInterview(false)
-      }, 500)
-    } catch (err: any) {
-      console.error("❌ Failed to prepare interview:", err)
-      setError(`Failed to prepare interview: ${err.message}`)
-      setIsPreparingInterview(false)
-    }
+  const handleStartInterview = () => {
+    console.log(`🎙️ Starting interview with user: "${userFirstName}"`)
+    setShowInterview(true)
   }
 
-  const retryLoading = () => {
-    setError(null)
-    autoLoadQuestions()
+  const handleBackToPrep = () => {
+    setShowInterview(false)
   }
 
+  // If showing interview, render the LiveInterview component
+  if (showInterview && hasEnoughQuestions) {
+    return (
+      <div className="space-y-6">
+        {/* Back button */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={handleBackToPrep} className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Interview Prep
+          </Button>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Briefcase className="h-4 w-4" />
+            <span>
+              {job.title} at {job.company}
+            </span>
+            {userFirstName !== "the candidate" && (
+              <>
+                <span>•</span>
+                <User className="h-4 w-4" />
+                <span>Interviewing {userFirstName}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Live Interview Component */}
+        <LiveInterview
+          job={job}
+          resume={resume}
+          questions={questions}
+          interviewType="phone-screener"
+          isPreloaded={isPreloaded}
+          userFirstName={userFirstName}
+        />
+      </div>
+    )
+  }
+
+  // Otherwise, show the preparation screen
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href={`/dashboard/interview-prep/${job.id}${resume ? `?resumeId=${resume}` : ""}`}>
+          <Button variant="ghost" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Interview Prep
+          </Button>
+        </Link>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Briefcase className="h-4 w-4" />
+          <span>
+            {job.title} at {job.company}
+          </span>
+          {userFirstName !== "the candidate" && (
+            <>
+              <span>•</span>
+              <User className="h-4 w-4" />
+              <span>Candidate: {userFirstName}</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Main Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Mock Phone Interview</span>
             <div className="flex gap-2">
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Zap className="h-3 w-3" />
-                Auto-Generated
-              </Badge>
-              <Badge variant="outline">
-                {interviewType === "phone-screener" ? "Phone Screener" : "First Interview"}
-              </Badge>
-              <Badge variant="outline">{job.company}</Badge>
-              <Badge variant="outline">{job.title}</Badge>
+              {isPreloaded && (
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1 bg-green-50 text-green-700 border-green-300"
+                >
+                  <Rocket className="h-3 w-3" />
+                  Preloaded
+                </Badge>
+              )}
+              <Badge variant="outline">Phone Screening</Badge>
+              <Badge variant="outline">15 min max</Badge>
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Job Context */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-medium text-blue-900">Interview Setup</h3>
-              <div className="mt-2 text-sm text-blue-800">
+        <CardContent className="space-y-6">
+          {/* Questions Status */}
+          {isGeneratingQuestions && (
+            <Alert>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertTitle>Generating Interview Questions</AlertTitle>
+              <AlertDescription>
+                Creating personalized interview questions based on the job description and your resume...
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {questionsError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error Loading Questions</AlertTitle>
+              <AlertDescription>{questionsError}</AlertDescription>
+            </Alert>
+          )}
+
+          {!hasEnoughQuestions && !isGeneratingQuestions && !questionsError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Not Enough Questions</AlertTitle>
+              <AlertDescription>
+                {totalQuestions > 0
+                  ? `Only ${totalQuestions} questions available. Need at least 3 for a realistic interview.`
+                  : "No interview questions found."}
+                <div className="mt-3">
+                  <Button onClick={handleGenerateQuestions} disabled={isGeneratingQuestions} size="sm">
+                    <Zap className="h-4 w-4 mr-2" />
+                    Generate Questions
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Interview Ready */}
+          {hasEnoughQuestions && !questionsError && (
+            <div className={`p-6 rounded-lg ${isPreloaded ? "bg-green-50" : "bg-blue-50"}`}>
+              <div className="flex items-center gap-3 mb-4">
+                {isPreloaded ? (
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                ) : (
+                  <Phone className="h-6 w-6 text-blue-600" />
+                )}
+                <h3 className={`text-xl font-bold ${isPreloaded ? "text-green-900" : "text-blue-900"}`}>
+                  {isPreloaded ? "Ready for Instant Interview!" : "Interview Ready"}
+                </h3>
+              </div>
+
+              <div className={`space-y-2 text-sm ${isPreloaded ? "text-green-800" : "text-blue-800"}`}>
                 <p>
-                  <strong>Company:</strong> {job.company}
+                  <strong>Position:</strong> {job.title} at {job.company}
                 </p>
                 <p>
-                  <strong>Position:</strong> {job.title}
+                  <strong>Candidate:</strong> {userFirstName}
                 </p>
                 <p>
-                  <strong>Candidate:</strong> {userProfile?.firstName || resume?.name || "You"}
+                  <strong>Questions:</strong> {questions.technical.length} technical, {questions.behavioral.length}{" "}
+                  behavioral
                 </p>
                 <p>
-                  <strong>Type:</strong>{" "}
-                  {interviewType === "phone-screener" ? "Phone Screener (15 min)" : "First Interview (30 min)"}
+                  <strong>Format:</strong> Phone screening focused on basic qualifications
                 </p>
                 <p>
-                  <strong>Status:</strong>{" "}
-                  {isLoading ? "Preparing..." : hasEnoughQuestions ? "Ready to start!" : "Needs setup"}
+                  <strong>Duration:</strong> 15 minutes maximum
                 </p>
+                {isPreloaded && (
+                  <p>
+                    <strong>Status:</strong>{" "}
+                    <span className="text-green-700 font-medium">Questions pre-loaded for instant start!</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              <div className="mt-4">
+                <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                  <span>Interview Preparation</span>
+                  <span>{isPreloaded ? "100%" : "Ready"}</span>
+                </div>
+                <Progress value={isPreloaded ? 100 : 85} className="h-2" />
+              </div>
+
+              {/* Start Button */}
+              <div className="mt-6">
+                <Button
+                  onClick={handleStartInterview}
+                  size="lg"
+                  className={`w-full ${
+                    isPreloaded ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  {isPreloaded ? (
+                    <>
+                      <Rocket className="mr-2 h-5 w-5" />
+                      Start Instant Interview
+                    </>
+                  ) : (
+                    <>
+                      <PhoneCall className="mr-2 h-5 w-5" />
+                      Start Mock Interview
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
+          )}
 
-            {/* Loading State */}
-            {isLoading && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                  <div className="flex-1">
-                    <div className="font-medium text-blue-800">Setting Up Your Interview</div>
-                    <div className="text-sm text-blue-700">{loadingStage}</div>
+          {/* Instructions */}
+          <Card className="border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="text-blue-800 text-lg">How Mock Phone Interview Works</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm text-blue-700">
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                    1
                   </div>
-                  {loadingProgress > 0 && (
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-blue-800">{loadingProgress}%</div>
-                    </div>
-                  )}
+                  <p>AI interviewer introduces themselves and explains the process</p>
                 </div>
-                <div>
-                  <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                    <span>Setup Progress</span>
-                    <span>{loadingProgress}%</span>
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                    2
                   </div>
-                  <Progress value={loadingProgress} className="w-full" />
+                  <p>Questions are asked concisely, focusing on basic qualifications</p>
                 </div>
-
-                {/* Loading stages indicator */}
-                <div className="grid grid-cols-4 gap-2 text-xs">
-                  <div
-                    className={`p-2 rounded text-center ${loadingProgress >= 25 ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
-                  >
-                    Questions
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                    3
                   </div>
-                  <div
-                    className={`p-2 rounded text-center ${loadingProgress >= 50 ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
-                  >
-                    Generation
-                  </div>
-                  <div
-                    className={`p-2 rounded text-center ${loadingProgress >= 75 ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
-                  >
-                    Preparation
-                  </div>
-                  <div
-                    className={`p-2 rounded text-center ${loadingProgress >= 100 ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
-                  >
-                    Ready
-                  </div>
+                  <p>Your microphone activates after each question for your response</p>
                 </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                    4
+                  </div>
+                  <p>Silence detection automatically moves to the next question</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                    5
+                  </div>
+                  <p>Interview concludes with professional closing and next steps</p>
+                </div>
+                {userFirstName !== "the candidate" && (
+                  <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+                    <p className="font-medium">
+                      The AI interviewer will address you as "{userFirstName}" throughout the interview for a realistic
+                      experience.
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Success State */}
-            {!isLoading && hasEnoughQuestions && !isPreparingInterview && (
-              <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <div className="flex-1">
-                  <div className="font-medium text-green-800">Interview Ready!</div>
-                  <div className="text-sm text-green-700">
-                    {totalQuestions} interview questions prepared ({questions.technical.length} technical,{" "}
-                    {questions.behavioral.length} behavioral) • Audio system optimized • Ready for instant start
-                  </div>
-                </div>
-                <div className="text-right">
-                  <Badge variant="outline" className="text-green-700 border-green-300">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Instant Start
-                  </Badge>
-                </div>
-              </div>
-            )}
-
-            {/* Preparing Interview State */}
-            {isPreparingInterview && (
-              <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-lg">
-                <Loader2 className="h-4 w-4 animate-spin text-yellow-600" />
-                <div className="flex-1">
-                  <div className="font-medium text-yellow-800">Optimizing Interview Experience</div>
-                  <div className="text-sm text-yellow-700">
-                    Pre-generating audio responses and optimizing conversation flow for seamless interaction...
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Error State */}
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Setup Failed</AlertTitle>
-                <AlertDescription>
-                  {error}
-                  <div className="mt-3">
-                    <button
-                      onClick={retryLoading}
-                      className="text-sm bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded"
-                    >
-                      Try Again
-                    </button>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
-
-      {/* Live Interview Component */}
-      <LiveInterview
-        job={job}
-        resume={resume}
-        questions={questions}
-        interviewType={interviewType}
-        isPreloaded={!isLoading && hasEnoughQuestions}
-        shouldAutoStart={shouldAutoStart}
-        userFirstName={userProfile?.firstName}
-      />
-
-      {/* Instructions */}
-      {!isLoading && hasEnoughQuestions && (
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader>
-            <CardTitle className="text-green-800">🚀 Instant Start Interview Ready!</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 text-sm text-green-700">
-              <p className="font-medium">
-                ⚡ Your interview has been fully prepared and optimized for the best possible experience!
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center text-xs font-medium">
-                      ✓
-                    </div>
-                    <p>
-                      Questions personalized for {job.title} at {job.company}
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center text-xs font-medium">
-                      ✓
-                    </div>
-                    <p>Audio system pre-optimized for smooth conversation</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center text-xs font-medium">
-                      ✓
-                    </div>
-                    <p>
-                      {interviewType === "phone-screener"
-                        ? "Screening-focused questions (15 min)"
-                        : "Comprehensive interview questions (30 min)"}
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center text-xs font-medium">
-                      ✓
-                    </div>
-                    <p>Professional interviewer voice ready</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center text-xs font-medium">
-                      ✓
-                    </div>
-                    <p>Real-time voice detection calibrated</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center text-xs font-medium">
-                      ✓
-                    </div>
-                    <p>Question queue pre-loaded for instant flow</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-green-100 p-3 rounded-lg mt-4">
-                <p className="text-sm text-green-800">
-                  <strong>Ready to Start:</strong> The interview will start automatically once everything is prepared!
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
