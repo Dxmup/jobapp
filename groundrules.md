@@ -51,8 +51,6 @@ Start with the most simple solution first.
 
 **Error Handling:** I implement error handling and logging.
 
-**Authentication:** I use cookie-based authentication.
-
 **Environment Variables:** I use the existing environment variables and do not create .env files.
 
 **Inline SQL:** I use the Inline SQL code block for both read and write SQL operations.
@@ -68,3 +66,5 @@ Start with the most simple solution first.
 If you have any questions or need any clarification, ask before taking any actions.
 
 Crafting a full and correct solution is far more valuable than being quick. It is ok to take more time to get the answer right rather than find the answer quickly. Have an engineer's mindset and tolerance for errors.
+
+Okay, I have read the `groundrules.md` file. I will keep the contents of that file in mind as I continue to assist you.

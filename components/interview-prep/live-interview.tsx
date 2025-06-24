@@ -1,316 +1,150 @@
 "use client"
 
-import type React from "react"
-import { createContext, useState, useEffect, useContext } from "react"
-import { useRouter } from "next/router"
-import { useSession } from "next-auth/react"
-import { toast } from "react-hot-toast"
-import { Document, Page, Text, View, StyleSheet, PDFViewer, Font } from "@react-pdf/renderer"
-
-// Import necessary libraries for speech-to-text and text-to-speech
-// For speech-to-text, you might use the Web Speech API or a library like 'react-speech-recognition'
-// For text-to-speech, you might use the Web Speech API or a library like 'responsivevoice.js'
-
-// Define context types
-interface ResumeContextType {
-  name: string
-  email: string
-  phone: string
-  linkedin: string
-  github: string
-  objective: string
-  skills: string[]
-  experience: {
-    title: string
-    company: string
-    dates: string
-    description: string
-  }[]
-  education: {
-    institution: string
-    degree: string
-    dates: string
-    description: string
-  }[]
-  projects: {
-    name: string
-    description: string
-    technologies: string[]
-  }[]
-}
-
-// Create context
-const ResumeContext = createContext<ResumeContextType | null>(null)
-
-// Provider component
-interface ResumeProviderProps {
-  children: React.ReactNode
-}
-
-const ResumeProvider: React.FC<ResumeProviderProps> = ({ children }) => {
-  const [resumeData, setResumeData] = useState<ResumeContextType>({
-    name: "liveInterviewContext candidate", // Changed from "the candidate"
-    email: "candidate@example.com",
-    phone: "123-456-7890",
-    linkedin: "linkedin.com/in/candidate",
-    github: "github.com/candidate",
-    objective: "To obtain a challenging position where I can utilize my skills and contribute to the company's growth.",
-    skills: ["JavaScript", "React", "Node.js", "HTML", "CSS"],
-    experience: [
-      {
-        title: "Software Engineer",
-        company: "Tech Company",
-        dates: "2020-2022",
-        description: "Developed and maintained web applications using React and Node.js.",
-      },
-    ],
-    education: [
-      {
-        institution: "University of Example",
-        degree: "Bachelor of Science in Computer Science",
-        dates: "2016-2020",
-        description: "Relevant coursework included data structures, algorithms, and software engineering.",
-      },
-    ],
-    projects: [
-      {
-        name: "Personal Website",
-        description: "A personal website built with React and hosted on Netlify.",
-        technologies: ["React", "Netlify"],
-      },
-    ],
-  })
-
-  return <ResumeContext.Provider value={resumeData}>{children}</ResumeContext.Provider>
-}
-
-// Custom hook to consume context
-const useResume = () => {
-  const context = useContext(ResumeContext)
-  if (!context) {
-    throw new Error("useResume must be used within a ResumeProvider")
-  }
-  return context
-}
+import { useState, useEffect, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Phone,
+  PhoneCall,
+  Mic,
+  Volume2,
+  Clock,
+  Zap,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  PhoneOff,
+  MicIcon,
+  TicketIcon as Queue,
+  Rocket,
+} from "lucide-react"
+import {
+  ConversationalInterviewClient,
+  type ConversationalInterviewConfig,
+} from "@/lib/conversational-interview-client"
+import { generateInterviewQuestions } from "@/app/actions/interview-prep-actions"
 
 interface LiveInterviewProps {
-  job: any // Replace 'any' with the actual type of 'job'
-  resume: any // Replace 'any' with the actual type of 'resume'
-  questions: any // Replace 'any' with the actual type of 'questions'
-  interviewType?: string
+  job: any
+  resume?: any
+  questions: {
+    technical: string[]
+    behavioral: string[]
+  }
+  interviewType?: "phone-screener" | "first-interview"
   isPreloaded?: boolean
   userFirstName?: string
 }
 
-// LiveInterview component
-const LiveInterview = ({
+type InterviewState =
+  | "ready"
+  | "initializing"
+  | "connecting"
+  | "connected"
+  | "playing_question"
+  | "listening"
+  | "user_speaking"
+  | "user_silence"
+  | "time_warning"
+  | "ending"
+  | "completed"
+  | "error"
+
+export function LiveInterview({
   job,
   resume,
   questions: initialQuestions,
   interviewType = "first-interview",
   isPreloaded = false,
   userFirstName,
-}: LiveInterviewProps) => {
-  const router = useRouter()
-  const { data: session, status } = useSession()
-  const [userProfile, setUserProfile] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+}: LiveInterviewProps) {
   const [questions, setQuestions] = useState(initialQuestions)
-  const [hasEnoughQuestions, setHasEnoughQuestions] = useState(true)
-  const [interviewState, setInterviewState] = useState("idle")
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
+  const [interviewState, setInterviewState] = useState<InterviewState>("ready")
+  const [interviewClient, setInterviewClient] = useState<ConversationalInterviewClient | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [duration, setDuration] = useState(0)
+  const [remainingTime, setRemainingTime] = useState(
+    interviewType === "phone-screener" ? 15 * 60 * 1000 : 30 * 60 * 1000,
+  )
+  const [currentQuestion, setCurrentQuestion] = useState<string>("")
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [totalQuestions, setTotalQuestions] = useState(0)
+  const [queueStatus, setQueueStatus] = useState({ queued: 0, ready: 0, generating: 0 })
+  const [selectedVoice, setSelectedVoice] = useState<ConversationalInterviewConfig["voice"]>("Kore")
+  const [memoryStatus, setMemoryStatus] = useState({ queueSize: 0, audioDataSize: 0, estimatedMemoryMB: 0 })
+
+  const clientRef = useRef<ConversationalInterviewClient | null>(null)
+  const durationTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Configure interview based on type
+  const maxDuration = interviewType === "phone-screener" ? 15 * 60 * 1000 : 30 * 60 * 1000 // 15 or 30 minutes
+  const timeWarningAt = interviewType === "phone-screener" ? 12 * 60 * 1000 : 27 * 60 * 1000 // 3 minutes before end
+
+  // Check if we have enough questions and required data
+  const hasEnoughQuestions = questions.technical.length + questions.behavioral.length >= 3
+  const canStartInterview = hasEnoughQuestions && job && interviewState === "ready"
+
+  // Update questions when props change
+  useEffect(() => {
+    setQuestions(initialQuestions)
+  }, [initialQuestions])
+
+  // Auto-start logic - generate questions first, then auto-start
+
+  // Auto-start interview after questions are ready
 
   // Debug logging
   useEffect(() => {
-    console.log("🔍 TRACE: LiveInterview props received:", {
+    console.log("🔍 LiveInterview state:", {
       technical: questions.technical.length,
       behavioral: questions.behavioral.length,
       total: questions.technical.length + questions.behavioral.length,
       interviewType,
       hasEnoughQuestions,
       isPreloaded,
-      userFirstName: userFirstName || "NOT PROVIDED",
-      jobTitle: job?.title,
-      resumeName: resume?.name,
+      canStartInterview,
+      userFirstName,
     })
-  }, [questions, interviewType, hasEnoughQuestions, isPreloaded, userFirstName, job?.title, resume?.name])
+  }, [questions, interviewType, hasEnoughQuestions, isPreloaded, canStartInterview, userFirstName])
 
-  useEffect(() => {
-    if (status === "loading") return
+  // Generate questions if not enough (fallback)
+  const handleGenerateQuestions = async () => {
+    setIsGeneratingQuestions(true)
+    setError(null)
 
-    if (status === "unauthenticated") {
-      router.push("/auth/signin")
-      return
-    }
-
-    const fetchUserProfile = async () => {
-      setIsLoading(true)
-      try {
-        const response = await fetch(`/api/user/profile`)
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        const data = await response.json()
-        setUserProfile(data)
-      } catch (e: any) {
-        setError(e.message)
-        toast.error(`Error fetching profile: ${e.message}`)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchUserProfile()
-  }, [session, status, router])
-
-  const fetchUserProfile = async () => {
-    setIsLoading(true)
     try {
-      const response = await fetch(`/api/user/profile`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+      console.log("🔄 Generating questions for job:", job.id, "resume:", resume?.id)
+
+      const result = await generateInterviewQuestions(job.id, resume?.id)
+
+      if (result.success && result.questions) {
+        console.log("✅ Questions generated successfully:", result.questions)
+        setQuestions(result.questions)
+      } else {
+        console.error("❌ Failed to generate questions:", result.error)
+        setError(result.error || "Failed to generate questions")
       }
-      const profileData = await response.json()
-      setUserProfile(profileData)
-
-      // Extract user's first name from profile data
-      const userFirstNameLocal =
-        profileData?.first_name || profileData?.name?.split(" ")[0] || "liveInterview candidate"
-
-      // Create resume context with the fetched user data
-      createResumeContext(userFirstNameLocal, profileData?.email || "candidate@example.com")
-    } catch (e: any) {
-      setError(e.message)
-      toast.error(`Error fetching profile: ${e.message}`)
+    } catch (err: any) {
+      console.error("❌ Error generating questions:", err)
+      setError(err.message || "Failed to generate questions")
     } finally {
-      setIsLoading(false)
+      setIsGeneratingQuestions(false)
     }
   }
 
-  const createResumeContext = (userFirstName: string, userEmail: string) => {
-    // Set default values or fetch from userProfile as needed
-    const newResumeData: ResumeContextType = {
-      name: userFirstName || "liveInterviewContext candidate", // Changed from "the candidate"
-      email: userEmail || "candidate@example.com",
-      phone: "123-456-7890",
-      linkedin: "linkedin.com/in/candidate",
-      github: "github.com/candidate",
-      objective:
-        "To obtain a challenging position where I can utilize my skills and contribute to the company's growth.",
-      skills: ["JavaScript", "React", "Node.js", "HTML", "CSS"],
-      experience: [
-        {
-          title: "Software Engineer",
-          company: "Tech Company",
-          dates: "2020-2022",
-          description: "Developed and maintained web applications using React and Node.js.",
-        },
-      ],
-      education: [
-        {
-          institution: "University of Example",
-          degree: "Bachelor of Science in Computer Science",
-          dates: "2016-2020",
-          description: "Relevant coursework included data structures, algorithms, and software engineering.",
-        },
-      ],
-      projects: [
-        {
-          name: "Personal Website",
-          description: "A personal website built with React and hosted on Netlify.",
-          technologies: ["React", "Netlify"],
-        },
-      ],
-    }
-    setResumeData(newResumeData)
-  }
+  // Randomly assign voice on component mount
+  useEffect(() => {
+    const voices: ConversationalInterviewConfig["voice"][] = ["Puck", "Charon", "Kore", "Fenrir", "Aoede"]
+    const randomVoice = voices[Math.floor(Math.random() * voices.length)]
+    setSelectedVoice(randomVoice)
+    setRemainingTime(maxDuration)
+  }, [maxDuration])
 
-  const [isSpeaking, setIsSpeaking] = useState(false)
-  const [spokenText, setSpokenText] = useState("")
-
-  const startSpeaking = () => {
-    setIsSpeaking(true)
-    // Implement speech-to-text logic here
-    // Update spokenText state with the transcribed text
-  }
-
-  const stopSpeaking = () => {
-    setIsSpeaking(false)
-    // Implement stop speech-to-text logic here
-  }
-
-  const speakText = (text: string) => {
-    // Implement text-to-speech logic here
-    // Use the Web Speech API or a library like 'responsivevoice.js' to speak the text
-  }
-
-  // PDF styles
-  Font.register({
-    family: "Oswald",
-    src: "https://fonts.gstatic.com/s/oswald/v13/Y_TKV6K6pT9gSkPiGxziMA.ttf",
-  })
-
-  const styles = StyleSheet.create({
-    page: {
-      flexDirection: "row",
-      backgroundColor: "#E4E4E4",
-    },
-    section: {
-      margin: 10,
-      padding: 10,
-      flexGrow: 1,
-    },
-    viewer: {
-      width: "100%",
-      height: "100vh",
-    },
-    title: {
-      fontSize: 24,
-      textAlign: "center",
-      fontFamily: "Oswald",
-    },
-    body: {
-      fontSize: 12,
-      textAlign: "justify",
-    },
-  })
-
-  // PDF Document
-  const MyDocument = () => {
-    const resume = useResume()
-
-    return (
-      <Document>
-        <Page size="A4" style={styles.page}>
-          <View style={styles.section}>
-            <Text style={styles.title}>{resume.name}</Text>
-            <Text style={styles.body}>{resume.objective}</Text>
-            <Text style={styles.title}>Experience</Text>
-            {resume.experience.map((exp, index) => (
-              <View key={index}>
-                <Text>{exp.title}</Text>
-                <Text>{exp.company}</Text>
-                <Text>{exp.dates}</Text>
-                <Text>{exp.description}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={styles.section}>
-            <Text style={styles.title}>Education</Text>
-            {resume.education.map((edu, index) => (
-              <View key={index}>
-                <Text>{edu.institution}</Text>
-                <Text>{edu.degree}</Text>
-                <Text>{edu.dates}</Text>
-                <Text>{edu.description}</Text>
-              </View>
-            ))}
-          </View>
-        </Page>
-      </Document>
-    )
-  }
-
+  // Start the conversational interview
   const startConversationalInterview = async () => {
     try {
       setError(null)
@@ -329,14 +163,95 @@ const LiveInterview = ({
         experience: resume?.experience,
       }
 
-      console.log("🔍 TRACE: startConversationalInterview contexts:", {
+      // Create interview client with type-specific configuration
+      const client = await ConversationalInterviewClient.create(
+        job.id,
+        resume?.id,
+        questions,
         jobContext,
         resumeContext,
-        userFirstNameProp: userFirstName || "NOT PROVIDED",
-        finalCandidateName: resumeContext.name,
-      })
+        {
+          voice: selectedVoice,
+          maxDuration: maxDuration,
+          timeWarningAt: timeWarningAt,
+          silenceThreshold: 30, // Audio level threshold for silence detection
+          silenceDuration: 750, // 0.75 seconds of silence
+          queueSize: 3, // Keep 3 questions in queue
+          interviewType: interviewType, // Pass the interview type
+        },
+        {
+          onConnected: () => {
+            console.log("✅ Connected to conversational interview")
+            setInterviewState("connected")
+          },
+          onDisconnected: () => {
+            console.log("🔗 Disconnected from conversational interview")
+            if (interviewState !== "completed") {
+              setInterviewState("completed")
+            }
+          },
+          onError: (error) => {
+            console.error("❌ Conversational interview error:", error)
+            setError(error)
+            setInterviewState("error")
+          },
+          onTimeWarning: (remainingMinutes) => {
+            console.log(`⏰ Time warning: ${remainingMinutes} minutes remaining`)
+            setInterviewState("time_warning")
+            setTimeout(() => {
+              if (interviewState === "time_warning") {
+                setInterviewState("listening")
+              }
+            }, 3000)
+          },
+          onTimeUp: () => {
+            console.log("⏰ Interview time limit reached")
+            setInterviewState("ending")
+          },
+          onInterviewComplete: () => {
+            console.log("🎉 Interview completed")
+            setInterviewState("completed")
+          },
+          onQuestionStarted: (question, index, total) => {
+            console.log(`❓ Question ${index}/${total}: ${question.substring(0, 50)}...`)
+            setCurrentQuestion(question)
+            setCurrentQuestionIndex(index)
+            setTotalQuestions(total)
+          },
+          onQuestionAudioPlaying: () => {
+            setInterviewState("playing_question")
+          },
+          onQuestionAudioComplete: () => {
+            setInterviewState("listening")
+          },
+          onUserSpeaking: () => {
+            setInterviewState("user_speaking")
+          },
+          onUserSilence: () => {
+            setInterviewState("user_silence")
+          },
+          onUserResponseComplete: (duration) => {
+            console.log(`✅ User response completed in ${duration}ms`)
+            setInterviewState("connecting")
+          },
+          onAudioGenerationProgress: (current, total) => {
+            console.log(`🎵 Audio generation progress: ${current}/${total}`)
+          },
+        },
+      )
 
-      // ... rest of function ...
+      clientRef.current = client
+      setInterviewClient(client)
+
+      setInterviewState("connecting")
+
+      // Start the interview
+      await client.startInterview()
+
+      // Start duration timer
+      startDurationTimer()
+
+      console.log("🎙️ Conversational interview started successfully")
     } catch (error: any) {
       console.error("❌ Failed to start conversational interview:", error)
       setError(`Failed to start interview: ${error.message}`)
@@ -344,37 +259,557 @@ const LiveInterview = ({
     }
   }
 
-  if (isLoading) return <div>Loading...</div>
-  if (error) return <div>Error: {error}</div>
+  // Start duration timer and queue status updates
+  const startDurationTimer = () => {
+    durationTimerRef.current = setInterval(() => {
+      if (clientRef.current && clientRef.current.isActive()) {
+        const currentDuration = clientRef.current.getInterviewDuration()
+        const remaining = clientRef.current.getRemainingTime()
+        const status = clientRef.current.getQueueStatus()
+        const memory = clientRef.current.getMemoryStatus()
+
+        setDuration(currentDuration)
+        setRemainingTime(remaining)
+        setQueueStatus(status)
+        setMemoryStatus(memory)
+      }
+    }, 1000)
+  }
+
+  // End interview manually
+  const endInterview = () => {
+    if (clientRef.current) {
+      setInterviewState("ending")
+      clientRef.current.endInterview()
+    }
+  }
+
+  // Restart interview
+  const restartInterview = () => {
+    console.log("🔄 Restarting interview...")
+
+    if (clientRef.current) {
+      clientRef.current.forceCleanup()
+    }
+
+    if (durationTimerRef.current) {
+      clearInterval(durationTimerRef.current)
+      durationTimerRef.current = null
+    }
+
+    // Reset all state
+    setInterviewClient(null)
+    setInterviewState("ready")
+    setError(null)
+    setDuration(0)
+    setRemainingTime(maxDuration)
+    setCurrentQuestion("")
+    setCurrentQuestionIndex(0)
+    setTotalQuestions(0)
+    setQueueStatus({ queued: 0, ready: 0, generating: 0 })
+    setMemoryStatus({ queueSize: 0, audioDataSize: 0, estimatedMemoryMB: 0 })
+
+    clientRef.current = null
+
+    // Force garbage collection
+    if (typeof window !== "undefined" && "gc" in window) {
+      try {
+        ;(window as any).gc()
+      } catch (error) {
+        // Ignore if gc is not available
+      }
+    }
+
+    console.log("✅ Interview restart completed")
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (clientRef.current) {
+        clientRef.current.endInterview()
+      }
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current)
+      }
+    }
+  }, [])
+
+  // Add this useEffect after the existing ones
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && clientRef.current && clientRef.current.isActive()) {
+        console.log("👁️ Page hidden, pausing interview...")
+        // Don't end the interview, but log that it's still running
+      }
+    }
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (clientRef.current && clientRef.current.isActive()) {
+        console.log("🚪 Page unloading, cleaning up interview...")
+        clientRef.current.forceCleanup()
+        e.preventDefault()
+        e.returnValue = ""
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("beforeunload", handleBeforeUnload)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+    }
+  }, [])
+
+  // Helper functions
+  const formatTime = (ms: number): string => {
+    const minutes = Math.floor(ms / 60000)
+    const seconds = Math.floor((ms % 60000) / 1000)
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
+
+  const getStateDisplay = () => {
+    switch (interviewState) {
+      case "ready":
+        return isPreloaded ? "Ready for instant start!" : "Ready to start conversational interview"
+      case "initializing":
+        return "Initializing interview system..."
+      case "connecting":
+        return "Preparing next question..."
+      case "connected":
+        return "Connected - Starting interview..."
+      case "playing_question":
+        return "AI interviewer is speaking"
+      case "listening":
+        return "Your turn to speak - microphone is active"
+      case "user_speaking":
+        return "Listening to your response..."
+      case "user_silence":
+        return "Detected silence - processing your response..."
+      case "time_warning":
+        return "Time warning - 3 minutes remaining!"
+      case "ending":
+        return "Ending interview..."
+      case "completed":
+        return "Interview completed!"
+      case "error":
+        return "Interview error occurred"
+      default:
+        return interviewState
+    }
+  }
+
+  const getStateIcon = () => {
+    switch (interviewState) {
+      case "ready":
+        return isPreloaded ? <Rocket className="h-4 w-4 text-green-500" /> : <Phone className="h-4 w-4" />
+      case "initializing":
+      case "connecting":
+      case "connected":
+        return <Loader2 className="h-4 w-4 animate-spin" />
+      case "playing_question":
+        return <Volume2 className="h-4 w-4 text-blue-500" />
+      case "listening":
+        return <MicIcon className="h-4 w-4 text-green-500" />
+      case "user_speaking":
+        return <Mic className="h-4 w-4 text-green-500 animate-pulse" />
+      case "user_silence":
+        return <Mic className="h-4 w-4 text-yellow-500" />
+      case "time_warning":
+        return <Clock className="h-4 w-4 text-orange-500" />
+      case "ending":
+        return <PhoneOff className="h-4 w-4" />
+      case "completed":
+        return <CheckCircle className="h-4 w-4 text-green-500" />
+      case "error":
+        return <AlertCircle className="h-4 w-4 text-red-500" />
+      default:
+        return <Phone className="h-4 w-4" />
+    }
+  }
+
+  const isInterviewActive = ["playing_question", "listening", "user_speaking", "user_silence", "time_warning"].includes(
+    interviewState,
+  )
+  const isConnecting = ["connecting", "connected", "initializing"].includes(interviewState)
+  const isCompleted = interviewState === "completed"
+  const hasError = interviewState === "error"
+
+  const progress = duration > 0 ? (duration / maxDuration) * 100 : 0
+  const questionProgress = totalQuestions > 0 ? (currentQuestionIndex / totalQuestions) * 100 : 0
 
   return (
-    <ResumeProvider>
-      <div>
-        <h1>Live Interview</h1>
-        {userProfile && (
-          <div>
-            <p>Welcome, {userProfile.name || "Candidate"}!</p>
-            {/* Display other user profile information here */}
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>
+              {interviewType === "phone-screener" ? "Phone Screening Interview" : "Professional Phone Interview"}
+            </span>
+            <div className="flex gap-2">
+              {isPreloaded && (
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1 bg-green-50 text-green-700 border-green-300"
+                >
+                  <Rocket className="h-3 w-3" />
+                  Instant Start
+                </Badge>
+              )}
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                {interviewClient?.getInterviewerName() || "Alex"} ({selectedVoice} Voice)
+              </Badge>
+              <Badge variant="outline">Queue: 3 questions</Badge>
+              <Badge variant="outline">{interviewType === "phone-screener" ? "15 min max" : "30 min max"}</Badge>
+              {isInterviewActive && (
+                <Badge variant="default" className="flex items-center gap-1">
+                  <PhoneCall className="h-3 w-3" />
+                  Live
+                </Badge>
+              )}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Question Generation Status */}
+            {isGeneratingQuestions && (
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertTitle>Generating Interview Questions</AlertTitle>
+                <AlertDescription>
+                  Creating personalized interview questions based on the job description and your resume...
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Warning if not enough questions */}
+            {!hasEnoughQuestions && !isGeneratingQuestions && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Not enough questions</AlertTitle>
+                <AlertDescription>
+                  {questions.technical.length + questions.behavioral.length > 0
+                    ? `Only ${questions.technical.length + questions.behavioral.length} questions available. Need at least 3.`
+                    : "No interview questions found."}
+                  <div className="mt-3">
+                    <Button onClick={handleGenerateQuestions} disabled={isGeneratingQuestions} size="sm">
+                      {isGeneratingQuestions ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-4 w-4 mr-2" />
+                          Generate Questions
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Interview Context */}
+            {hasEnoughQuestions && (
+              <div className={`p-4 rounded-lg ${isPreloaded ? "bg-green-50" : "bg-blue-50"}`}>
+                <h3 className={`font-medium ${isPreloaded ? "text-green-900" : "text-blue-900"}`}>
+                  {interviewType === "phone-screener" ? "Phone Screening Interview" : "Professional Phone Interview"}
+                  {isPreloaded && " • Optimized & Ready"}
+                </h3>
+                <div className={`mt-2 text-sm ${isPreloaded ? "text-green-800" : "text-blue-800"}`}>
+                  <p>
+                    <strong>Interviewer:</strong> {interviewClient?.getInterviewerName() || "Alex"} from {job.company}
+                  </p>
+                  <p>
+                    <strong>Position:</strong> {job.title}
+                  </p>
+                  <p>
+                    <strong>Candidate:</strong> {userFirstName || resume?.name || "You"}
+                  </p>
+                  <p>
+                    <strong>Questions Available:</strong> {questions.technical.length} technical,{" "}
+                    {questions.behavioral.length} behavioral
+                  </p>
+                  <p>
+                    <strong>Format:</strong>{" "}
+                    {interviewType === "phone-screener"
+                      ? "Brief phone screening focused on basic qualifications"
+                      : "Professional phone interview with introduction and closing"}
+                  </p>
+                  <p>
+                    <strong>Duration:</strong> {interviewType === "phone-screener" ? "15 minutes" : "30 minutes"}
+                  </p>
+                  {isPreloaded && (
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      <span className="text-green-700 font-medium">Fully optimized for instant start!</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Current State */}
+            {hasEnoughQuestions && (
+              <div
+                className={`flex items-center gap-3 p-4 rounded-lg ${isPreloaded && interviewState === "ready" ? "bg-green-50" : "bg-gray-50"}`}
+              >
+                {getStateIcon()}
+                <div className="flex-1">
+                  <div className="font-medium">{getStateDisplay()}</div>
+                  {currentQuestion && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {currentQuestionIndex === 1
+                        ? "Introduction"
+                        : `Question ${currentQuestionIndex}/${totalQuestions}`}
+                      : {currentQuestion.substring(0, 100)}
+                      {currentQuestion.length > 100 ? "..." : ""}
+                    </div>
+                  )}
+                </div>
+                {isInterviewActive && (
+                  <div className="text-right">
+                    <div className="text-sm font-medium">{formatTime(remainingTime)} left</div>
+                    <div className="text-xs text-muted-foreground">{formatTime(duration)} elapsed</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Queue Status */}
+            {(isInterviewActive || isConnecting) && queueStatus.queued > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                <Queue className="h-4 w-4 text-green-600" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-green-800">Question Queue Status</div>
+                  <div className="text-xs text-green-600">
+                    {queueStatus.ready} ready • {queueStatus.generating} generating • {queueStatus.queued} total in
+                    queue
+                  </div>
+                  <div className="text-xs text-green-500 mt-1">
+                    Memory: {memoryStatus.audioDataSize} audio clips • ~{memoryStatus.estimatedMemoryMB}MB used • Queue:{" "}
+                    {queueStatus.queued}/3
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Progress Bars */}
+            {(isInterviewActive || isCompleted) && (
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                    <span>Interview Progress</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                  <Progress value={progress} className="w-full" />
+                </div>
+                {totalQuestions > 0 && (
+                  <div>
+                    <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                      <span>Questions Progress</span>
+                      <span>
+                        {currentQuestionIndex}/{totalQuestions}
+                      </span>
+                    </div>
+                    <Progress value={questionProgress} className="w-full" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Voice Activity Indicator */}
+            {isInterviewActive && (
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      interviewState === "playing_question" ? "bg-blue-500" : "bg-gray-300"
+                    }`}
+                  />
+                  <span>Alex Speaking</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      ["listening", "user_speaking", "user_silence"].includes(interviewState)
+                        ? "bg-green-500"
+                        : "bg-gray-300"
+                    }`}
+                  />
+                  <span>Your Microphone</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      interviewState === "user_speaking" ? "bg-green-500 animate-pulse" : "bg-gray-300"
+                    }`}
+                  />
+                  <span>Voice Detected</span>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </CardContent>
+      </Card>
 
-        {/* Speech-to-text and text-to-speech controls */}
-        <button onClick={startSpeaking} disabled={isSpeaking}>
-          Start Speaking
-        </button>
-        <button onClick={stopSpeaking} disabled={!isSpeaking}>
-          Stop Speaking
-        </button>
-        <p>Spoken Text: {spokenText}</p>
-        <button onClick={() => speakText("Hello, how are you today?")}>Speak Example Text</button>
+      {/* Controls */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex justify-center gap-4">
+            {canStartInterview && (
+              <Button
+                onClick={startConversationalInterview}
+                size="lg"
+                className={`${isPreloaded ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}`}
+              >
+                {isPreloaded ? <Rocket className="h-4 w-4 mr-2" /> : <PhoneCall className="h-4 w-4 mr-2" />}
+                {isPreloaded ? "Instant Start" : "Start"}{" "}
+                {interviewType === "phone-screener" ? "Phone Screening" : "Phone Interview"}
+              </Button>
+            )}
 
-        {/* PDF Viewer */}
-        <PDFViewer style={styles.viewer}>
-          <MyDocument />
-        </PDFViewer>
-      </div>
-    </ResumeProvider>
+            {isConnecting && (
+              <Button disabled size="lg">
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {interviewState === "initializing" ? "Initializing..." : "Preparing..."}
+              </Button>
+            )}
+
+            {isInterviewActive && (
+              <Button onClick={endInterview} variant="destructive" size="lg">
+                <PhoneOff className="h-4 w-4 mr-2" />
+                End Interview
+              </Button>
+            )}
+
+            {(isCompleted || hasError) && (
+              <Button onClick={restartInterview} size="lg">
+                <Phone className="h-4 w-4 mr-2" />
+                Start New Interview
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Error Display */}
+      {hasError && error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Interview Error</AlertTitle>
+          <AlertDescription>
+            {error}
+            <br />
+            <span className="text-sm">Please try again later or contact support if the problem persists.</span>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Interview Completed */}
+      {isCompleted && (
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="text-green-800 flex items-center gap-2">
+              <CheckCircle className="h-5 w-5" />
+              {interviewType === "phone-screener" ? "Phone Screening" : "Phone Interview"} Completed! 🎉
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-green-700">
+                Excellent work! You've completed a{" "}
+                {interviewType === "phone-screener" ? "phone screening" : "professional phone interview"} with{" "}
+                {interviewClient?.getInterviewerName() || "Alex"} from {job.company} for the {job.title} position.
+              </p>
+              <div className="flex gap-4 text-sm text-green-600">
+                <div>
+                  <span className="font-medium">Duration:</span> {formatTime(duration)}
+                </div>
+                <div>
+                  <span className="font-medium">Questions:</span> {currentQuestionIndex}/{totalQuestions}
+                </div>
+                <div>
+                  <span className="font-medium">Interviewer:</span> {interviewClient?.getInterviewerName() || "Alex"} (
+                  {selectedVoice})
+                </div>
+                <div>
+                  <span className="font-medium">Type:</span>{" "}
+                  {interviewType === "phone-screener" ? "Phone Screening" : "Professional Interview"}
+                </div>
+              </div>
+              <div className="bg-green-100 p-3 rounded-lg">
+                <p className="text-sm text-green-800">
+                  <strong>What's Next:</strong>{" "}
+                  {interviewType === "phone-screener"
+                    ? "This was a realistic phone screening focused on basic qualifications and fit. In real screenings, be prepared to discuss your background briefly and show genuine interest in the role."
+                    : "This was a realistic phone interview simulation with proper introduction and closing. In real interviews, remember to speak clearly, ask clarifying questions, and maintain professional enthusiasm throughout."}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Instructions */}
+      {interviewState === "ready" && hasEnoughQuestions && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-blue-800">
+              How {interviewType === "phone-screener" ? "Phone Screening" : "Professional Phone Interview"} Works
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 text-sm text-blue-700">
+              <div className="flex items-start gap-2">
+                <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                  1
+                </div>
+                <p>The interviewer will introduce themselves and explain the interview process</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                  2
+                </div>
+                <p>
+                  Questions are asked{" "}
+                  {interviewType === "phone-screener"
+                    ? "concisely, focusing on basic qualifications and fit"
+                    : "professionally with natural conversation flow"}
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                  3
+                </div>
+                <p>Your microphone activates after each question for your response</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                  4
+                </div>
+                <p>Silence detection (0.75s) automatically moves to the next question</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-xs font-medium">
+                  5
+                </div>
+                <p>
+                  Interview concludes with{" "}
+                  {interviewType === "phone-screener"
+                    ? "brief closing and timeline expectations"
+                    : "professional closing and next steps"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }
-
-export default LiveInterview
