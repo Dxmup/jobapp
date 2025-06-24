@@ -66,6 +66,7 @@ export class ConversationalInterviewClient {
   private totalAudioMemoryMB = 0
   private interviewerName: string
   private activeRequests: Set<AbortController> = new Set()
+  private firstName: string
 
   private constructor(
     jobId: string,
@@ -73,6 +74,7 @@ export class ConversationalInterviewClient {
     questions: any,
     jobContext: any,
     resumeContext: any,
+    firstName: string, // Add this
     config: ConversationalInterviewConfig,
     callbacks: ConversationalInterviewCallbacks,
   ) {
@@ -102,6 +104,8 @@ export class ConversationalInterviewClient {
       interviewerName: this.interviewerName,
     }
 
+    this.firstName = firstName || "the candidate"
+
     console.log(`🎭 Selected interviewer: ${this.interviewerName}`)
     console.log(`👤 Using candidate name: ${candidateName}`)
   }
@@ -112,6 +116,7 @@ export class ConversationalInterviewClient {
     questions: any,
     jobContext: any,
     resumeContext: any,
+    firstName: string, // Add this
     config: ConversationalInterviewConfig,
     callbacks: ConversationalInterviewCallbacks,
   ): Promise<ConversationalInterviewClient> {
@@ -121,6 +126,7 @@ export class ConversationalInterviewClient {
       questions,
       jobContext,
       resumeContext,
+      firstName, // Add this
       config,
       callbacks,
     )
@@ -155,7 +161,7 @@ export class ConversationalInterviewClient {
   }
 
   private createIntroductionText(): string {
-    const applicantName = this.resumeContext?.name || "introductionText candidate" // Changed from "there"
+    const applicantName = this.firstName // Use direct firstName
     const companyName = this.jobContext?.company || "our company"
     const positionTitle = this.jobContext?.title || "this position"
     const durationMinutes = Math.round(this.config.maxDuration / (60 * 1000))
@@ -535,23 +541,27 @@ REMEMBER: This is a SCREENING to determine basic fit - save detailed behavioral 
         : ""
 
     return `ROLE: You are ${this.interviewerName}, a professional phone interviewer conducting a ${this.config.interviewType === "phone-screener" ? "screening interview" : "first-round interview"} for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
+
+CANDIDATE: The candidate's name is ${this.firstName}.
+
 ${phoneScreenerInstructions}
-INSTRUCTION: Ask this interview question naturally and professionally. Speak as if you're genuinely interested in hearing the candidate's response.
+INSTRUCTION: Ask this interview question naturally and professionally. You may use the candidate's name naturally in conversation when appropriate.
 
 QUESTION: "${questionText}"
 
 DELIVERY REQUIREMENTS:
 1. Ask this question with a professional, encouraging tone
-2. Include natural pauses and speak clearly for phone audio quality
-3. Sound engaged and interested in their response
-4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
-5. DO NOT narrate your actions - only speak the actual words you would say
+2. You may naturally use "${this.firstName}" in your response when appropriate
+3. Include natural pauses and speak clearly for phone audio quality
+4. Sound engaged and interested in their response
+5. DO NOT include any stage directions, parenthetical instructions, or descriptions
+6. DO NOT narrate your actions - only speak the actual words you would say
 
 OUTPUT: Ask the question directly without any stage directions or descriptions.`
   }
 
   private async playClosingStatement(): Promise<void> {
-    const applicantName = this.resumeContext?.name || "there"
+    const applicantName = this.firstName // Use direct firstName
     const companyName = this.jobContext?.company || "our company"
 
     const closingText = `${applicantName}, thank you so much for taking the time to speak with me today. I really enjoyed learning about your experience and background. The next step in our process is a follow-up interview with the hiring manager, and you can expect to hear from us within 3 to 5 business days. Do you have any questions about the role, ${companyName}, or our interview process before we wrap up? Thank you again, and have a wonderful rest of your day!`
