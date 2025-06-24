@@ -97,13 +97,6 @@ export function LiveInterview({
 
   // Auto-start interview after questions are ready
 
-  // Debug logging - add this right after the props destructuring
-  useEffect(() => {
-    console.log("🔍 LiveInterview received userFirstName:", userFirstName)
-    console.log("🔍 Resume name:", resume?.name)
-    console.log("🔍 Job info:", { company: job.company, title: job.title })
-  }, [userFirstName, resume?.name, job.company, job.title])
-
   // Debug logging
   useEffect(() => {
     console.log("🔍 LiveInterview state:", {
@@ -177,7 +170,6 @@ export function LiveInterview({
         questions,
         jobContext,
         resumeContext,
-        userFirstName || "DEBUG_NO_NAME_PROVIDED", // Change this line
         {
           voice: selectedVoice,
           maxDuration: maxDuration,
