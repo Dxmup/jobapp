@@ -1,66 +1,83 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
+
+    // Check if user is authenticated
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const category = searchParams.get("category")
-    const includeInactive = searchParams.get("includeInactive") === "true"
+    const search = searchParams.get("search")
 
-    let query = supabase
-      .from("prompts")
-      .select("*")
-      .order("name", { ascending: true })
-      .order("version", { ascending: false })
+    let query = supabase.from("prompts").select("*").order("created_at", { ascending: false })
 
-    if (category) {
+    if (category && category !== "all") {
       query = query.eq("category", category)
     }
 
-    if (!includeInactive) {
-      query = query.eq("is_active", true)
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
     }
 
     const { data: prompts, error } = await query
 
     if (error) {
-      console.error("Error fetching prompts:", error)
+      console.error("Database error:", error)
       return NextResponse.json({ error: "Failed to fetch prompts" }, { status: 500 })
     }
 
-    return NextResponse.json({ prompts })
+    return NextResponse.json({ prompts: prompts || [] })
   } catch (error) {
-    console.error("Error in prompts GET:", error)
+    console.error("API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { name, category, description, content, variables } = body
+    const supabase = createClient()
 
-    if (!name || !category || !content) {
-      return NextResponse.json({ error: "Name, category, and content are required" }, { status: 400 })
+    // Check if user is authenticated
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const supabase = createServerSupabaseClient()
+    const body = await request.json()
+    const { name, category, description, content } = body
+
+    if (!name || !category || !content) {
+      return NextResponse.json({ error: "Missing required fields: name, category, content" }, { status: 400 })
+    }
+
+    // Extract variables from content
+    const variableRegex = /\{([^}]+)\}/g
+    const variables = new Set<string>()
+    let match
+
+    while ((match = variableRegex.exec(content)) !== null) {
+      variables.add(match[1])
+    }
 
     // Check if prompt with this name already exists
-    const { data: existingPrompt } = await supabase
-      .from("prompts")
-      .select("name, version")
-      .eq("name", name)
-      .order("version", { ascending: false })
-      .limit(1)
-      .single()
+    const { data: existing } = await supabase.from("prompts").select("id").eq("name", name).single()
 
-    const newVersion = existingPrompt ? existingPrompt.version + 1 : 1
-
-    // If this is a new version, deactivate the current active version
-    if (existingPrompt) {
-      await supabase.from("prompts").update({ is_active: false }).eq("name", name).eq("is_active", true)
+    if (existing) {
+      return NextResponse.json({ error: "Prompt with this name already exists" }, { status: 409 })
     }
 
     const { data: prompt, error } = await supabase
@@ -68,23 +85,22 @@ export async function POST(request: NextRequest) {
       .insert({
         name,
         category,
-        description,
+        description: description || null,
         content,
-        variables: variables || [],
-        version: newVersion,
-        is_active: true,
+        variables: Array.from(variables),
+        created_by: user.id,
       })
       .select()
       .single()
 
     if (error) {
-      console.error("Error creating prompt:", error)
+      console.error("Database error:", error)
       return NextResponse.json({ error: "Failed to create prompt" }, { status: 500 })
     }
 
     return NextResponse.json({ prompt }, { status: 201 })
   } catch (error) {
-    console.error("Error in prompts POST:", error)
+    console.error("API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

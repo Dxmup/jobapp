@@ -1,8 +1,10 @@
+import { createClient } from "@/lib/supabase/client"
+
 interface Prompt {
   id: string
   name: string
   category: string
-  description: string
+  description?: string
   content: string
   variables: string[]
   version: number
@@ -11,16 +13,14 @@ interface Prompt {
   updated_at: string
 }
 
-interface PromptCache {
-  [key: string]: {
-    prompt: Prompt
-    timestamp: number
-  }
-}
+class PromptManager {
+  private cache = new Map<string, Prompt>()
+  private cacheExpiry = new Map<string, number>()
+  private readonly CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
-// Hardcoded fallback prompts
-const FALLBACK_PROMPTS: Record<string, string> = {
-  "interview-introduction": `ROLE: You are {interviewerName}, a professional phone interviewer from {companyName}.
+  // Fallback prompts for critical functionality
+  private fallbackPrompts: Record<string, string> = {
+    "interview-introduction": `ROLE: You are {interviewerName}, a professional phone interviewer from {companyName}.
 {phoneScreenerInstructions}
 INSTRUCTION: Deliver this introduction naturally and warmly as if starting a phone interview. Speak clearly and professionally.
 
@@ -35,7 +35,7 @@ DELIVERY REQUIREMENTS:
 
 OUTPUT: Speak the introduction directly without any stage directions or descriptions of how to speak it.`,
 
-  "interview-question": `ROLE: You are {interviewerName}, a professional phone interviewer conducting a {interviewType} for {jobTitle} at {companyName}.
+    "interview-question": `ROLE: You are {interviewerName}, a professional phone interviewer conducting a {interviewType} for {jobTitle} at {companyName}.
 {phoneScreenerInstructions}
 INSTRUCTION: Ask this interview question naturally and professionally. Speak as if you're genuinely interested in hearing {userFirstName}'s response.
 
@@ -50,7 +50,7 @@ DELIVERY REQUIREMENTS:
 
 OUTPUT: Ask the question directly without any stage directions or descriptions.`,
 
-  "interview-closing": `ROLE: You are {interviewerName}, a professional phone interviewer concluding a screening interview.
+    "interview-closing": `ROLE: You are {interviewerName}, a professional phone interviewer concluding a screening interview.
 
 INSTRUCTION: Deliver this closing statement naturally and professionally as if ending a phone interview.
 
@@ -65,7 +65,7 @@ DELIVERY REQUIREMENTS:
 
 OUTPUT: Speak the closing statement directly without any stage directions or descriptions.`,
 
-  "resume-optimization": `You are an expert resume optimization specialist. Your task is to enhance a resume to better match a specific job posting while maintaining authenticity and accuracy.
+    "resume-optimization": `You are an expert resume optimization specialist. Your task is to enhance a resume to better match a specific job posting while maintaining authenticity and accuracy.
 
 JOB POSTING:
 {jobDescription}
@@ -84,7 +84,7 @@ OPTIMIZATION REQUIREMENTS:
 
 Please provide an optimized version of the resume that better matches this job posting.`,
 
-  "cover-letter-generation": `You are a professional cover letter writer. Create a compelling, personalized cover letter based on the provided information.
+    "cover-letter-generation": `You are a professional cover letter writer. Create a compelling, personalized cover letter based on the provided information.
 
 JOB POSTING:
 {jobDescription}
@@ -105,59 +105,73 @@ COVER LETTER REQUIREMENTS:
 7. Personalized to {companyName} and {jobTitle}
 
 Please write a compelling cover letter that showcases why {candidateName} is an excellent fit for this position.`,
-}
 
-class PromptManager {
-  private cache: PromptCache = {}
-  private cacheTimeout = 5 * 60 * 1000 // 5 minutes
+    "general-assistant": `You are CareerAI, a professional career guidance assistant. You help job seekers with:
 
-  private isCacheValid(timestamp: number): boolean {
-    return Date.now() - timestamp < this.cacheTimeout
+- Resume optimization and feedback
+- Interview preparation and practice
+- Cover letter writing
+- Job search strategies
+- Career advice and planning
+- Professional development guidance
+
+USER CONTEXT:
+Name: {userName}
+Current Role: {currentRole}
+Target Role: {targetRole}
+Experience Level: {experienceLevel}
+
+Provide helpful, actionable advice tailored to the user's career goals and experience level. Be encouraging, professional, and specific in your recommendations.`,
+  }
+
+  private isCacheValid(name: string): boolean {
+    const expiry = this.cacheExpiry.get(name)
+    return expiry ? Date.now() < expiry : false
+  }
+
+  private setCacheEntry(name: string, prompt: Prompt): void {
+    this.cache.set(name, prompt)
+    this.cacheExpiry.set(name, Date.now() + this.CACHE_DURATION)
   }
 
   async getPrompt(name: string): Promise<Prompt | null> {
     // Check cache first
-    const cached = this.cache[name]
-    if (cached && this.isCacheValid(cached.timestamp)) {
-      console.log(`✅ Using cached prompt for ${name}`)
-      return cached.prompt
+    if (this.isCacheValid(name)) {
+      const cached = this.cache.get(name)
+      if (cached) {
+        return cached
+      }
     }
 
     try {
-      const response = await fetch(`/api/prompts?name=${encodeURIComponent(name)}`)
-      if (!response.ok) {
-        console.warn(`Failed to fetch prompt ${name}, using fallback`)
+      const supabase = createClient()
+      const { data: prompt, error } = await supabase
+        .from("prompts")
+        .select("*")
+        .eq("name", name)
+        .eq("is_active", true)
+        .single()
+
+      if (error || !prompt) {
+        console.warn(`Prompt '${name}' not found in database, using fallback`)
         return this.getFallbackPrompt(name)
       }
 
-      const data = await response.json()
-      const prompt = data.prompt
-
-      if (prompt) {
-        // Cache the result
-        this.cache[name] = {
-          prompt,
-          timestamp: Date.now(),
-        }
-        console.log(`✅ Fetched and cached prompt for ${name}`)
-        return prompt
-      }
-
-      return this.getFallbackPrompt(name)
+      // Cache the result
+      this.setCacheEntry(name, prompt)
+      return prompt
     } catch (error) {
-      console.error(`Error fetching prompt ${name}:`, error)
+      console.error(`Error fetching prompt '${name}':`, error)
       return this.getFallbackPrompt(name)
     }
   }
 
   private getFallbackPrompt(name: string): Prompt | null {
-    const fallbackContent = FALLBACK_PROMPTS[name]
+    const fallbackContent = this.fallbackPrompts[name]
     if (!fallbackContent) {
-      console.error(`No fallback prompt found for ${name}`)
+      console.error(`No fallback prompt available for '${name}'`)
       return null
     }
-
-    console.log(`⚠️ Using fallback prompt for ${name}`)
 
     // Extract variables from fallback content
     const variables = this.extractVariables(fallbackContent)
@@ -177,58 +191,70 @@ class PromptManager {
   }
 
   private extractVariables(content: string): string[] {
-    const matches = content.match(/\{([^}]+)\}/g)
-    if (!matches) return []
-    return [...new Set(matches.map((match) => match.slice(1, -1)))]
+    const variableRegex = /\{([^}]+)\}/g
+    const variables = new Set<string>()
+    let match
+
+    while ((match = variableRegex.exec(content)) !== null) {
+      variables.add(match[1])
+    }
+
+    return Array.from(variables)
   }
 
-  async getProcessedPrompt(name: string, variables: Record<string, string> = {}): Promise<string | null> {
-    const prompt = await this.getPrompt(name)
-    if (!prompt) return null
+  processVariables(content: string, variables: Record<string, string>): string {
+    let processedContent = content
 
-    let processedContent = prompt.content
-
-    // Replace variables in the content
     for (const [key, value] of Object.entries(variables)) {
       const regex = new RegExp(`\\{${key}\\}`, "g")
       processedContent = processedContent.replace(regex, value || "")
     }
 
-    // Log any unresolved variables for debugging
-    const unresolvedVariables = processedContent.match(/\{([^}]+)\}/g)
-    if (unresolvedVariables) {
-      console.warn(`Unresolved variables in prompt ${name}:`, unresolvedVariables)
+    return processedContent
+  }
+
+  async getProcessedPrompt(name: string, variables: Record<string, string>): Promise<string | null> {
+    const prompt = await this.getPrompt(name)
+    if (!prompt) {
+      return null
     }
 
-    return processedContent
+    return this.processVariables(prompt.content, variables)
   }
 
   async getPromptsByCategory(category: string): Promise<Prompt[]> {
     try {
-      const response = await fetch(`/api/prompts?category=${encodeURIComponent(category)}`)
-      if (!response.ok) {
-        console.warn(`Failed to fetch prompts for category ${category}`)
+      const supabase = createClient()
+      const { data: prompts, error } = await supabase
+        .from("prompts")
+        .select("*")
+        .eq("category", category)
+        .eq("is_active", true)
+        .order("name")
+
+      if (error) {
+        console.error(`Error fetching prompts for category '${category}':`, error)
         return []
       }
 
-      const data = await response.json()
-      return data.prompts || []
+      return prompts || []
     } catch (error) {
-      console.error(`Error fetching prompts for category ${category}:`, error)
+      console.error(`Error fetching prompts for category '${category}':`, error)
       return []
     }
   }
 
   clearCache(): void {
-    this.cache = {}
-    console.log("🧹 Prompt cache cleared")
+    this.cache.clear()
+    this.cacheExpiry.clear()
   }
 
-  clearCacheForPrompt(name: string): void {
-    delete this.cache[name]
-    console.log(`🧹 Cache cleared for prompt: ${name}`)
+  getCacheStats(): { size: number; entries: string[] } {
+    return {
+      size: this.cache.size,
+      entries: Array.from(this.cache.keys()),
+    }
   }
 }
 
-// Export singleton instance
 export const promptManager = new PromptManager()

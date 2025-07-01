@@ -1,9 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createClient()
+
+    // Check if user is authenticated
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     // Get the prompt to activate
     const { data: promptToActivate, error: fetchError } = await supabase
@@ -21,9 +31,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .from("prompts")
       .update({ is_active: false })
       .eq("name", promptToActivate.name)
+      .eq("is_active", true)
 
     if (deactivateError) {
-      console.error("Error deactivating other versions:", deactivateError)
+      console.error("Error deactivating prompts:", deactivateError)
       return NextResponse.json({ error: "Failed to deactivate other versions" }, { status: 500 })
     }
 
@@ -42,7 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     return NextResponse.json({ prompt })
   } catch (error) {
-    console.error("Error in prompt activation:", error)
+    console.error("API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
