@@ -23,20 +23,17 @@ CREATE INDEX IF NOT EXISTS idx_prompts_version ON prompts(name, version);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_prompts_active_unique 
 ON prompts(name) WHERE is_active = true;
 
--- Add RLS policies
-ALTER TABLE prompts ENABLE ROW LEVEL SECURITY;
+-- Create function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_prompts_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- Allow admins to manage prompts
-CREATE POLICY "Admins can manage prompts" ON prompts
-FOR ALL USING (
-  EXISTS (
-    SELECT 1 FROM user_roles ur
-    JOIN roles r ON ur.role_id = r.id
-    WHERE ur.user_id = auth.uid()
-    AND r.name IN ('admin', 'super_admin')
-  )
-);
-
--- Allow authenticated users to read active prompts
-CREATE POLICY "Users can read active prompts" ON prompts
-FOR SELECT USING (is_active = true);
+-- Create trigger for updated_at
+CREATE TRIGGER update_prompts_updated_at
+BEFORE UPDATE ON prompts
+FOR EACH ROW
+EXECUTE FUNCTION update_prompts_updated_at();

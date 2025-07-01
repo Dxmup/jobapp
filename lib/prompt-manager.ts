@@ -119,6 +119,7 @@ class PromptManager {
     // Check cache first
     const cached = this.cache[name]
     if (cached && this.isCacheValid(cached.timestamp)) {
+      console.log(`✅ Using cached prompt for ${name}`)
       return cached.prompt
     }
 
@@ -130,7 +131,7 @@ class PromptManager {
       }
 
       const data = await response.json()
-      const prompt = data.prompts?.[0]
+      const prompt = data.prompt
 
       if (prompt) {
         // Cache the result
@@ -138,6 +139,7 @@ class PromptManager {
           prompt,
           timestamp: Date.now(),
         }
+        console.log(`✅ Fetched and cached prompt for ${name}`)
         return prompt
       }
 
@@ -154,6 +156,8 @@ class PromptManager {
       console.error(`No fallback prompt found for ${name}`)
       return null
     }
+
+    console.log(`⚠️ Using fallback prompt for ${name}`)
 
     // Extract variables from fallback content
     const variables = this.extractVariables(fallbackContent)
@@ -190,6 +194,12 @@ class PromptManager {
       processedContent = processedContent.replace(regex, value || "")
     }
 
+    // Log any unresolved variables for debugging
+    const unresolvedVariables = processedContent.match(/\{([^}]+)\}/g)
+    if (unresolvedVariables) {
+      console.warn(`Unresolved variables in prompt ${name}:`, unresolvedVariables)
+    }
+
     return processedContent
   }
 
@@ -211,10 +221,12 @@ class PromptManager {
 
   clearCache(): void {
     this.cache = {}
+    console.log("🧹 Prompt cache cleared")
   }
 
   clearCacheForPrompt(name: string): void {
     delete this.cache[name]
+    console.log(`🧹 Cache cleared for prompt: ${name}`)
   }
 }
 

@@ -55,6 +55,15 @@ export async function GET(request: NextRequest) {
     const name = searchParams.get("name")
     const category = searchParams.get("category")
 
+    if (!name && !category) {
+      return NextResponse.json(
+        {
+          error: "Either name or category parameter is required",
+        },
+        { status: 400 },
+      )
+    }
+
     const supabase = createServerSupabaseClient()
 
     let query = supabase.from("prompts").select("*").eq("is_active", true)
@@ -71,12 +80,56 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Error fetching prompts:", error)
+      // Return fallback if database error
+      if (name && FALLBACK_PROMPTS[name as keyof typeof FALLBACK_PROMPTS]) {
+        return NextResponse.json({
+          prompt: {
+            name,
+            content: FALLBACK_PROMPTS[name as keyof typeof FALLBACK_PROMPTS],
+            variables: [],
+            fallback: true,
+          },
+        })
+      }
       return NextResponse.json({ error: "Failed to fetch prompts" }, { status: 500 })
+    }
+
+    if (name) {
+      const prompt = prompts?.[0]
+      if (!prompt) {
+        // Return fallback if prompt not found
+        if (FALLBACK_PROMPTS[name as keyof typeof FALLBACK_PROMPTS]) {
+          return NextResponse.json({
+            prompt: {
+              name,
+              content: FALLBACK_PROMPTS[name as keyof typeof FALLBACK_PROMPTS],
+              variables: [],
+              fallback: true,
+            },
+          })
+        }
+        return NextResponse.json({ error: "Prompt not found" }, { status: 404 })
+      }
+      return NextResponse.json({ prompt })
     }
 
     return NextResponse.json({ prompts })
   } catch (error) {
     console.error("Error in prompts GET:", error)
+
+    // Return fallback on any error
+    const name = new URL(request.url).searchParams.get("name")
+    if (name && FALLBACK_PROMPTS[name as keyof typeof FALLBACK_PROMPTS]) {
+      return NextResponse.json({
+        prompt: {
+          name,
+          content: FALLBACK_PROMPTS[name as keyof typeof FALLBACK_PROMPTS],
+          variables: [],
+          fallback: true,
+        },
+      })
+    }
+
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

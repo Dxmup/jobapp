@@ -1,14 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { checkAdminPermission } from "@/lib/admin-auth"
 
 export async function GET(request: NextRequest) {
   try {
-    const hasPermission = await checkAdminPermission()
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const supabase = createServerSupabaseClient()
     const { searchParams } = new URL(request.url)
     const category = searchParams.get("category")
@@ -44,11 +38,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const hasPermission = await checkAdminPermission()
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const body = await request.json()
     const { name, category, description, content, variables } = body
 

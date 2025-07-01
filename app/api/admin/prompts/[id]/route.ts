@@ -1,14 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { checkAdminPermission } from "@/lib/admin-auth"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const hasPermission = await checkAdminPermission()
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const supabase = createServerSupabaseClient()
     const { data: prompt, error } = await supabase.from("prompts").select("*").eq("id", params.id).single()
 
@@ -26,11 +20,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const hasPermission = await checkAdminPermission()
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const body = await request.json()
     const { name, category, description, content, variables } = body
 
@@ -39,13 +28,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const supabase = createServerSupabaseClient()
-
-    // Get current prompt to check if name is changing
-    const { data: currentPrompt } = await supabase.from("prompts").select("name").eq("id", params.id).single()
-
-    if (!currentPrompt) {
-      return NextResponse.json({ error: "Prompt not found" }, { status: 404 })
-    }
 
     const { data: prompt, error } = await supabase
       .from("prompts")
@@ -75,11 +57,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const hasPermission = await checkAdminPermission()
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const supabase = createServerSupabaseClient()
     const { error } = await supabase.from("prompts").delete().eq("id", params.id)
 

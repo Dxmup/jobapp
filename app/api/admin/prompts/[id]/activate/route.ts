@@ -1,14 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { checkAdminPermission } from "@/lib/admin-auth"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const hasPermission = await checkAdminPermission()
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const supabase = createServerSupabaseClient()
 
     // Get the prompt to activate
