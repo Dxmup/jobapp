@@ -8,64 +8,97 @@ import {
   Settings,
   BarChart3,
   FileText,
-  MessageSquare,
   Database,
-  Activity,
   TestTube,
+  Activity,
   BookOpen,
   Star,
   Wrench,
-  Home,
+  MessageCircle,
 } from "lucide-react"
 
-const navigation = [
-  { name: "Dashboard", href: "/admin", icon: Home },
-  { name: "Users", href: "/admin/users", icon: Users },
-  { name: "Prompts", href: "/admin/prompts", icon: MessageSquare },
-  { name: "Blogs", href: "/admin/blogs", icon: BookOpen },
-  { name: "Testimonials", href: "/admin/testimonials", icon: Star },
-  { name: "Content", href: "/admin/content", icon: FileText },
-  { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
-  { name: "Audit Logs", href: "/admin/audit-logs", icon: Activity },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
-  { name: "Migrations", href: "/admin/migrations", icon: Database },
-  { name: "Testing", href: "/admin/testing", icon: TestTube },
-  { name: "Setup", href: "/admin/setup", icon: Wrench },
+const sidebarItems = [
+  {
+    title: "Overview",
+    href: "/admin",
+    icon: BarChart3,
+  },
+  {
+    title: "Users",
+    href: "/admin/users",
+    icon: Users,
+  },
+  {
+    title: "Content Management",
+    href: "/admin/content",
+    icon: FileText,
+  },
+  {
+    title: "Prompts",
+    href: "/admin/prompts",
+    icon: MessageCircle,
+  },
+  {
+    title: "Blogs",
+    href: "/admin/blogs",
+    icon: BookOpen,
+  },
+  {
+    title: "Testimonials",
+    href: "/admin/testimonials",
+    icon: Star,
+  },
+  {
+    title: "Settings",
+    href: "/admin/settings",
+    icon: Settings,
+  },
+  {
+    title: "Audit Logs",
+    href: "/admin/audit-logs",
+    icon: Activity,
+  },
+  {
+    title: "Testing",
+    href: "/admin/testing",
+    icon: TestTube,
+  },
+  {
+    title: "Migrations",
+    href: "/admin/migrations",
+    icon: Database,
+  },
+  {
+    title: "Setup",
+    href: "/admin/setup",
+    icon: Wrench,
+  },
 ]
 
 export function AdminSidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-64 flex-col bg-gray-900">
-      <div className="flex h-16 flex-shrink-0 items-center px-4">
-        <h1 className="text-xl font-bold text-white">Admin Panel</h1>
-      </div>
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <nav className="flex-1 space-y-1 px-2 py-4">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href
-            return (
+    <div className="pb-12 w-64">
+      <div className="space-y-4 py-4">
+        <div className="px-3 py-2">
+          <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">Admin Panel</h2>
+          <div className="space-y-1">
+            {sidebarItems.map((item) => (
               <Link
-                key={item.name}
+                key={item.href}
                 href={item.href}
                 className={cn(
-                  isActive ? "bg-gray-800 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white",
-                  "group flex items-center px-2 py-2 text-sm font-medium rounded-md",
+                  "flex items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+                  pathname === item.href ? "bg-accent text-accent-foreground" : "transparent",
                 )}
               >
-                <item.icon
-                  className={cn(
-                    isActive ? "text-white" : "text-gray-400 group-hover:text-white",
-                    "mr-3 h-5 w-5 flex-shrink-0",
-                  )}
-                  aria-hidden="true"
-                />
-                {item.name}
+                <item.icon className="mr-2 h-4 w-4" />
+                {item.title}
               </Link>
-            )
-          })}
-        </nav>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -2,23 +2,33 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/hooks/use-toast"
-import { Plus, Search, Edit, Trash2, Eye, Play } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
+import { Plus, Search, Edit, Trash2, Eye, Power, MessageSquare } from "lucide-react"
 
 interface Prompt {
   id: string
@@ -27,13 +37,17 @@ interface Prompt {
   description?: string
   content: string
   variables: string[]
-  version: number
   is_active: boolean
   created_at: string
   updated_at: string
 }
 
-const categories = ["interview", "resume", "cover-letter", "general", "email", "analysis"]
+const CATEGORIES = [
+  { value: "interview", label: "Interview" },
+  { value: "resume", label: "Resume" },
+  { value: "cover-letter", label: "Cover Letter" },
+  { value: "general", label: "General" },
+]
 
 export default function AdminPromptsPage() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
@@ -53,178 +67,125 @@ export default function AdminPromptsPage() {
 
   useEffect(() => {
     fetchPrompts()
-  }, [selectedCategory, searchTerm])
+  }, [])
 
   const fetchPrompts = async () => {
     try {
-      const params = new URLSearchParams()
-      if (selectedCategory !== "all") {
-        params.append("category", selectedCategory)
-      }
-      if (searchTerm) {
-        params.append("search", searchTerm)
+      setLoading(true)
+      const response = await fetch("/api/admin/prompts")
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("API Error:", errorText)
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const response = await fetch(`/api/admin/prompts?${params}`)
       const data = await response.json()
-
-      if (response.ok) {
-        setPrompts(data.prompts)
-      } else {
-        toast({
-          title: "Error",
-          description: data.error || "Failed to fetch prompts",
-          variant: "destructive",
-        })
-      }
+      setPrompts(data.prompts || [])
     } catch (error) {
       console.error("Error fetching prompts:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch prompts",
-        variant: "destructive",
-      })
+      toast.error(`Failed to fetch prompts: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreatePrompt = async () => {
+  const extractVariables = (content: string): string[] => {
+    const variableRegex = /\{([^}]+)\}/g
+    const variables = new Set<string>()
+    let match
+
+    while ((match = variableRegex.exec(content)) !== null) {
+      variables.add(match[1])
+    }
+
+    return Array.from(variables)
+  }
+
+  const handleCreate = async () => {
     try {
       const response = await fetch("/api/admin/prompts", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Prompt created successfully",
-        })
-        setIsCreateDialogOpen(false)
-        setFormData({ name: "", category: "", description: "", content: "" })
-        fetchPrompts()
-      } else {
-        toast({
-          title: "Error",
-          description: data.error || "Failed to create prompt",
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to create prompt")
       }
+
+      toast.success("Prompt created successfully")
+      setIsCreateDialogOpen(false)
+      setFormData({ name: "", category: "", description: "", content: "" })
+      fetchPrompts()
     } catch (error) {
       console.error("Error creating prompt:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create prompt",
-        variant: "destructive",
-      })
+      toast.error(`Failed to create prompt: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
-  const handleEditPrompt = async () => {
+  const handleEdit = async () => {
     if (!selectedPrompt) return
 
     try {
       const response = await fetch(`/api/admin/prompts/${selectedPrompt.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Prompt updated successfully",
-        })
-        setIsEditDialogOpen(false)
-        setSelectedPrompt(null)
-        setFormData({ name: "", category: "", description: "", content: "" })
-        fetchPrompts()
-      } else {
-        toast({
-          title: "Error",
-          description: data.error || "Failed to update prompt",
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update prompt")
       }
+
+      toast.success("Prompt updated successfully")
+      setIsEditDialogOpen(false)
+      setSelectedPrompt(null)
+      setFormData({ name: "", category: "", description: "", content: "" })
+      fetchPrompts()
     } catch (error) {
       console.error("Error updating prompt:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update prompt",
-        variant: "destructive",
-      })
+      toast.error(`Failed to update prompt: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
-  const handleDeletePrompt = async (promptId: string) => {
-    if (!confirm("Are you sure you want to delete this prompt?")) return
-
+  const handleDelete = async (prompt: Prompt) => {
     try {
-      const response = await fetch(`/api/admin/prompts/${promptId}`, {
+      const response = await fetch(`/api/admin/prompts/${prompt.id}`, {
         method: "DELETE",
       })
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Prompt deleted successfully",
-        })
-        fetchPrompts()
-      } else {
-        const data = await response.json()
-        toast({
-          title: "Error",
-          description: data.error || "Failed to delete prompt",
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete prompt")
       }
+
+      toast.success("Prompt deleted successfully")
+      fetchPrompts()
     } catch (error) {
       console.error("Error deleting prompt:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete prompt",
-        variant: "destructive",
-      })
+      toast.error(`Failed to delete prompt: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
-  const handleActivatePrompt = async (promptId: string) => {
+  const handleActivate = async (prompt: Prompt) => {
     try {
-      const response = await fetch(`/api/admin/prompts/${promptId}/activate`, {
+      const response = await fetch(`/api/admin/prompts/${prompt.id}/activate`, {
         method: "POST",
       })
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Prompt activated successfully",
-        })
-        fetchPrompts()
-      } else {
-        const data = await response.json()
-        toast({
-          title: "Error",
-          description: data.error || "Failed to activate prompt",
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to activate prompt")
       }
+
+      toast.success("Prompt activated successfully")
+      fetchPrompts()
     } catch (error) {
       console.error("Error activating prompt:", error)
-      toast({
-        title: "Error",
-        description: "Failed to activate prompt",
-        variant: "destructive",
-      })
+      toast.error(`Failed to activate prompt: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -244,43 +205,33 @@ export default function AdminPromptsPage() {
     setIsViewDialogOpen(true)
   }
 
-  const extractVariables = (content: string): string[] => {
-    const variableRegex = /\{([^}]+)\}/g
-    const variables = new Set<string>()
-    let match
-
-    while ((match = variableRegex.exec(content)) !== null) {
-      variables.add(match[1])
-    }
-
-    return Array.from(variables)
-  }
-
   const filteredPrompts = prompts.filter((prompt) => {
     const matchesSearch =
-      !searchTerm ||
       prompt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prompt.description?.toLowerCase().includes(searchTerm.toLowerCase())
-
     const matchesCategory = selectedCategory === "all" || prompt.category === selectedCategory
-
     return matchesSearch && matchesCategory
   })
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading prompts...</div>
+      <div className="container py-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p>Loading prompts...</p>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="container py-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Prompt Management</h1>
-          <p className="text-gray-600">Manage AI prompts and templates</p>
+          <p className="text-muted-foreground">Manage AI prompts for the application</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -292,7 +243,7 @@ export default function AdminPromptsPage() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New Prompt</DialogTitle>
-              <DialogDescription>Create a new AI prompt template</DialogDescription>
+              <DialogDescription>Create a new AI prompt template with variables</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -314,9 +265,9 @@ export default function AdminPromptsPage() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -342,8 +293,8 @@ export default function AdminPromptsPage() {
                 />
                 {formData.content && (
                   <div className="mt-2">
-                    <p className="text-sm text-gray-600">Variables detected:</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
+                    <p className="text-sm text-muted-foreground mb-1">Detected variables:</p>
+                    <div className="flex flex-wrap gap-1">
                       {extractVariables(formData.content).map((variable) => (
                         <Badge key={variable} variant="secondary">
                           {variable}
@@ -354,86 +305,118 @@ export default function AdminPromptsPage() {
                 )}
               </div>
             </div>
-            <DialogFooter>
+            <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreatePrompt}>Create Prompt</Button>
-            </DialogFooter>
+              <Button onClick={handleCreate} disabled={!formData.name || !formData.category || !formData.content}>
+                Create Prompt
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="flex gap-4 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search prompts..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      {/* Search and Filter */}
+      <div className="flex space-x-4 mb-6">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search prompts..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {categories.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
+            <SelectItem value="all">All Categories</SelectItem>
+            {CATEGORIES.map((cat) => (
+              <SelectItem key={cat.value} value={cat.value}>
+                {cat.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      <div className="grid gap-4">
+      {/* Prompts Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredPrompts.map((prompt) => (
-          <Card key={prompt.id}>
+          <Card key={prompt.id} className="relative">
             <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    {prompt.name}
-                    {prompt.is_active && <Badge variant="default">Active</Badge>}
-                    <Badge variant="outline">{prompt.category}</Badge>
-                  </CardTitle>
-                  <CardDescription>{prompt.description}</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openViewDialog(prompt)}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => openEditDialog(prompt)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  {!prompt.is_active && (
-                    <Button variant="outline" size="sm" onClick={() => handleActivatePrompt(prompt.id)}>
-                      <Play className="h-4 w-4" />
-                    </Button>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">{prompt.name}</CardTitle>
+                <div className="flex items-center space-x-1">
+                  {prompt.is_active ? (
+                    <Badge variant="default">Active</Badge>
+                  ) : (
+                    <Badge variant="secondary">Inactive</Badge>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => handleDeletePrompt(prompt.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
+              <CardDescription>
+                <Badge variant="outline" className="mb-2">
+                  {CATEGORIES.find((c) => c.value === prompt.category)?.label || prompt.category}
+                </Badge>
+                {prompt.description && <p>{prompt.description}</p>}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-600">Variables:</p>
+                  <p className="text-sm text-muted-foreground mb-1">Variables ({prompt.variables.length}):</p>
                   <div className="flex flex-wrap gap-1">
-                    {prompt.variables.map((variable) => (
-                      <Badge key={variable} variant="secondary">
+                    {prompt.variables.slice(0, 3).map((variable) => (
+                      <Badge key={variable} variant="secondary" className="text-xs">
                         {variable}
                       </Badge>
                     ))}
+                    {prompt.variables.length > 3 && (
+                      <Badge variant="secondary" className="text-xs">
+                        +{prompt.variables.length - 3} more
+                      </Badge>
+                    )}
                   </div>
                 </div>
-                <div className="text-sm text-gray-500">
-                  Version {prompt.version} • Updated {new Date(prompt.updated_at).toLocaleDateString()}
+                <div className="flex justify-between items-center pt-2">
+                  <div className="flex space-x-1">
+                    <Button size="sm" variant="outline" onClick={() => openViewDialog(prompt)}>
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openEditDialog(prompt)}>
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    {!prompt.is_active && (
+                      <Button size="sm" variant="outline" onClick={() => handleActivate(prompt)}>
+                        <Power className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Prompt</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{prompt.name}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(prompt)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </CardContent>
@@ -441,55 +424,30 @@ export default function AdminPromptsPage() {
         ))}
       </div>
 
-      {/* View Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>View Prompt: {selectedPrompt?.name}</DialogTitle>
-            <DialogDescription>{selectedPrompt?.description}</DialogDescription>
-          </DialogHeader>
-          {selectedPrompt && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Category</Label>
-                  <p className="text-sm">{selectedPrompt.category}</p>
-                </div>
-                <div>
-                  <Label>Version</Label>
-                  <p className="text-sm">{selectedPrompt.version}</p>
-                </div>
-              </div>
-              <div>
-                <Label>Variables</Label>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {selectedPrompt.variables.map((variable) => (
-                    <Badge key={variable} variant="secondary">
-                      {variable}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <Label>Content</Label>
-                <Textarea value={selectedPrompt.content} readOnly rows={15} className="font-mono text-sm" />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
-              Close
+      {filteredPrompts.length === 0 && (
+        <div className="text-center py-12">
+          <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No prompts found</h3>
+          <p className="text-muted-foreground mb-4">
+            {searchTerm || selectedCategory !== "all"
+              ? "Try adjusting your search or filter criteria"
+              : "Get started by creating your first prompt"}
+          </p>
+          {!searchTerm && selectedCategory === "all" && (
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Prompt
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Prompt</DialogTitle>
-            <DialogDescription>Update the prompt details</DialogDescription>
+            <DialogDescription>Update the prompt template and variables</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -510,9 +468,9 @@ export default function AdminPromptsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -536,8 +494,8 @@ export default function AdminPromptsPage() {
               />
               {formData.content && (
                 <div className="mt-2">
-                  <p className="text-sm text-gray-600">Variables detected:</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
+                  <p className="text-sm text-muted-foreground mb-1">Detected variables:</p>
+                  <div className="flex flex-wrap gap-1">
                     {extractVariables(formData.content).map((variable) => (
                       <Badge key={variable} variant="secondary">
                         {variable}
@@ -548,12 +506,63 @@ export default function AdminPromptsPage() {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleEditPrompt}>Update Prompt</Button>
-          </DialogFooter>
+            <Button onClick={handleEdit}>Update Prompt</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{selectedPrompt?.name}</DialogTitle>
+            <DialogDescription>
+              <Badge variant="outline" className="mr-2">
+                {CATEGORIES.find((c) => c.value === selectedPrompt?.category)?.label || selectedPrompt?.category}
+              </Badge>
+              {selectedPrompt?.is_active ? (
+                <Badge variant="default">Active</Badge>
+              ) : (
+                <Badge variant="secondary">Inactive</Badge>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPrompt && (
+            <div className="space-y-4">
+              {selectedPrompt.description && (
+                <div>
+                  <Label>Description</Label>
+                  <p className="text-sm text-muted-foreground">{selectedPrompt.description}</p>
+                </div>
+              )}
+              <div>
+                <Label>Variables ({selectedPrompt.variables.length})</Label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedPrompt.variables.map((variable) => (
+                    <Badge key={variable} variant="secondary">
+                      {variable}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label>Content</Label>
+                <div className="mt-1 p-3 bg-muted rounded-md">
+                  <pre className="text-sm whitespace-pre-wrap">{selectedPrompt.content}</pre>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Created: {new Date(selectedPrompt.created_at).toLocaleString()}
+                {selectedPrompt.updated_at !== selectedPrompt.created_at && (
+                  <> • Updated: {new Date(selectedPrompt.updated_at).toLocaleString()}</>
+                )}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -1,19 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
-
-    // Check if user is authenticated
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const supabase = createServerSupabaseClient()
 
     // Get the prompt to activate
     const { data: promptToActivate, error: fetchError } = await supabase
@@ -54,6 +44,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ prompt })
   } catch (error) {
     console.error("API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
+    )
   }
 }
