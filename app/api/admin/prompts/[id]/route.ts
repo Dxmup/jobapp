@@ -4,14 +4,12 @@ import { checkAdminPermission } from "@/lib/admin-auth"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = createServerSupabaseClient()
-
-    // Check admin permission
-    const adminCheck = await checkAdminPermission(supabase)
-    if (!adminCheck.success) {
-      return NextResponse.json({ error: adminCheck.error }, { status: 401 })
+    const hasPermission = await checkAdminPermission()
+    if (!hasPermission) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const supabase = createServerSupabaseClient()
     const { data: prompt, error } = await supabase.from("prompts").select("*").eq("id", params.id).single()
 
     if (error) {
@@ -28,24 +26,35 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = createServerSupabaseClient()
-
-    // Check admin permission
-    const adminCheck = await checkAdminPermission(supabase)
-    if (!adminCheck.success) {
-      return NextResponse.json({ error: adminCheck.error }, { status: 401 })
+    const hasPermission = await checkAdminPermission()
+    if (!hasPermission) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
-    const { description, content, variables, is_active } = body
+    const { name, category, description, content, variables } = body
+
+    if (!name || !category || !content) {
+      return NextResponse.json({ error: "Name, category, and content are required" }, { status: 400 })
+    }
+
+    const supabase = createServerSupabaseClient()
+
+    // Get current prompt to check if name is changing
+    const { data: currentPrompt } = await supabase.from("prompts").select("name").eq("id", params.id).single()
+
+    if (!currentPrompt) {
+      return NextResponse.json({ error: "Prompt not found" }, { status: 404 })
+    }
 
     const { data: prompt, error } = await supabase
       .from("prompts")
       .update({
+        name,
+        category,
         description,
         content,
         variables: variables || [],
-        is_active,
         updated_at: new Date().toISOString(),
       })
       .eq("id", params.id)
@@ -66,14 +75,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = createServerSupabaseClient()
-
-    // Check admin permission
-    const adminCheck = await checkAdminPermission(supabase)
-    if (!adminCheck.success) {
-      return NextResponse.json({ error: adminCheck.error }, { status: 401 })
+    const hasPermission = await checkAdminPermission()
+    if (!hasPermission) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const supabase = createServerSupabaseClient()
     const { error } = await supabase.from("prompts").delete().eq("id", params.id)
 
     if (error) {
