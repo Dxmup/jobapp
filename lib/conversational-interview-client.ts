@@ -1,4 +1,5 @@
 import { AudioFormatAnalyzer, type AudioFormatInfo } from "./audio-format-analyzer"
+import { PromptManager } from "./prompt-manager"
 
 export interface ConversationalInterviewConfig {
   voice: "Puck" | "Charon" | "Kore" | "Fenrir" | "Aoede" | "Leda" | "Orus" | "Zephyr"
@@ -417,14 +418,195 @@ export class ConversationalInterviewClient {
     }
   }
 
+  private async createIntroductionPrompt(introText: string): Promise<string> {
+    const phoneScreenerInstructions =
+      this.config.interviewType === "phone-screener"
+        ? `
+
+🚨 CRITICAL: THIS IS A PHONE SCREENING - NOT A FULL INTERVIEW 🚨
+
+The questions you'll be asking are designed for full interviews, but you MUST adapt them for a brief 15-minute phone screening:
+
+- Ask simplified, high-level versions of questions
+- Focus on basic qualifications and interest level
+- Expect brief 30-60 second answers
+- Skip detailed behavioral examples
+- Ask "Do you have experience with..." instead of "Tell me about a time..."
+- Keep it conversational but efficient
+
+`
+        : ""
+
+    const variables = {
+      interviewerName: this.interviewerName,
+      companyName: this.jobContext?.company || "the company",
+      phoneScreenerInstructions,
+      introText,
+      userFirstName: this.userFirstName,
+    }
+
+    const processedPrompt = await PromptManager.getProcessedPrompt("interview-introduction", variables)
+
+    if (processedPrompt) {
+      console.log("✅ Using database prompt for interview introduction")
+      return processedPrompt
+    }
+
+    // Fallback to hardcoded prompt
+    console.log("⚠️ Using fallback prompt for interview introduction")
+    return `ROLE: You are ${this.interviewerName}, a professional phone interviewer from ${this.jobContext?.company || "the company"}.
+${phoneScreenerInstructions}
+INSTRUCTION: Deliver this introduction naturally and warmly as if starting a phone interview. Speak clearly and professionally.
+
+INTRODUCTION: "${introText}"
+
+DELIVERY REQUIREMENTS:
+1. Speak this introduction with a warm, welcoming tone
+2. Include natural pauses and inflection
+3. Sound genuinely pleased to be speaking with ${this.userFirstName}
+4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
+5. DO NOT narrate your actions - only speak the actual words you would say
+
+OUTPUT: Speak the introduction directly without any stage directions or descriptions of how to speak it.`
+  }
+
+  private async createQuestionPrompt(questionText: string): Promise<string> {
+    const phoneScreenerInstructions =
+      this.config.interviewType === "phone-screener"
+        ? `
+
+🚨 CRITICAL: THIS IS A PHONE SCREENING - NOT A FULL INTERVIEW 🚨
+
+You MUST completely transform the provided question to be appropriate for a 15-minute phone screening. The original question is designed for in-depth interviews but you need to make it screening-appropriate.
+
+MANDATORY ADAPTATIONS:
+1. SHORTEN: Convert multi-part questions into single, simple questions
+2. SCREEN-FOCUS: Ask about basic qualifications, not detailed examples
+3. HIGH-LEVEL: Ask "Do you have experience with X?" instead of "Tell me about a time when..."
+4. BRIEF: Expect 30-60 second answers, not 3-5 minute stories
+5. QUALIFYING: Focus on yes/no qualifications and basic interest level
+
+TRANSFORMATION EXAMPLES:
+❌ WRONG (Full Interview): "Tell me about a challenging project where you had to overcome significant technical obstacles. Walk me through your problem-solving process, the stakeholders involved, and the final outcome."
+✅ CORRECT (Phone Screen): "Do you have experience working on challenging technical projects? Can you briefly mention one example?"
+
+❌ WRONG (Full Interview): "Describe a situation where you had to work with a difficult team member. How did you handle the conflict and what was the resolution?"
+✅ CORRECT (Phone Screen): "How do you typically handle disagreements with team members?"
+
+❌ WRONG (Full Interview): "Walk me through your approach to system design for a large-scale application, including your considerations for scalability, reliability, and performance."
+✅ CORRECT (Phone Screen): "Do you have experience with system design for large applications?"
+
+REMEMBER: This is a SCREENING to determine basic fit - save detailed behavioral and technical deep-dives for later rounds!
+
+`
+        : ""
+
+    const variables = {
+      interviewerName: this.interviewerName,
+      interviewType: this.config.interviewType === "phone-screener" ? "screening interview" : "first-round interview",
+      jobTitle: this.jobContext?.title || "this position",
+      companyName: this.jobContext?.company || "the company",
+      phoneScreenerInstructions,
+      questionText,
+      userFirstName: this.userFirstName,
+    }
+
+    const processedPrompt = await PromptManager.getProcessedPrompt("interview-question", variables)
+
+    if (processedPrompt) {
+      console.log("✅ Using database prompt for interview question")
+      return processedPrompt
+    }
+
+    // Fallback to hardcoded prompt
+    console.log("⚠️ Using fallback prompt for interview question")
+    return `ROLE: You are ${this.interviewerName}, a professional phone interviewer conducting a ${this.config.interviewType === "phone-screener" ? "screening interview" : "first-round interview"} for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
+${phoneScreenerInstructions}
+INSTRUCTION: Ask this interview question naturally and professionally. Speak as if you're genuinely interested in hearing ${this.userFirstName}'s response.
+
+QUESTION: "${questionText}"
+
+DELIVERY REQUIREMENTS:
+1. Ask this question with a professional, encouraging tone
+2. Include natural pauses and speak clearly for phone audio quality
+3. Sound engaged and interested in ${this.userFirstName}'s response
+4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
+5. DO NOT narrate your actions - only speak the actual words you would say
+
+OUTPUT: Ask the question directly without any stage directions or descriptions.`
+  }
+
+  private async playClosingStatement(): Promise<void> {
+    const companyName = this.jobContext?.company || "our company"
+
+    const closingText = `${this.userFirstName}, thank you so much for taking the time to speak with me today. I really enjoyed learning about your experience and background. The next step in our process is a follow-up interview with the hiring manager, and you can expect to hear from us within 3 to 5 business days. Do you have any questions about the role, ${companyName}, or our interview process before we wrap up? Thank you again, and have a wonderful rest of your day!`
+
+    const variables = {
+      interviewerName: this.interviewerName,
+      closingText,
+      userFirstName: this.userFirstName,
+    }
+
+    let closingPrompt: string
+
+    const processedPrompt = await PromptManager.getProcessedPrompt("interview-closing", variables)
+
+    if (processedPrompt) {
+      console.log("✅ Using database prompt for interview closing")
+      closingPrompt = processedPrompt
+    } else {
+      // Fallback to hardcoded prompt
+      console.log("⚠️ Using fallback prompt for interview closing")
+      closingPrompt = `ROLE: You are ${this.interviewerName}, a professional phone interviewer concluding a screening interview.
+
+INSTRUCTION: Deliver this closing statement naturally and professionally as if ending a phone interview.
+
+CLOSING: "${closingText}"
+
+DELIVERY REQUIREMENTS:
+1. Speak with a warm, professional tone
+2. Sound genuinely appreciative of ${this.userFirstName}'s time
+3. Speak clearly for phone audio quality
+4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
+5. DO NOT narrate your actions - only speak the actual words you would say
+
+OUTPUT: Speak the closing statement directly without any stage directions or descriptions.`
+    }
+
+    try {
+      console.log("🎬 Playing closing statement...")
+      const abortController = new AbortController()
+      this.activeRequests.add(abortController)
+
+      const audioData = await this.generateQuestionAudio(closingPrompt, false, abortController)
+
+      this.activeRequests.delete(abortController)
+
+      this.isPlayingQuestion = true
+      await this.playAudioData(audioData)
+      this.isPlayingQuestion = false
+
+      console.log("✅ Closing statement completed")
+    } catch (error) {
+      console.error("❌ Failed to play closing statement:", error)
+    }
+  }
+
   private async generateQuestionAudio(
     questionText: string,
     isIntroduction = false,
     abortController?: AbortController,
   ): Promise<string> {
-    const prompt = isIntroduction
-      ? this.createIntroductionPrompt(questionText)
-      : this.createQuestionPrompt(questionText)
+    let prompt: string
+
+    if (isIntroduction) {
+      prompt = await this.createIntroductionPrompt(questionText)
+    } else if (questionText.includes("ROLE:")) {
+      // This is already a processed prompt
+      prompt = questionText
+    } else {
+      prompt = await this.createQuestionPrompt(questionText)
+    }
 
     try {
       console.log(`🎵 Generating audio using Gemini Live API (${this.config.voice} voice)...`)
@@ -475,128 +657,6 @@ export class ConversationalInterviewClient {
 
       console.error(`❌ Live API audio generation failed:`, error)
       throw new Error(`Live API audio generation failed: ${error.message}`)
-    }
-  }
-
-  private createIntroductionPrompt(introText: string): string {
-    const phoneScreenerInstructions =
-      this.config.interviewType === "phone-screener"
-        ? `
-
-🚨 CRITICAL: THIS IS A PHONE SCREENING - NOT A FULL INTERVIEW 🚨
-
-The questions you'll be asking are designed for full interviews, but you MUST adapt them for a brief 15-minute phone screening:
-
-- Ask simplified, high-level versions of questions
-- Focus on basic qualifications and interest level
-- Expect brief 30-60 second answers
-- Skip detailed behavioral examples
-- Ask "Do you have experience with..." instead of "Tell me about a time..."
-- Keep it conversational but efficient
-
-`
-        : ""
-
-    return `ROLE: You are ${this.interviewerName}, a professional phone interviewer from ${this.jobContext?.company || "the company"}.
-${phoneScreenerInstructions}
-INSTRUCTION: Deliver this introduction naturally and warmly as if starting a phone interview. Speak clearly and professionally.
-
-INTRODUCTION: "${introText}"
-
-DELIVERY REQUIREMENTS:
-1. Speak this introduction with a warm, welcoming tone
-2. Include natural pauses and inflection
-3. Sound genuinely pleased to be speaking with ${this.userFirstName}
-4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
-5. DO NOT narrate your actions - only speak the actual words you would say
-
-OUTPUT: Speak the introduction directly without any stage directions or descriptions of how to speak it.`
-  }
-
-  private createQuestionPrompt(questionText: string): string {
-    const phoneScreenerInstructions =
-      this.config.interviewType === "phone-screener"
-        ? `
-
-🚨 CRITICAL: THIS IS A PHONE SCREENING - NOT A FULL INTERVIEW 🚨
-
-You MUST completely transform the provided question to be appropriate for a 15-minute phone screening. The original question is designed for in-depth interviews but you need to make it screening-appropriate.
-
-MANDATORY ADAPTATIONS:
-1. SHORTEN: Convert multi-part questions into single, simple questions
-2. SCREEN-FOCUS: Ask about basic qualifications, not detailed examples
-3. HIGH-LEVEL: Ask "Do you have experience with X?" instead of "Tell me about a time when..."
-4. BRIEF: Expect 30-60 second answers, not 3-5 minute stories
-5. QUALIFYING: Focus on yes/no qualifications and basic interest level
-
-TRANSFORMATION EXAMPLES:
-❌ WRONG (Full Interview): "Tell me about a challenging project where you had to overcome significant technical obstacles. Walk me through your problem-solving process, the stakeholders involved, and the final outcome."
-✅ CORRECT (Phone Screen): "Do you have experience working on challenging technical projects? Can you briefly mention one example?"
-
-❌ WRONG (Full Interview): "Describe a situation where you had to work with a difficult team member. How did you handle the conflict and what was the resolution?"
-✅ CORRECT (Phone Screen): "How do you typically handle disagreements with team members?"
-
-❌ WRONG (Full Interview): "Walk me through your approach to system design for a large-scale application, including your considerations for scalability, reliability, and performance."
-✅ CORRECT (Phone Screen): "Do you have experience with system design for large applications?"
-
-REMEMBER: This is a SCREENING to determine basic fit - save detailed behavioral and technical deep-dives for later rounds!
-
-`
-        : ""
-
-    return `ROLE: You are ${this.interviewerName}, a professional phone interviewer conducting a ${this.config.interviewType === "phone-screener" ? "screening interview" : "first-round interview"} for ${this.jobContext?.title || "this position"} at ${this.jobContext?.company || "the company"}.
-${phoneScreenerInstructions}
-INSTRUCTION: Ask this interview question naturally and professionally. Speak as if you're genuinely interested in hearing ${this.userFirstName}'s response.
-
-QUESTION: "${questionText}"
-
-DELIVERY REQUIREMENTS:
-1. Ask this question with a professional, encouraging tone
-2. Include natural pauses and speak clearly for phone audio quality
-3. Sound engaged and interested in ${this.userFirstName}'s response
-4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
-5. DO NOT narrate your actions - only speak the actual words you would say
-
-OUTPUT: Ask the question directly without any stage directions or descriptions.`
-  }
-
-  private async playClosingStatement(): Promise<void> {
-    // SIMPLIFIED: Use only userFirstName
-    const companyName = this.jobContext?.company || "our company"
-
-    const closingText = `${this.userFirstName}, thank you so much for taking the time to speak with me today. I really enjoyed learning about your experience and background. The next step in our process is a follow-up interview with the hiring manager, and you can expect to hear from us within 3 to 5 business days. Do you have any questions about the role, ${companyName}, or our interview process before we wrap up? Thank you again, and have a wonderful rest of your day!`
-
-    const closingPrompt = `ROLE: You are ${this.interviewerName}, a professional phone interviewer concluding a screening interview.
-
-INSTRUCTION: Deliver this closing statement naturally and professionally as if ending a phone interview.
-
-CLOSING: "${closingText}"
-
-DELIVERY REQUIREMENTS:
-1. Speak with a warm, professional tone
-2. Sound genuinely appreciative of ${this.userFirstName}'s time
-3. Speak clearly for phone audio quality
-4. DO NOT include any stage directions, parenthetical instructions, or descriptions like "(pause)", "(short pause)", "small pause", etc.
-5. DO NOT narrate your actions - only speak the actual words you would say
-
-OUTPUT: Speak the closing statement directly without any stage directions or descriptions.`
-
-    try {
-      console.log("🎬 Playing closing statement...")
-      const abortController = new AbortController()
-      this.activeRequests.add(abortController)
-
-      const audioData = await this.generateQuestionAudio(closingPrompt, false, abortController)
-
-      this.activeRequests.delete(abortController)
-
-      this.isPlayingQuestion = true
-      await this.playAudioData(audioData)
-      this.isPlayingQuestion = false
-
-      console.log("✅ Closing statement completed")
-    } catch (error) {
-      console.error("❌ Failed to play closing statement:", error)
     }
   }
 

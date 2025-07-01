@@ -41,6 +41,12 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
       description: "Templates & prompts",
     },
     {
+      title: "Prompts",
+      href: "/admin/prompts",
+      icon: FileText,
+      description: "Manage system prompts",
+    },
+    {
       title: "Blogs",
       href: "/admin/blogs",
       icon: FileText,
