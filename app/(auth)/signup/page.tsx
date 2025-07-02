@@ -29,12 +29,29 @@ export default function SignUpPage() {
     setError("")
 
     try {
-      // Simulate API call - replace with actual waitlist API
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          setError("This email is already on our waitlist!")
+        } else {
+          setError(data.error || "Something went wrong. Please try again.")
+        }
+        return
+      }
+
       setIsSubmitted(true)
       setEmail("")
     } catch (err) {
-      setError("Something went wrong. Please try again.")
+      setError("Network error. Please check your connection and try again.")
     } finally {
       setIsSubmitting(false)
     }
