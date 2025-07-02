@@ -74,8 +74,8 @@ export function SocialProofSection() {
                 ))}
               </div>
               <blockquote className="text-2xl md:text-3xl font-medium text-white mb-6 leading-relaxed">
-                "JobCraft AI didn't just help me get a job—it helped me land my dream role at Google. The AI-optimized
-                resume got me 5x more interviews than my old one."
+                "JobCraft AI didn't just help me get a job—it helped me land my dream role. The AI-optimized practice
+                interviews gave me the confidence to crush my interviews!"
               </blockquote>
               <div className="flex items-center justify-center gap-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
@@ -83,7 +83,7 @@ export function SocialProofSection() {
                 </div>
                 <div className="text-left">
                   <div className="text-white font-semibold">Sarah Martinez</div>
-                  <div className="text-slate-300">Software Engineer at Google</div>
+                  <div className="text-slate-300">Software Engineer</div>
                 </div>
               </div>
             </div>
