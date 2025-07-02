@@ -71,8 +71,8 @@ export function LandingHero() {
             While you're getting rejected, smart job seekers are using AI to get{" "}
             <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-bold">
               3x more interviews
-            </span>
-            . Don't get left behind.
+            </span>{" "}
+            AND practice interviewing using AI. Don't get left behind.
           </p>
 
           {/* Enhanced CTA buttons */}

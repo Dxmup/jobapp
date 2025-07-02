@@ -3,156 +3,154 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Loader2, Sparkles, BrainCircuit, MessageSquare } from "lucide-react"
-
-const sampleQuestions = [
-  "Tell me about yourself and your background.",
-  "Why are you interested in this position?",
-  "What are your greatest strengths and weaknesses?",
-  "Describe a challenging project you worked on and how you overcame obstacles.",
-  "Where do you see yourself in 5 years?",
-  "Why are you leaving your current position?",
-  "How do you handle stress and pressure?",
-  "What questions do you have for us?",
-]
+import { Label } from "@/components/ui/label"
+import { Loader2, Lightbulb, Mic, MessageSquare, Sparkles } from "lucide-react"
+import { generateInterviewQuestions } from "@/app/api/landing/generate-interview-questions/route"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { motion, AnimatePresence } from "framer-motion"
 
 export function InterviewPrepTab() {
-  const [jobTitle, setJobTitle] = useState("")
   const [jobDescription, setJobDescription] = useState("")
+  const [resumeContent, setResumeContent] = useState("")
   const [questions, setQuestions] = useState<string[]>([])
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const generateQuestions = async () => {
-    if (!jobTitle.trim()) return
-
-    setIsGenerating(true)
-
+  const handleGenerateQuestions = async () => {
+    setIsLoading(true)
+    setError(null)
+    setQuestions([])
     try {
-      // Simulate API call - replace with actual API
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // For demo, mix sample questions with job-specific ones
-      const jobSpecificQuestions = [
-        `What specific experience do you have with ${jobTitle} responsibilities?`,
-        `How would you approach the key challenges in ${jobTitle}?`,
-        `What tools and technologies are you familiar with for ${jobTitle}?`,
-        ...sampleQuestions.slice(0, 5),
-      ]
-
-      setQuestions(jobSpecificQuestions)
-    } catch (error) {
-      console.error("Error generating questions:", error)
+      const response = await generateInterviewQuestions({ jobDescription, resumeContent })
+      if (response.success) {
+        setQuestions(response.questions)
+      } else {
+        setError(response.error || "Failed to generate questions.")
+      }
+    } catch (err) {
+      console.error("Error generating interview questions:", err)
+      setError("An unexpected error occurred. Please try again.")
     } finally {
-      setIsGenerating(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Input Form */}
-      <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
+    <div className="grid md:grid-cols-2 gap-8">
+      <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-lg border-purple-200/50 dark:border-purple-800/50">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-700">
-            <BrainCircuit className="w-5 h-5" />
-            Interview Preparation
+          <CardTitle className="text-2xl font-bold text-purple-800 dark:text-purple-300 flex items-center">
+            <Lightbulb className="mr-2 h-6 w-6" /> Generate Interview Questions
           </CardTitle>
-          <CardDescription>
-            Generate personalized interview questions based on the job you're applying for
+          <CardDescription className="text-slate-600 dark:text-slate-400">
+            Paste your job description and resume to get personalized interview questions.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="job-title">Job Title</Label>
-            <Input
-              id="job-title"
-              placeholder="e.g., Senior Software Engineer"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              className="border-purple-200 focus:border-purple-400"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="job-description">Job Description (Optional)</Label>
+        <CardContent className="space-y-6">
+          <div>
+            <Label htmlFor="job-description" className="text-slate-700 dark:text-slate-300">
+              Job Description
+            </Label>
             <Textarea
               id="job-description"
-              placeholder="Paste the job description here for more targeted questions..."
+              placeholder="Paste the job description here..."
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
-              className="border-purple-200 focus:border-purple-400 min-h-[100px]"
+              rows={8}
+              className="mt-1 bg-white/80 dark:bg-slate-800/80 border-purple-200 dark:border-purple-700 focus-visible:ring-purple-500"
             />
           </div>
-
+          <div>
+            <Label htmlFor="resume-content" className="text-slate-700 dark:text-slate-300">
+              Your Resume Content (Optional)
+            </Label>
+            <Textarea
+              id="resume-content"
+              placeholder="Paste your resume text here for more tailored questions..."
+              value={resumeContent}
+              onChange={(e) => setResumeContent(e.target.value)}
+              rows={6}
+              className="mt-1 bg-white/80 dark:bg-slate-800/80 border-purple-200 dark:border-purple-700 focus-visible:ring-purple-500"
+            />
+          </div>
           <Button
-            onClick={generateQuestions}
-            disabled={!jobTitle.trim() || isGenerating}
-            className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700"
+            onClick={handleGenerateQuestions}
+            disabled={isLoading || !jobDescription.trim()}
+            className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
           >
-            {isGenerating ? (
+            {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating Questions...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Interview Questions
+                <Sparkles className="mr-2 h-4 w-4" /> Generate Questions
               </>
             )}
           </Button>
+          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
         </CardContent>
       </Card>
 
-      {/* Generated Questions */}
-      {questions.length > 0 && (
-        <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-purple-700">
-                <MessageSquare className="w-5 h-5" />
-                Interview Questions
-              </CardTitle>
-              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-                {questions.length} Questions
-              </Badge>
-            </div>
-            <CardDescription>
-              Practice these questions to prepare for your interview. Take time to think through your responses.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {questions.map((question, index) => (
-                <div
-                  key={index}
-                  className="p-4 bg-gradient-to-r from-purple-50 to-cyan-50 rounded-lg border border-purple-100"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                      {index + 1}
-                    </div>
-                    <p className="text-slate-700 leading-relaxed">{question}</p>
-                  </div>
+      <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-lg border-cyan-200/50 dark:border-cyan-800/50">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-cyan-800 dark:text-cyan-300 flex items-center">
+            <MessageSquare className="mr-2 h-6 w-6" /> Your Interview Questions
+          </CardTitle>
+          <CardDescription className="text-slate-600 dark:text-slate-400">
+            Practice these questions to ace your interview.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AnimatePresence mode="wait">
+            {questions.length > 0 ? (
+              <motion.div
+                key="questions"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ScrollArea className="h-[400px] pr-4">
+                  <ul className="space-y-4">
+                    {questions.map((q, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <span className="text-purple-600 dark:text-purple-400 font-semibold flex-shrink-0">
+                          {index + 1}.
+                        </span>
+                        <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{q}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </ScrollArea>
+                <Separator className="my-6 bg-purple-200 dark:bg-purple-700" />
+                <div className="flex items-center gap-4 text-slate-600 dark:text-slate-400 text-sm">
+                  <Mic className="h-5 w-5 text-cyan-600" />
+                  <span>
+                    **Pro Tip:** Practice answering these questions out loud to build confidence and refine your
+                    responses.
+                  </span>
                 </div>
-              ))}
-            </div>
-
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-800 mb-2">💡 Practice Tips:</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Practice answering out loud, not just in your head</li>
-                <li>• Use the STAR method (Situation, Task, Action, Result) for behavioral questions</li>
-                <li>• Prepare specific examples from your experience</li>
-                <li>• Practice with a friend or record yourself</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="placeholder"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="flex flex-col items-center justify-center h-[400px] text-center text-slate-500 dark:text-slate-400"
+              >
+                <Sparkles className="h-12 w-12 mb-4 text-purple-400" />
+                <p className="text-lg">Your personalized interview questions will appear here.</p>
+                <p className="text-sm mt-2">Enter a job description and click "Generate Questions" to get started!</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </CardContent>
+      </Card>
     </div>
   )
 }
