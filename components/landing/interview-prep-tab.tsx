@@ -50,10 +50,9 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
     onActionUsed?.()
 
     try {
-      // Simulate API call - replace with actual API
+      // Simulate API call for demo
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // For demo, mix sample questions with job-specific ones
       const jobSpecificQuestions = [
         `What specific experience do you have with ${jobTitle} responsibilities?`,
         `How would you approach the key challenges in ${jobTitle}?`,
@@ -63,7 +62,8 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
 
       setQuestions(jobSpecificQuestions)
     } catch (error) {
-      console.error("Error generating questions:", error)
+      // Silent error handling for demo
+      setQuestions(sampleQuestions)
     } finally {
       setIsGenerating(false)
     }
@@ -89,12 +89,10 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
       return
     }
 
-    // Check if all questions have been played
     if (availableAudioFiles.length === 0) {
       return
     }
 
-    // Select random audio file from available ones
     const randomIndex = Math.floor(Math.random() * availableAudioFiles.length)
     const selectedAudio = availableAudioFiles[randomIndex]
 
@@ -102,7 +100,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
     setIsPlaying(true)
     onActionUsed?.()
 
-    // Create and play audio
     if (audioRef.current) {
       audioRef.current.pause()
     }
@@ -113,8 +110,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
     audio.onended = () => {
       setIsPlaying(false)
       setCurrentAudio(null)
-
-      // Remove the played audio from available files and add to played files
       setPlayedAudioFiles((prev) => [...prev, selectedAudio])
       setAvailableAudioFiles((prev) => prev.filter((file) => file !== selectedAudio))
     }
@@ -122,11 +117,9 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
     audio.onerror = () => {
       setIsPlaying(false)
       setCurrentAudio(null)
-      console.error("Error playing audio file")
     }
 
-    audio.play().catch((error) => {
-      console.error("Error playing audio:", error)
+    audio.play().catch(() => {
       setIsPlaying(false)
       setCurrentAudio(null)
     })
@@ -195,7 +188,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
             </div>
           )}
 
-          {/* Completion Message */}
           {availableAudioFiles.length === 0 && playedAudioFiles.length > 0 && (
             <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
               <h4 className="font-medium text-green-800 mb-2">🎉 Great job!</h4>
@@ -263,7 +255,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
         </CardContent>
       </Card>
 
-      {/* Generated Questions */}
       {questions.length > 0 && (
         <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
           <CardHeader>

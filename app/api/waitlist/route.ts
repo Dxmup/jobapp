@@ -19,18 +19,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert new email
-    const { data, error } = await supabase
-      .from("waitlist")
-      .insert({
-        email: email.toLowerCase(),
-        created_at: new Date().toISOString(),
-        source: "signup_page",
-      })
-      .select()
-      .single()
+    const { error } = await supabase.from("waitlist").insert({
+      email: email.toLowerCase(),
+      created_at: new Date().toISOString(),
+      source: "signup_page",
+    })
 
     if (error) {
-      console.error("Error inserting waitlist email:", error)
       return NextResponse.json({ error: "Failed to join waitlist" }, { status: 500 })
     }
 
@@ -39,32 +34,6 @@ export async function POST(request: NextRequest) {
       message: "Successfully joined waitlist",
     })
   } catch (error) {
-    console.error("Waitlist API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function GET() {
-  try {
-    const supabase = createServerSupabaseClient()
-
-    const { data, error } = await supabase
-      .from("waitlist")
-      .select("email, created_at")
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error("Error fetching waitlist:", error)
-      return NextResponse.json({ error: "Failed to fetch waitlist" }, { status: 500 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      count: data.length,
-      emails: data,
-    })
-  } catch (error) {
-    console.error("Waitlist GET API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
