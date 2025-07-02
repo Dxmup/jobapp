@@ -1,7 +1,4 @@
 "use client"
-
-import { motion } from "framer-motion"
-import { StatCounter } from "../animations/stats-counter"
 import { SuccessStoriesTicker } from "../animations/success-stories-ticker"
 import { ScrollReveal } from "../animations/scroll-reveal"
 import { Star, Users, Briefcase, TrendingUp, Award, Target } from "lucide-react"
@@ -62,24 +59,6 @@ export function SocialProofSection() {
             Real results from real people who transformed their job search with AI
           </p>
         </ScrollReveal>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-20">
-          {stats.map((stat, index) => (
-            <ScrollReveal key={index} delay={index * 0.1}>
-              <motion.div
-                className="text-center p-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:bg-white/10 transition-all duration-300"
-                whileHover={{ y: -4, scale: 1.05 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className={`flex justify-center mb-4 ${stat.color}`}>{stat.icon}</div>
-                <div className="text-3xl md:text-4xl font-black text-white mb-2">
-                  <StatCounter end={stat.value} suffix={stat.suffix} />
-                </div>
-                <div className="text-sm text-slate-300 font-medium">{stat.label}</div>
-              </motion.div>
-            </ScrollReveal>
-          ))}
-        </div>
 
         <ScrollReveal delay={0.8}>
           <SuccessStoriesTicker />
