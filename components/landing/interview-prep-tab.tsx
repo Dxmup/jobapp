@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, MessageSquare, Copy, CheckCircle, Lightbulb } from "lucide-react"
+import { Loader2, MessageSquare, Lightbulb } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 interface InterviewPrepTabProps {
@@ -22,7 +22,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
   const [questions, setQuestions] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const { toast } = useToast()
 
   const handleGenerate = async () => {
@@ -111,41 +110,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
       })
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const copyQuestion = async (question: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(question)
-      setCopiedIndex(index)
-      setTimeout(() => setCopiedIndex(null), 2000)
-      toast({
-        title: "Copied!",
-        description: "Question copied to clipboard",
-      })
-    } catch (err) {
-      toast({
-        title: "Failed to copy",
-        description: "Please copy the question manually",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const copyAllQuestions = async () => {
-    try {
-      const allQuestions = questions.map((q, i) => `${i + 1}. ${q}`).join("\n\n")
-      await navigator.clipboard.writeText(allQuestions)
-      toast({
-        title: "All questions copied!",
-        description: "All interview questions copied to clipboard",
-      })
-    } catch (err) {
-      toast({
-        title: "Failed to copy",
-        description: "Please copy the questions manually",
-        variant: "destructive",
-      })
     }
   }
 
@@ -244,40 +208,22 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
       {questions.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Interview Questions</CardTitle>
-                <CardDescription>Practice these questions to prepare for your interview</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={copyAllQuestions}>
-                <Copy className="h-4 w-4 mr-2" />
-                Copy All
-              </Button>
+            <div>
+              <CardTitle>Interview Questions</CardTitle>
+              <CardDescription>Practice these questions to prepare for your interview</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-4">
               {questions.map((question, index) => (
                 <div key={index} className="p-4 border rounded-lg bg-card">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-sm font-medium text-muted-foreground">Question {index + 1}</span>
                       </div>
                       <p className="font-medium leading-relaxed">{question}</p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyQuestion(question, index)}
-                      className="shrink-0"
-                    >
-                      {copiedIndex === index ? (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
                   </div>
                 </div>
               ))}
