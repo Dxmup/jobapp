@@ -3,35 +3,76 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Lightbulb, Mic, MessageSquare, Sparkles } from "lucide-react"
-import { generateInterviewQuestions } from "@/app/api/landing/generate-interview-questions/route"
+import { Textarea } from "@/components/ui/textarea"
+import { Loader2, Sparkles, BrainCircuit, MessageSquare, Mic } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { motion, AnimatePresence } from "framer-motion"
+import { useToast } from "@/components/ui/use-toast"
 
 export function InterviewPrepTab() {
   const [jobDescription, setJobDescription] = useState("")
-  const [resumeContent, setResumeContent] = useState("")
+  const [role, setRole] = useState("")
+  const [experience, setExperience] = useState("")
   const [questions, setQuestions] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   const handleGenerateQuestions = async () => {
-    setIsLoading(true)
     setError(null)
     setQuestions([])
+
+    if (!jobDescription.trim()) {
+      setError("Please enter a job description.")
+      return
+    }
+
+    if (jobDescription.length < 50) {
+      setError("Job description must be at least 50 characters.")
+      return
+    }
+
+    setIsLoading(true)
     try {
-      const response = await generateInterviewQuestions({ jobDescription, resumeContent })
-      if (response.success) {
-        setQuestions(response.questions)
+      const response = await fetch("/api/landing/generate-interview-questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jobDescription: jobDescription.trim(),
+          role: role.trim(),
+          experience: experience || "entry to mid-level",
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setQuestions(data.questions)
+        toast({
+          title: "Questions generated!",
+          description: "Practice these questions to ace your interview.",
+        })
       } else {
-        setError(response.error || "Failed to generate questions.")
+        setError(data.error || "Failed to generate questions. Please try again.")
+        toast({
+          title: "Error",
+          description: data.error || "Failed to generate questions.",
+          variant: "destructive",
+        })
       }
     } catch (err) {
       console.error("Error generating interview questions:", err)
       setError("An unexpected error occurred. Please try again.")
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -42,42 +83,58 @@ export function InterviewPrepTab() {
       <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-lg border-purple-200/50 dark:border-purple-800/50">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-purple-800 dark:text-purple-300 flex items-center">
-            <Lightbulb className="mr-2 h-6 w-6" /> Generate Interview Questions
+            <BrainCircuit className="mr-2 h-6 w-6" /> Generate Interview Questions
           </CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">
-            Paste your job description and resume to get personalized interview questions.
+            Paste your job description to get personalized interview questions.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
             <Label htmlFor="job-description" className="text-slate-700 dark:text-slate-300">
-              Job Description
+              Job Description <span className="text-red-500">*</span>
             </Label>
             <Textarea
               id="job-description"
-              placeholder="Paste the job description here..."
+              placeholder="Paste the job description here... (minimum 50 characters)"
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
               rows={8}
               className="mt-1 bg-white/80 dark:bg-slate-800/80 border-purple-200 dark:border-purple-700 focus-visible:ring-purple-500"
             />
+            <div className="flex justify-between text-sm text-muted-foreground mt-1">
+              <span>{jobDescription.length} characters</span>
+              <span>Minimum: 50 characters</span>
+            </div>
           </div>
           <div>
-            <Label htmlFor="resume-content" className="text-slate-700 dark:text-slate-300">
-              Your Resume Content (Optional)
+            <Label htmlFor="role" className="text-slate-700 dark:text-slate-300">
+              Role/Position (Optional)
             </Label>
-            <Textarea
-              id="resume-content"
-              placeholder="Paste your resume text here for more tailored questions..."
-              value={resumeContent}
-              onChange={(e) => setResumeContent(e.target.value)}
-              rows={6}
+            <Input
+              id="role"
+              placeholder="e.g., Software Engineer, Marketing Manager"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
               className="mt-1 bg-white/80 dark:bg-slate-800/80 border-purple-200 dark:border-purple-700 focus-visible:ring-purple-500"
             />
           </div>
+          <div>
+            <Label htmlFor="experience" className="text-slate-700 dark:text-slate-300">
+              Experience Level (Optional)
+            </Label>
+            <Input
+              id="experience"
+              placeholder="e.g., Entry-level, Mid-level, Senior"
+              value={experience}
+              onChange={(e) => setExperience(e.target.value)}
+              className="mt-1 bg-white/80 dark:bg-slate-800/80 border-purple-200 dark:border-purple-700 focus-visible:ring-purple-500"
+            />
+          </div>
+
           <Button
             onClick={handleGenerateQuestions}
-            disabled={isLoading || !jobDescription.trim()}
+            disabled={isLoading || !jobDescription.trim() || jobDescription.length < 50}
             className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
           >
             {isLoading ? (
