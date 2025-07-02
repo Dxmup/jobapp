@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Sparkles, BrainCircuit, MessageSquare } from "lucide-react"
+import { Loader2, Sparkles, BrainCircuit, MessageSquare, Play, Pause, Volume2 } from "lucide-react"
 
 const sampleQuestions = [
   "Tell me about yourself and your background.",
@@ -20,16 +20,32 @@ const sampleQuestions = [
   "What questions do you have for us?",
 ]
 
-export function InterviewPrepTab() {
+const audioFiles = [
+  "/audio/difficultteammatequestion.wav",
+  "/audio/newtechquestion.wav",
+  "/audio/codemistakequestion.wav",
+  "/audio/genzquestion.wav",
+]
+
+interface InterviewPrepTabProps {
+  onActionUsed?: () => void
+  isDisabled?: boolean
+}
+
+export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabProps) {
   const [jobTitle, setJobTitle] = useState("")
   const [jobDescription, setJobDescription] = useState("")
   const [questions, setQuestions] = useState<string[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentAudio, setCurrentAudio] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const generateQuestions = async () => {
-    if (!jobTitle.trim()) return
+    if (!jobTitle.trim() || isDisabled) return
 
     setIsGenerating(true)
+    onActionUsed?.()
 
     try {
       // Simulate API call - replace with actual API
@@ -51,17 +67,112 @@ export function InterviewPrepTab() {
     }
   }
 
+  const playRandomAudio = () => {
+    if (isDisabled) return
+
+    if (isPlaying && audioRef.current) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+      setCurrentAudio(null)
+      return
+    }
+
+    // Select random audio file
+    const randomIndex = Math.floor(Math.random() * audioFiles.length)
+    const selectedAudio = audioFiles[randomIndex]
+
+    setCurrentAudio(selectedAudio)
+    setIsPlaying(true)
+    onActionUsed?.()
+
+    // Create and play audio
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
+    const audio = new Audio(selectedAudio)
+    audioRef.current = audio
+
+    audio.onended = () => {
+      setIsPlaying(false)
+      setCurrentAudio(null)
+    }
+
+    audio.onerror = () => {
+      setIsPlaying(false)
+      setCurrentAudio(null)
+      console.error("Error playing audio file")
+    }
+
+    audio.play().catch((error) => {
+      console.error("Error playing audio:", error)
+      setIsPlaying(false)
+      setCurrentAudio(null)
+    })
+  }
+
   return (
     <div className="space-y-6">
+      {/* Audio Practice Section */}
+      <Card className="bg-gradient-to-r from-purple-50 to-cyan-50 border-purple-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-purple-700">
+            <Volume2 className="w-5 h-5" />
+            Practice with Real Interview Questions
+          </CardTitle>
+          <CardDescription>Listen to actual interview questions and practice your responses out loud</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-center">
+            <Button
+              onClick={playRandomAudio}
+              disabled={isDisabled}
+              size="lg"
+              className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700"
+            >
+              {isPlaying ? (
+                <>
+                  <Pause className="w-5 h-5 mr-2" />
+                  Stop Audio
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5 mr-2" />
+                  Play Random Question
+                </>
+              )}
+            </Button>
+          </div>
+
+          {currentAudio && (
+            <div className="text-center">
+              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                🎧 Playing interview question...
+              </Badge>
+            </div>
+          )}
+
+          <div className="bg-white/80 p-4 rounded-lg border border-purple-100">
+            <h4 className="font-medium text-purple-800 mb-2">🎯 How to Practice:</h4>
+            <ul className="text-sm text-purple-700 space-y-1">
+              <li>• Click "Play Random Question" to hear a real interview question</li>
+              <li>• Listen carefully and take a moment to think</li>
+              <li>• Answer out loud as if you're in a real interview</li>
+              <li>• Practice multiple times with different questions</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Input Form */}
       <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-purple-700">
             <BrainCircuit className="w-5 h-5" />
-            Interview Preparation
+            Generate Custom Questions
           </CardTitle>
           <CardDescription>
-            Generate personalized interview questions based on the job you're applying for
+            Get personalized interview questions based on the specific job you're applying for
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -73,6 +184,7 @@ export function InterviewPrepTab() {
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
               className="border-purple-200 focus:border-purple-400"
+              disabled={isDisabled}
             />
           </div>
 
@@ -84,12 +196,13 @@ export function InterviewPrepTab() {
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
               className="border-purple-200 focus:border-purple-400 min-h-[100px]"
+              disabled={isDisabled}
             />
           </div>
 
           <Button
             onClick={generateQuestions}
-            disabled={!jobTitle.trim() || isGenerating}
+            disabled={!jobTitle.trim() || isGenerating || isDisabled}
             className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700"
           >
             {isGenerating ? (
@@ -99,7 +212,7 @@ export function InterviewPrepTab() {
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 mr-2" />
+                <Sparkles className="w-4 w-4 mr-2" />
                 Generate Interview Questions
               </>
             )}
