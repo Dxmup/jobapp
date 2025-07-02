@@ -1,194 +1,34 @@
 "use server"
 
-import { getCurrentUserId } from "@/lib/auth-cookie"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { generateText } from "ai"
-import { google } from "@ai-sdk/google"
-
-export async function createCoverLetter(data: any) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
-  try {
-    const { data: coverLetter, error } = await supabase
-      .from("cover_letters")
-      .insert({
-        user_id: userId,
-        job_id: data.jobId,
-        name: data.name,
-        content: data.content,
-        is_ai_generated: data.isAiGenerated || false,
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-
-    revalidatePath("/dashboard/cover-letters")
-    revalidatePath(`/jobs/${data.jobId}`)
-
-    return { success: true, coverLetter }
-  } catch (error) {
-    console.error("Error creating cover letter:", error)
-    return { success: false, error: "Failed to create cover letter" }
-  }
-}
-
-export async function getCoverLetters() {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
-  try {
-    const { data: coverLetters, error } = await supabase
-      .from("cover_letters")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-
-    return { success: true, data: coverLetters || [] }
-  } catch (error) {
-    console.error("Error fetching cover letters:", error)
-    return { success: false, error: "Failed to fetch cover letters" }
-  }
-}
-
-export async function getCoverLetter(id: string) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
-  try {
-    const { data: coverLetter, error } = await supabase
-      .from("cover_letters")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", userId)
-      .single()
-
-    if (error) throw error
-
-    return { success: true, data: coverLetter }
-  } catch (error) {
-    console.error("Error fetching cover letter:", error)
-    return { success: false, error: "Failed to fetch cover letter" }
-  }
-}
-
-// Alias for getCoverLetter
-export async function getCoverLetterById(id: string) {
-  return getCoverLetter(id)
-}
-
-export async function updateCoverLetter(id: string, data: any) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
-  try {
-    const { data: coverLetter, error } = await supabase
-      .from("cover_letters")
-      .update({
-        name: data.name,
-        content: data.content,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("user_id", userId)
-      .select()
-      .single()
-
-    if (error) throw error
-
-    revalidatePath("/dashboard/cover-letters")
-    revalidatePath(`/dashboard/cover-letters/${id}`)
-
-    return { success: true, coverLetter }
-  } catch (error) {
-    console.error("Error updating cover letter:", error)
-    return { success: false, error: "Failed to update cover letter" }
-  }
-}
-
-export async function deleteCoverLetter(id: string) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
-  try {
-    const { error } = await supabase.from("cover_letters").delete().eq("id", id).eq("user_id", userId)
-
-    if (error) throw error
-
-    revalidatePath("/dashboard/cover-letters")
-
-    return { success: true, message: "Cover letter deleted successfully!" }
-  } catch (error) {
-    console.error("Error deleting cover letter:", error)
-    return { success: false, error: "Failed to delete cover letter" }
-  }
-}
 
 export async function getJobCoverLetters(jobId: string) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
   try {
+    const supabase = createServerSupabaseClient()
+
     const { data: coverLetters, error } = await supabase
       .from("cover_letters")
       .select("*")
       .eq("job_id", jobId)
-      .eq("user_id", userId)
       .order("created_at", { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      console.error("Error fetching job cover letters:", error)
+      return { success: false, error: error.message, data: [] }
+    }
 
-    return { success: true, coverLetters: coverLetters || [] }
+    return { success: true, data: coverLetters || [] }
   } catch (error) {
-    console.error("Error fetching job cover letters:", error)
-    return { success: false, error: "Failed to fetch cover letters" }
+    console.error("Error in getJobCoverLetters:", error)
+    return { success: false, error: "Failed to fetch cover letters", data: [] }
   }
 }
 
-export async function getUserCoverLetters() {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
+export async function getUserCoverLetters(userId: string) {
   try {
+    const supabase = createServerSupabaseClient()
+
     const { data: coverLetters, error } = await supabase
       .from("cover_letters")
       .select(`
@@ -196,128 +36,170 @@ export async function getUserCoverLetters() {
         jobs (
           id,
           title,
-          company,
-          status
+          company
         )
       `)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      console.error("Error fetching user cover letters:", error)
+      return { success: false, error: error.message, data: [] }
+    }
 
-    return { success: true, coverLetters: coverLetters || [] }
+    return { success: true, data: coverLetters || [] }
   } catch (error) {
-    console.error("Error fetching user cover letters:", error)
-    return { success: false, error: "Failed to fetch cover letters" }
+    console.error("Error in getUserCoverLetters:", error)
+    return { success: false, error: "Failed to fetch cover letters", data: [] }
   }
 }
 
-export async function generateCoverLetter(jobId: string, resumeId?: string) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
+export async function createCoverLetter(formData: FormData) {
   try {
-    // Get job details
-    const { data: job, error: jobError } = await supabase
-      .from("jobs")
-      .select("*")
-      .eq("id", jobId)
-      .eq("user_id", userId)
+    const supabase = createServerSupabaseClient()
+
+    const title = formData.get("title") as string
+    const content = formData.get("content") as string
+    const jobId = formData.get("jobId") as string
+    const userId = formData.get("userId") as string
+
+    if (!title || !content || !jobId || !userId) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    const { data, error } = await supabase
+      .from("cover_letters")
+      .insert({
+        title,
+        content,
+        job_id: jobId,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
       .single()
 
-    if (jobError) throw jobError
-
-    // Get resume if provided
-    let resumeContent = ""
-    if (resumeId) {
-      const { data: resume, error: resumeError } = await supabase
-        .from("resumes")
-        .select("content")
-        .eq("id", resumeId)
-        .eq("user_id", userId)
-        .single()
-
-      if (!resumeError && resume) {
-        resumeContent = resume.content
-      }
+    if (error) {
+      console.error("Error creating cover letter:", error)
+      return { success: false, error: error.message }
     }
 
-    // Generate cover letter using AI
-    const prompt = `Generate a professional cover letter for the following job:
-
-Job Title: ${job.title}
-Company: ${job.company}
-Job Description: ${job.description || "Not provided"}
-
-${resumeContent ? `Based on this resume:\n${resumeContent}` : ""}
-
-Please create a compelling cover letter that:
-1. Shows enthusiasm for the role
-2. Highlights relevant experience
-3. Demonstrates knowledge of the company
-4. Is professional and concise
-5. Includes a strong opening and closing
-
-Format the cover letter with proper paragraphs and professional structure.`
-
-    const { text } = await generateText({
-      model: google("gemini-1.5-flash"),
-      prompt,
-      maxTokens: 1000,
-    })
-
-    return {
-      success: true,
-      content: text,
-      jobTitle: job.title,
-      company: job.company,
-    }
+    revalidatePath("/dashboard/cover-letters")
+    return { success: true, data }
   } catch (error) {
-    console.error("Error generating cover letter:", error)
-    return { success: false, error: "Failed to generate cover letter" }
+    console.error("Error in createCoverLetter:", error)
+    return { success: false, error: "Failed to create cover letter" }
   }
 }
 
-// Alias for createCoverLetter
-export async function saveCoverLetter(data: any) {
-  return createCoverLetter(data)
-}
-
-export async function getJobResumes(jobId: string) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    return { success: false, error: "Unauthorized" }
-  }
-
-  const supabase = createServerSupabaseClient()
-
+export async function updateCoverLetter(id: string, formData: FormData) {
   try {
-    const { data: jobResumes, error } = await supabase
-      .from("job_resumes")
-      .select(`
-        *,
-        resumes (
-          id,
-          name,
-          content,
-          created_at,
-          updated_at
-        )
-      `)
-      .eq("job_id", jobId)
-      .eq("user_id", userId)
+    const supabase = createServerSupabaseClient()
 
-    if (error) throw error
+    const title = formData.get("title") as string
+    const content = formData.get("content") as string
 
-    return { success: true, resumes: jobResumes || [] }
+    if (!title || !content) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    const { data, error } = await supabase
+      .from("cover_letters")
+      .update({
+        title,
+        content,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating cover letter:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/dashboard/cover-letters")
+    return { success: true, data }
   } catch (error) {
-    console.error("Error fetching job resumes:", error)
-    return { success: false, error: "Failed to fetch job resumes" }
+    console.error("Error in updateCoverLetter:", error)
+    return { success: false, error: "Failed to update cover letter" }
+  }
+}
+
+export async function deleteCoverLetter(id: string) {
+  try {
+    const supabase = createServerSupabaseClient()
+
+    const { error } = await supabase.from("cover_letters").delete().eq("id", id)
+
+    if (error) {
+      console.error("Error deleting cover letter:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/dashboard/cover-letters")
+    return { success: true }
+  } catch (error) {
+    console.error("Error in deleteCoverLetter:", error)
+    return { success: false, error: "Failed to delete cover letter" }
+  }
+}
+
+export async function generateCoverLetter(jobId: string, resumeId: string) {
+  try {
+    const supabase = createServerSupabaseClient()
+
+    // Get job details
+    const { data: job, error: jobError } = await supabase.from("jobs").select("*").eq("id", jobId).single()
+
+    if (jobError || !job) {
+      return { success: false, error: "Job not found" }
+    }
+
+    // Get resume details
+    const { data: resume, error: resumeError } = await supabase.from("resumes").select("*").eq("id", resumeId).single()
+
+    if (resumeError || !resume) {
+      return { success: false, error: "Resume not found" }
+    }
+
+    // Here you would integrate with your AI service to generate the cover letter
+    // For now, we'll create a basic template
+    const generatedContent = `Dear Hiring Manager,
+
+I am writing to express my strong interest in the ${job.title} position at ${job.company}. With my background and experience, I believe I would be a valuable addition to your team.
+
+${job.description ? `I am particularly excited about this opportunity because ${job.description.substring(0, 200)}...` : ""}
+
+I look forward to discussing how my skills and experience can contribute to your team's success.
+
+Best regards,
+[Your Name]`
+
+    const { data, error } = await supabase
+      .from("cover_letters")
+      .insert({
+        title: `Cover Letter for ${job.title} at ${job.company}`,
+        content: generatedContent,
+        job_id: jobId,
+        user_id: job.user_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error generating cover letter:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/dashboard/cover-letters")
+    return { success: true, data }
+  } catch (error) {
+    console.error("Error in generateCoverLetter:", error)
+    return { success: false, error: "Failed to generate cover letter" }
   }
 }
