@@ -12,7 +12,7 @@ const inter = Inter({
 
 export const metadata = {
   title: "JobCraft AI - Resume & Cover Letter Assistant",
-  description: "AI-powered job application assistant for optimizing resumes,generating cover letters, and practice interviews",
+  description: "AI-powered job application assistant for practice interviews, optimizing resumes,and generating cover letters.",
     generator: 'v0.dev'
 }
 
