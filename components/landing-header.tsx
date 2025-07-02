@@ -11,7 +11,7 @@ const ModeToggle = dynamic(() => import("@/components/mode-toggle").then((mod) =
   ssr: false,
 })
 
-export default function LandingHeader() {
+export function LandingHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
@@ -105,3 +105,5 @@ export default function LandingHeader() {
     </header>
   )
 }
+
+export default LandingHeader

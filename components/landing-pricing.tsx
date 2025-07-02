@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { ScrollReveal } from "./animations/scroll-reveal"
 
-export default function LandingPricing() {
+export function LandingPricing() {
   const plans = [
     {
       name: "Free",
@@ -164,3 +164,5 @@ export default function LandingPricing() {
     </section>
   )
 }
+
+export default LandingPricing
