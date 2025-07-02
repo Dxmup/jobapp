@@ -6,7 +6,7 @@ import { cookies } from "next/headers"
  * Creates a Supabase client with service role privileges for server-side operations.
  * This client has full access to the database and bypasses Row Level Security (RLS).
  */
-export function createClient() {
+export function createServerSupabaseClient() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Missing Supabase environment variables")
   }
@@ -47,32 +47,11 @@ export function createServerClient() {
 }
 
 /**
- * Creates a Supabase client with service role privileges.
- * Alias for createClient() for backward compatibility.
+ * Creates a standard Supabase client - alias for createServerSupabaseClient
  */
-export function createServerSupabaseClient() {
-  return createClient()
+export function createClient() {
+  return createServerSupabaseClient()
 }
 
-/**
- * Creates an admin Supabase client with full privileges.
- */
-export function createAdminClient() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("Missing Supabase admin environment variables")
-  }
-
-  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: {
-      persistSession: false,
-    },
-    global: {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
-  })
-}
-
-// Export default for backward compatibility
-export default createClient
+// Export the default client creation function
+export default createServerSupabaseClient
