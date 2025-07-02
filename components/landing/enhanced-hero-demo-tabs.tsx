@@ -109,21 +109,25 @@ export function EnhancedHeroDemoTabs() {
         </div>
       )}
 
-      <Tabs defaultValue="resume" className="w-full">
+      <Tabs defaultValue="interview" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="interview" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Interview Prep
+          </TabsTrigger>
           <TabsTrigger value="resume" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Resume Optimizer
           </TabsTrigger>
           <TabsTrigger value="cover-letter" className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
-            Cover Letter
-          </TabsTrigger>
-          <TabsTrigger value="interview" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Interview Prep
+            Cover Letter Generator
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="interview" className="mt-6">
+          <InterviewPrepTab onActionUsed={handleActionUsed} isDisabled={isDisabled} />
+        </TabsContent>
 
         <TabsContent value="resume" className="mt-6">
           <ResumeOptimizationTab onActionUsed={handleActionUsed} isDisabled={isDisabled} />
@@ -131,10 +135,6 @@ export function EnhancedHeroDemoTabs() {
 
         <TabsContent value="cover-letter" className="mt-6">
           <CoverLetterTab onActionUsed={handleActionUsed} isDisabled={isDisabled} />
-        </TabsContent>
-
-        <TabsContent value="interview" className="mt-6">
-          <InterviewPrepTab onActionUsed={handleActionUsed} isDisabled={isDisabled} />
         </TabsContent>
       </Tabs>
     </div>

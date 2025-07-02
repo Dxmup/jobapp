@@ -40,11 +40,6 @@ export function HeroDemoTabs() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
             <div className="p-4 border rounded-lg">
-              <MessageSquare className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-              <h4 className="font-semibold">Interview Practice</h4>
-              <p className="text-sm text-muted-foreground">Practice with AI-powered phone interviews</p>
-            </div>
-            <div className="p-4 border rounded-lg">
               <FileText className="h-8 w-8 mx-auto mb-2 text-blue-600" />
               <h4 className="font-semibold">Unlimited Resume Optimization</h4>
               <p className="text-sm text-muted-foreground">Tailor resumes for every job application</p>
@@ -53,6 +48,11 @@ export function HeroDemoTabs() {
               <Mail className="h-8 w-8 mx-auto mb-2 text-green-600" />
               <h4 className="font-semibold">AI Cover Letters</h4>
               <p className="text-sm text-muted-foreground">Generate personalized cover letters instantly</p>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <MessageSquare className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+              <h4 className="font-semibold">Interview Practice</h4>
+              <p className="text-sm text-muted-foreground">Practice with AI-powered phone interviews</p>
             </div>
           </div>
 
@@ -79,24 +79,24 @@ export function HeroDemoTabs() {
       <div className="text-center space-y-4">
         <h2 className="text-3xl font-bold">See What Our AI Can Do — No Sign-Up Needed</h2>
         <p className="text-lg text-muted-foreground max-w-4xl mx-auto">
-          Instantly improve your interview performance,resume, or cover letters. Just try one of the tools below to see how our
+          Instantly improve your resume, cover letter, or interview prep. Just try one of the tools below to see how our
           AI works—your first few actions are free. Sign up for full powered results.
         </p>
       </div>
 
-      <Tabs defaultValue="resume" className="w-full">
+      <Tabs defaultValue="interview" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="interview" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
+            <MessageSquare className="h-4 w-4" />
             Interview Prep
-          </TabsTri.gger>
+          </TabsTrigger>
           <TabsTrigger value="resume" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             Resume Optimizer
           </TabsTrigger>
           <TabsTrigger value="cover-letter" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Cover Letter
+            <Mail className="h-4 w-4" />
+            Cover Letter Generator
           </TabsTrigger>
         </TabsList>
 
