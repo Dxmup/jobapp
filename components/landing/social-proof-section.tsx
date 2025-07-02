@@ -41,7 +41,7 @@ export function SocialProofSection() {
   ]
 
   return (
-    <section className="py-16 bg-white dark:bg-slate-900 relative overflow-hidden">
+    <section className="py-32 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white relative overflow-hidden">
       {/* Background effects */}
       <div className="absolute inset-0">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full blur-3xl animate-pulse" />
@@ -50,19 +50,6 @@ export function SocialProofSection() {
       </div>
 
       <div className="container relative z-10">
-        <div className="text-center mb-20">
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-8">
-            Trusted by professionals at leading companies
-          </p>
-          <div className="flex justify-center items-center gap-12 opacity-60">
-            <div className="text-2xl font-bold text-slate-400">Microsoft</div>
-            <div className="text-2xl font-bold text-slate-400">Amazon</div>
-            <div className="text-2xl font-bold text-slate-400">Google</div>
-            <div className="text-2xl font-bold text-slate-400">Meta</div>
-            <div className="text-2xl font-bold text-slate-400">Apple</div>
-          </div>
-        </div>
-
         <ScrollReveal className="text-center mb-20">
           <h2 className="text-4xl md:text-6xl font-black mb-6 bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
             Join Thousands Who've Already

@@ -1,188 +1,232 @@
-import { LandingHeader } from "@/components/landing-header"
-import { LandingFooter } from "@/components/landing-footer"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Clock, Sparkles, Zap, Target, Users } from "lucide-react"
-import Link from "next/link"
+import { CheckCircle, Clock, Sparkles, Zap, Target, Users, ArrowLeft } from "lucide-react"
 
-export default function SignupPage() {
+export default function SignUpPage() {
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Animated Background */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-purple-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/30" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]" />
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Left side with gradient - matching landing page style */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            background: "linear-gradient(135deg, rgb(147, 51, 234) 0%, rgb(6, 182, 212) 100%)",
+            zIndex: 0,
+          }}
+        />
 
-        {/* Animated Blobs */}
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-cyan-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
+        {/* Animated background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-20 w-32 h-32 bg-white/10 rounded-full blur-xl animate-pulse" />
+          <div
+            className="absolute bottom-32 right-16 w-24 h-24 bg-cyan-300/20 rounded-full blur-lg animate-bounce"
+            style={{ animationDelay: "1s" }}
+          />
+          <div
+            className="absolute top-1/2 left-8 w-16 h-16 bg-purple-300/20 rounded-full blur-md animate-pulse"
+            style={{ animationDelay: "2s" }}
+          />
+        </div>
+
+        <div className="relative z-10 flex flex-col h-full p-10 text-white">
+          <div className="flex items-center text-lg font-medium">
+            <Link href="/" className="flex items-center group">
+              <div className="p-2 rounded-xl bg-white/20 mr-3 group-hover:scale-110 transition-transform duration-300">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-2xl font-bold text-white">JobCraft AI</span>
+            </Link>
+          </div>
+
+          <div className="mt-auto space-y-8">
+            <div>
+              <h2 className="text-3xl font-bold mb-4">The Future of Job Applications</h2>
+              <p className="text-lg text-white/90 leading-relaxed">
+                We're building something revolutionary that will transform how you approach your career. AI-powered
+                tools that understand your unique strengths and help you land your dream job.
+              </p>
+            </div>
+
+            <blockquote className="space-y-3 border-l-4 border-white/30 pl-6">
+              <p className="text-lg italic text-white/95">
+                "The early preview completely changed my job search strategy. I can't wait for the full launch!"
+              </p>
+              <footer className="text-sm text-white/80">Sarah Chen, Beta Tester</footer>
+            </blockquote>
+          </div>
+        </div>
       </div>
 
-      <LandingHeader />
-
-      <main className="flex-1 container mx-auto px-4 py-16">
-        {/* Hero Section */}
-        <div className="text-center mb-16">
-          <Badge
-            variant="secondary"
-            className="mb-6 bg-gradient-to-r from-purple-100 to-cyan-100 text-purple-700 border-purple-200"
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            Coming Soon
-          </Badge>
-
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-purple-600 via-purple-700 to-cyan-600 bg-clip-text text-transparent mb-6">
-            Get Ready for the Future of
-            <br />
-            <span className="text-5xl md:text-7xl">Job Applications</span>
-          </h1>
-
-          <p className="text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto mb-8">
-            JobCraft AI is launching soon with revolutionary AI-powered tools to transform your job search. Be among the
-            first to experience the future of career advancement.
-          </p>
-        </div>
-
-        {/* Waitlist Form */}
-        <Card className="max-w-md mx-auto mb-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-purple-200 dark:border-purple-800">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
-              Join the Waitlist
-            </CardTitle>
-            <CardDescription>Be the first to know when we launch and get exclusive early access</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                type="email"
-                placeholder="Enter your email address"
-                className="border-purple-200 focus:border-purple-400"
-              />
+      {/* Right side with coming soon content */}
+      <div className="flex-1 lg:w-1/2 flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+        {/* Mobile header */}
+        <div className="lg:hidden p-4 border-b bg-white/80 backdrop-blur-sm">
+          <Link href="/" className="flex items-center group">
+            <div className="p-2 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 mr-3 group-hover:scale-110 transition-transform duration-300">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <Button className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700">
-              <Zap className="w-4 h-4 mr-2" />
-              Get Early Access
-            </Button>
-            <p className="text-xs text-slate-500 text-center">
-              No spam, unsubscribe at any time. We respect your privacy.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Feature Preview */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
-            What's Coming
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-purple-200 dark:border-purple-800">
-              <CardHeader>
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-4">
-                  <Target className="w-6 h-6 text-white" />
-                </div>
-                <CardTitle>AI Resume Optimization</CardTitle>
-                <CardDescription>
-                  Automatically tailor your resume for each job application with advanced AI analysis
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-purple-200 dark:border-purple-800">
-              <CardHeader>
-                <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-2xl flex items-center justify-center mb-4">
-                  <Sparkles className="w-6 h-6 text-white" />
-                </div>
-                <CardTitle>Smart Cover Letters</CardTitle>
-                <CardDescription>
-                  Generate personalized, compelling cover letters that match your voice and the job requirements
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-purple-200 dark:border-purple-800">
-              <CardHeader>
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-4">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <CardTitle>Live Interview Prep</CardTitle>
-                <CardDescription>
-                  Practice with AI-powered mock interviews that adapt to your industry and experience level
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-        </div>
-
-        {/* Launch Timeline */}
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
-            Launch Timeline
-          </h2>
-
-          <div className="space-y-8">
-            <div className="flex items-center space-x-4">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-green-600 dark:text-green-400">Phase 1: Core Platform</h3>
-                <p className="text-slate-600 dark:text-slate-300">
-                  Basic job tracking and resume management - Completed
-                </p>
-              </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-700">
-                Complete
-              </Badge>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-white animate-spin" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-purple-600 dark:text-purple-400">Phase 2: AI Integration</h3>
-                <p className="text-slate-600 dark:text-slate-300">Resume optimization and cover letter generation</p>
-              </div>
-              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-                In Progress
-              </Badge>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-gradient-to-r from-slate-300 to-slate-400 rounded-full flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-400">Phase 3: Advanced Features</h3>
-                <p className="text-slate-600 dark:text-slate-300">Live interview prep and advanced analytics</p>
-              </div>
-              <Badge variant="outline">Coming Soon</Badge>
-            </div>
-          </div>
-        </div>
-
-        {/* CTA Section */}
-        <div className="text-center mt-16">
-          <p className="text-lg text-slate-600 dark:text-slate-300 mb-6">Already have an account?</p>
-          <Link href="/login">
-            <Button variant="outline" size="lg" className="border-purple-200 hover:border-purple-400 bg-transparent">
-              Sign In Instead
-            </Button>
+            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-cyan-500 bg-clip-text text-transparent">
+              JobCraft AI
+            </span>
           </Link>
         </div>
-      </main>
 
-      <LandingFooter />
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex items-center justify-center p-4 sm:p-6 lg:p-8 min-h-full">
+            <div className="w-full max-w-lg space-y-8 py-4">
+              {/* Back to home link */}
+              <div className="text-center">
+                <Link
+                  href="/"
+                  className="inline-flex items-center text-sm text-slate-600 hover:text-purple-600 transition-colors group"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+                  Back to Home
+                </Link>
+              </div>
+
+              {/* Coming Soon Badge */}
+              <div className="text-center">
+                <Badge
+                  variant="secondary"
+                  className="mb-6 bg-gradient-to-r from-purple-100 to-cyan-100 text-purple-700 border-purple-200 px-4 py-2"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Coming Soon
+                </Badge>
+
+                <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-600 via-purple-700 to-cyan-600 bg-clip-text text-transparent mb-4">
+                  Get Ready for Launch
+                </h1>
+
+                <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+                  JobCraft AI is launching soon with revolutionary AI-powered tools to transform your job search. Be
+                  among the first to experience the future of career advancement.
+                </p>
+              </div>
+
+              {/* Feature Preview Cards */}
+              <div className="space-y-4">
+                <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-xl flex items-center justify-center">
+                        <Target className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">AI Resume Optimization</CardTitle>
+                        <CardDescription className="text-sm">
+                          Automatically tailor your resume for each job application
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+
+                <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Smart Cover Letters</CardTitle>
+                        <CardDescription className="text-sm">
+                          Generate personalized, compelling cover letters instantly
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+
+                <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                        <Users className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Live Interview Prep</CardTitle>
+                        <CardDescription className="text-sm">Practice with AI-powered mock interviews</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              {/* Launch Timeline */}
+              <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
+                <CardHeader>
+                  <CardTitle className="text-center bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
+                    Launch Timeline
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-green-600">Phase 1: Core Platform</p>
+                      <p className="text-sm text-slate-600">Basic job tracking - Complete</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Clock className="w-4 h-4 text-white animate-spin" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-purple-600">Phase 2: AI Integration</p>
+                      <p className="text-sm text-slate-600">Resume optimization & cover letters</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-slate-300 to-slate-400 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Clock className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-600">Phase 3: Advanced Features</p>
+                      <p className="text-sm text-slate-600">Live interview prep & analytics</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* CTA Section */}
+              <div className="text-center space-y-4">
+                <p className="text-slate-600">Want to be notified when we launch?</p>
+                <Button
+                  asChild
+                  className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                >
+                  <Link href="/">
+                    <Zap className="w-4 h-4 mr-2" />
+                    Join Our Waitlist
+                  </Link>
+                </Button>
+
+                <div className="pt-4">
+                  <Link
+                    href="/login"
+                    className="text-sm text-slate-600 hover:text-purple-600 transition-colors underline underline-offset-4"
+                  >
+                    Already have an account? Sign In
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

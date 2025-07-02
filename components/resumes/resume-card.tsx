@@ -15,6 +15,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 
 interface ResumeCardProps {
   resume: {
@@ -31,6 +34,8 @@ interface ResumeCardProps {
 
 export function ResumeCard({ resume, onDelete, onDuplicate }: ResumeCardProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const { toast } = useToast()
+  const router = useRouter()
 
   const statusColors = {
     draft: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-100",
@@ -42,6 +47,33 @@ export function ResumeCard({ resume, onDelete, onDuplicate }: ResumeCardProps) {
     draft: "Draft",
     ready: "Ready",
     optimized: "AI Optimized",
+  }
+
+  const handleDeleteResume = async () => {
+    try {
+      const response = await fetch(`/api/resumes/${resume.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete resume")
+      }
+
+      toast({
+        title: "Resume deleted",
+        description: `"${resume.title}" has been permanently deleted.`,
+      })
+
+      onDelete?.(resume.id)
+      router.refresh()
+    } catch (error) {
+      console.error("Error deleting resume:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete resume. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -85,9 +117,19 @@ export function ResumeCard({ resume, onDelete, onDuplicate }: ResumeCardProps) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDelete?.(resume.id)} className="text-red-600 focus:text-red-600">
-                <Trash className="mr-2 h-4 w-4" />
-                <span>Delete</span>
+              <DropdownMenuItem asChild>
+                <DeleteConfirmationDialog
+                  title="Delete Resume"
+                  description="Are you sure you want to delete this resume? This will also remove it from any associated job applications."
+                  itemName={resume.title}
+                  onConfirm={handleDeleteResume}
+                  trigger={
+                    <div className="flex items-center w-full px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer rounded-sm">
+                      <Trash className="mr-2 h-4 w-4" />
+                      <span>Delete</span>
+                    </div>
+                  }
+                />
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

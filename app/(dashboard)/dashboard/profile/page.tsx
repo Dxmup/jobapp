@@ -10,7 +10,9 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Save, User, Mail, Calendar, Settings, Bell, Shield, Trash2 } from "lucide-react"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+import { Loader2, Save, User, Mail, Calendar, Settings, Bell, Shield, Trash2, AlertTriangle } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface UserProfile {
   id: string
@@ -23,6 +25,8 @@ interface UserProfile {
   city?: string
   state?: string
   zip_code?: string
+  marked_for_deletion?: boolean
+  deletion_date?: string
 }
 
 export default function ProfilePage() {
@@ -30,6 +34,7 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   // Form state
   const [formData, setFormData] = useState({
@@ -69,16 +74,16 @@ export default function ProfilePage() {
       const response = await fetch("/api/user/profile")
       const data = await response.json()
 
-      if (response.ok && data.profile) {
-        setProfile(data.profile)
+      if (response.ok && data.user) {
+        setProfile(data.user)
         setFormData({
-          full_name: data.profile.full_name || data.profile.name || "",
-          email: data.profile.email || "",
-          phone: data.profile.phone || "",
-          address: data.profile.address || "",
-          city: data.profile.city || "",
-          state: data.profile.state || "",
-          zip_code: data.profile.zip_code || "",
+          full_name: data.user.full_name || data.user.name || "",
+          email: data.user.email || "",
+          phone: data.user.phone || "",
+          address: data.user.address || "",
+          city: data.user.city || "",
+          state: data.user.state || "",
+          zip_code: data.user.zip_code || "",
         })
       }
     } catch (error) {
@@ -159,6 +164,61 @@ export default function ProfilePage() {
     }
   }
 
+  const handleDeleteAccount = async () => {
+    try {
+      const response = await fetch("/api/user/delete-account", {
+        method: "POST",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete account")
+      }
+
+      const data = await response.json()
+
+      toast({
+        title: "Account scheduled for deletion",
+        description: `Your account will be permanently deleted on ${new Date(data.deletion_date).toLocaleDateString()}. You have 30 days to cancel this action.`,
+      })
+
+      // Redirect to login page
+      router.push("/login")
+    } catch (error) {
+      console.error("Error deleting account:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCancelDeletion = async () => {
+    try {
+      const response = await fetch("/api/user/cancel-deletion", {
+        method: "POST",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to cancel deletion")
+      }
+
+      toast({
+        title: "Account deletion canceled",
+        description: "Your account deletion has been successfully canceled.",
+      })
+
+      await fetchProfile()
+    } catch (error) {
+      console.error("Error canceling deletion:", error)
+      toast({
+        title: "Error",
+        description: "Failed to cancel account deletion. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const getUserInitials = (name: string | null, email: string | null) => {
     if (name) {
       return name
@@ -172,6 +232,14 @@ export default function ProfilePage() {
       return email[0].toUpperCase()
     }
     return "U"
+  }
+
+  const getDaysUntilDeletion = (deletionDate: string) => {
+    const deletion = new Date(deletionDate)
+    const now = new Date()
+    const diffTime = deletion.getTime() - now.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
   }
 
   if (isLoading) {
@@ -190,6 +258,28 @@ export default function ProfilePage() {
         <h1 className="text-3xl font-bold">Profile & Settings</h1>
         <p className="text-muted-foreground">Manage your account information, preferences, and settings.</p>
       </div>
+
+      {/* Account Deletion Warning */}
+      {profile?.marked_for_deletion && profile?.deletion_date && (
+        <Card className="mb-6 border-destructive bg-destructive/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Account Scheduled for Deletion
+            </CardTitle>
+            <CardDescription>
+              Your account is scheduled to be permanently deleted on{" "}
+              <strong>{new Date(profile.deletion_date).toLocaleDateString()}</strong> (
+              {getDaysUntilDeletion(profile.deletion_date)} days remaining). All your data will be permanently removed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleCancelDeletion} variant="outline">
+              Cancel Account Deletion
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Profile Header */}
       <Card className="mb-6">
@@ -593,19 +683,50 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-destructive">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">
                 <Trash2 className="w-5 h-5" />
                 Delete Account
               </CardTitle>
-              <CardDescription>Permanently delete your account and all associated data.</CardDescription>
+              <CardDescription>
+                Permanently delete your account and all associated data. This action cannot be undone.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Once you delete your account, there is no going back. All of your data will be permanently deleted.
-              </p>
-              <Button variant="destructive">Delete Account</Button>
+              <div className="space-y-4">
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <h4 className="font-medium text-destructive mb-2">What will be deleted:</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• All job applications and tracking data</li>
+                    <li>• All resumes and cover letters</li>
+                    <li>• All interview preparation data</li>
+                    <li>• Your profile and personal information</li>
+                    <li>• All uploaded files and documents</li>
+                  </ul>
+                </div>
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Grace Period:</h4>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    Your account will be scheduled for deletion with a 30-day grace period. You can cancel the deletion
+                    at any time during this period by logging back in.
+                  </p>
+                </div>
+                {!profile?.marked_for_deletion && (
+                  <DeleteConfirmationDialog
+                    title="Delete Account"
+                    description="Are you absolutely sure you want to delete your account? This will schedule your account for permanent deletion in 30 days. All your data will be permanently removed and cannot be recovered."
+                    itemName={`${profile?.name || "your account"} (${profile?.email})`}
+                    onConfirm={handleDeleteAccount}
+                    trigger={
+                      <Button variant="destructive" className="w-full">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete My Account
+                      </Button>
+                    }
+                  />
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
