@@ -4,66 +4,76 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-  LayoutDashboard,
-  Users,
+  BarChart3,
   FileText,
-  Settings,
-  Database,
   MessageSquare,
-  Activity,
+  Settings,
+  Shield,
+  Users,
+  Database,
   TestTube,
   BookOpen,
+  Home,
+  LogOut,
   Zap,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
 
-const sidebarItems = [
+const navigation = [
   {
-    title: "Overview",
+    name: "Dashboard",
     href: "/admin",
-    icon: LayoutDashboard,
+    icon: Home,
   },
   {
-    title: "Users",
+    name: "Users",
     href: "/admin/users",
     icon: Users,
   },
   {
-    title: "Blogs",
-    href: "/admin/blogs",
+    name: "Audit Logs",
+    href: "/admin/audit-logs",
+    icon: Shield,
+  },
+  {
+    name: "Analytics",
+    href: "/admin/analytics",
+    icon: BarChart3,
+  },
+  {
+    name: "Content",
+    href: "/admin/content",
     icon: FileText,
   },
   {
-    title: "Testimonials",
+    name: "Blogs",
+    href: "/admin/blogs",
+    icon: BookOpen,
+  },
+  {
+    name: "Testimonials",
     href: "/admin/testimonials",
     icon: MessageSquare,
   },
   {
-    title: "Prompts",
+    name: "Prompts",
     href: "/admin/prompts",
     icon: Zap,
   },
   {
-    title: "Content",
-    href: "/admin/content",
-    icon: BookOpen,
-  },
-  {
-    title: "Audit Logs",
-    href: "/admin/audit-logs",
-    icon: Activity,
-  },
-  {
-    title: "Testing",
+    name: "Testing",
     href: "/admin/testing",
     icon: TestTube,
   },
   {
-    title: "Migrations",
+    name: "Migrations",
     href: "/admin/migrations",
     icon: Database,
   },
   {
-    title: "Settings",
+    name: "Settings",
     href: "/admin/settings",
     icon: Settings,
   },
@@ -72,33 +82,56 @@ const sidebarItems = [
 export function AdminSidebar() {
   const pathname = usePathname()
 
-  return (
-    <div className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-72 bg-white border-r border-gray-200 overflow-y-auto">
-      <div className="p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Admin Panel</h2>
-        <nav className="space-y-2">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin/logout", { method: "POST" })
+      window.location.href = "/admin/login"
+    } catch (error) {
+      console.error("Logout failed:", error)
+    }
+  }
 
+  return (
+    <div className="flex h-full w-64 flex-col bg-gray-50 dark:bg-gray-900">
+      <div className="flex h-16 items-center px-6">
+        <h1 className="text-xl font-bold">Admin Panel</h1>
+      </div>
+
+      <Separator />
+
+      <ScrollArea className="flex-1 px-3">
+        <div className="space-y-1 py-4">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href
             return (
               <Link
-                key={item.href}
+                key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800",
                   isActive
-                    ? "bg-blue-50 text-blue-700 border border-blue-200"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
+                    ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                    : "text-gray-600 dark:text-gray-400",
                 )}
               >
-                <Icon className="h-4 w-4" />
-                {item.title}
+                <item.icon className="h-4 w-4" />
+                {item.name}
               </Link>
             )
           })}
-        </nav>
+        </div>
+      </ScrollArea>
+
+      <Separator />
+
+      <div className="p-4">
+        <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </div>
     </div>
   )
 }
+
+export default AdminSidebar

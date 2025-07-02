@@ -19,21 +19,21 @@ export default function UploadResumePage({ params }: { params: { id: string } })
   const router = useRouter()
   const { toast } = useToast()
   const jobId = params.id
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
       setSelectedFile(file)
-      
+
       // Auto-set resume name based on file name
       const fileName = file.name.replace(/\.[^/.]+$/, "") // Remove extension
       setResumeName(fileName)
     }
   }
-  
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!selectedFile) {
       toast({
         title: "No file selected",
@@ -42,19 +42,30 @@ export default function UploadResumePage({ params }: { params: { id: string } })
       })
       return
     }
-    
+
     setIsUploading(true)
-    
+
     try {
-      // Simulate file upload
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      
+      const formData = new FormData()
+      formData.append("file", selectedFile)
+      formData.append("name", resumeName)
+      formData.append("jobId", jobId)
+
+      const response = await fetch("/api/resumes", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error("Upload failed")
+      }
+
       toast({
         title: "Resume uploaded",
         description: "Your resume has been uploaded successfully.",
       })
-      
-      router.push(`/dashboard/jobs/${jobId}`)
+
+      router.push(`/jobs/${jobId}`)
     } catch (error) {
       console.error("Error uploading resume:", error)
       toast({
@@ -66,25 +77,23 @@ export default function UploadResumePage({ params }: { params: { id: string } })
       setIsUploading(false)
     }
   }
-  
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" asChild>
-          <Link href={`/dashboard/jobs/${jobId}`}>
+          <Link href={`/jobs/${jobId}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <h1 className="text-2xl font-bold tracking-tight">Upload Resume</h1>
       </div>
-      
+
       <Card className="max-w-2xl mx-auto">
         <form onSubmit={handleUpload}>
           <CardHeader>
             <CardTitle>Upload Your Resume</CardTitle>
-            <CardDescription>
-              Upload your existing resume to use for this job application.
-            </CardDescription>
+            <CardDescription>Upload your existing resume to use for this job application.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -97,7 +106,7 @@ export default function UploadResumePage({ params }: { params: { id: string } })
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="resume-file">Resume File</Label>
               <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
@@ -108,19 +117,17 @@ export default function UploadResumePage({ params }: { params: { id: string } })
                   accept=".pdf,.doc,.docx"
                   onChange={handleFileChange}
                 />
-                
+
                 {selectedFile ? (
                   <div className="text-center">
                     <FileUp className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
                     <p className="font-medium">{selectedFile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
+                    <p className="text-sm text-muted-foreground">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="mt-2"
+                      className="mt-2 bg-transparent"
                       onClick={() => {
                         const fileInput = document.getElementById("resume-file") as HTMLInputElement
                         fileInput.click()
@@ -133,9 +140,7 @@ export default function UploadResumePage({ params }: { params: { id: string } })
                   <div className="text-center">
                     <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
                     <p className="font-medium">Drag and drop your resume here</p>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Supports PDF, DOC, and DOCX files up to 5MB
-                    </p>
+                    <p className="text-sm text-muted-foreground mb-2">Supports PDF, DOC, and DOCX files up to 5MB</p>
                     <Button
                       type="button"
                       variant="outline"
@@ -146,6 +151,17 @@ export default function UploadResumePage({ params }: { params: { id: string } })
                     >
                       Browse Files
                     </Button>
-                  </div
+                  </div>
+                )}
+              </div>
+            </div>
 
-\
+            <Button type="submit" className="w-full" disabled={isUploading || !selectedFile}>
+              {isUploading ? "Uploading..." : "Upload Resume"}
+            </Button>
+          </CardContent>
+        </form>
+      </Card>
+    </div>
+  )
+}
