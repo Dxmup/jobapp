@@ -85,7 +85,4 @@ export function SocialProofSection() {
             </div>
           </div>
         </ScrollReveal>
-      </div>
-    </section>
-  )
-}
+      </dSoftware Engineer
