@@ -1,13 +1,23 @@
-CREATE TABLE IF NOT EXISTS public.waitlist (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email TEXT UNIQUE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Create waitlist table to store email signups
+CREATE TABLE IF NOT EXISTS waitlist (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  source VARCHAR(50) DEFAULT 'unknown',
+  metadata JSONB DEFAULT '{}'::jsonb
 );
 
--- Optional: Add an index for faster lookups on email
-CREATE INDEX IF NOT EXISTS idx_waitlist_email ON public.waitlist (email);
+-- Create index for faster email lookups
+CREATE INDEX IF NOT EXISTS idx_waitlist_email ON waitlist(email);
+CREATE INDEX IF NOT EXISTS idx_waitlist_created_at ON waitlist(created_at DESC);
 
--- Optional: Add RLS policies if you want to control access
--- For a public waitlist, you might allow anonymous inserts
--- ALTER TABLE public.waitlist ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow public insert" ON public.waitlist FOR INSERT WITH CHECK (true);
+-- Add RLS (Row Level Security) if needed
+ALTER TABLE waitlist ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow inserts (for public signups)
+CREATE POLICY "Allow public waitlist signups" ON waitlist
+  FOR INSERT WITH CHECK (true);
+
+-- Create policy to allow admin reads
+CREATE POLICY "Allow admin waitlist reads" ON waitlist
+  FOR SELECT USING (true);
