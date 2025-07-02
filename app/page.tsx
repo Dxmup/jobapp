@@ -1,25 +1,21 @@
-import { Suspense } from "react"
-import LandingHeader from "@/components/landing-header"
-import LandingHero from "@/components/landing-hero"
-import LandingPricing from "@/components/landing-pricing"
-import LandingFooter from "@/components/landing-footer"
-import { LandingFeatures, MagneticCursor } from "./client-components"
+import { LandingHero } from "@/components/landing-hero"
+import { LandingPricing } from "@/components/landing-pricing"
+import { LandingHeader } from "@/components/landing-header"
+import { LandingFooter } from "@/components/landing-footer"
+import { SocialProofSection } from "@/components/landing/social-proof-section"
+import { LandingFeatures } from "@/components/landing-features"
 
-export default function HomePage() {
+export default function Home() {
   return (
-    <div className="min-h-screen">
+    <div className="flex flex-col min-h-screen">
       <LandingHeader />
-      <main>
+      <main className="flex-1">
         <LandingHero />
-        <Suspense fallback={<div className="h-96 animate-pulse bg-gradient-to-r from-purple-50 to-cyan-50" />}>
-          <LandingFeatures />
-        </Suspense>
+        <LandingFeatures />
+        <SocialProofSection />
         <LandingPricing />
       </main>
       <LandingFooter />
-      <Suspense fallback={null}>
-        <MagneticCursor />
-      </Suspense>
     </div>
   )
 }
