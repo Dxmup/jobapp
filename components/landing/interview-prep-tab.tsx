@@ -1,246 +1,135 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, MessageSquare, Lightbulb } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, MessageSquare, Briefcase, Clock } from "lucide-react"
 
-interface InterviewPrepTabProps {
-  onActionUsed: () => void
-  isDisabled: boolean
-}
+const sampleQuestions = [
+  "Tell me about yourself and your background in software development.",
+  "What interests you most about this Senior Frontend Developer position?",
+  "Describe a challenging project you've worked on and how you overcame obstacles.",
+  "How do you stay current with the latest frontend technologies and best practices?",
+  "Walk me through your approach to debugging a complex React application.",
+  "How do you ensure your code is maintainable and scalable?",
+  "Describe a time when you had to collaborate with designers and backend developers.",
+  "What's your experience with testing frameworks and writing unit tests?",
+]
 
-export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabProps) {
-  const [jobDescription, setJobDescription] = useState("")
-  const [role, setRole] = useState("")
-  const [experience, setExperience] = useState("")
+export function InterviewPrepTab() {
+  const [isGenerating, setIsGenerating] = useState(false)
   const [questions, setQuestions] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-  const { toast } = useToast()
+  const [jobTitle, setJobTitle] = useState("Senior Frontend Developer")
 
-  const handleGenerate = async () => {
-    if (isDisabled) {
-      toast({
-        title: "Demo limit reached",
-        description: "Sign up to continue using our AI tools!",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!jobDescription.trim()) {
-      setError("Please enter a job description")
-      return
-    }
-
-    if (jobDescription.length < 50) {
-      setError("Job description must be at least 50 characters")
-      return
-    }
-
-    setIsLoading(true)
-    setError("")
-    setQuestions([])
-
-    try {
-      console.log("🚀 Calling interview questions API...")
-
-      const response = await fetch("/api/landing/generate-interview-questions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          jobDescription: jobDescription.trim(),
-          role: role.trim(),
-          experience: experience || "entry to mid-level",
-        }),
-      })
-
-      console.log("📡 Response status:", response.status)
-      console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()))
-
-      // Check if response is JSON
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        console.error("❌ Response is not JSON, content-type:", contentType)
-        const textResponse = await response.text()
-        console.error("❌ Response text:", textResponse.substring(0, 200))
-        throw new Error("Server returned invalid response format. Please try again.")
-      }
-
-      // Parse JSON
-      let data
-      try {
-        data = await response.json()
-        console.log("✅ Parsed JSON response:", data)
-      } catch (jsonError) {
-        console.error("❌ Failed to parse JSON:", jsonError)
-        throw new Error("Server returned invalid JSON. Please try again.")
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || `Server error: ${response.status}`)
-      }
-
-      if (data.success && data.questions && Array.isArray(data.questions)) {
-        setQuestions(data.questions)
-        onActionUsed() // Count this as a demo action
-        toast({
-          title: "Questions generated!",
-          description: "Practice these questions to ace your interview.",
-        })
-      } else {
-        throw new Error(data.error || "Invalid response format")
-      }
-    } catch (err) {
-      console.error("❌ Error generating interview questions:", err)
-      const errorMessage = err instanceof Error ? err.message : "Failed to generate interview questions"
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  const generateQuestions = async () => {
+    setIsGenerating(true)
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    setQuestions(sampleQuestions)
+    setIsGenerating(false)
   }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Interview Question Generator
-          </CardTitle>
-          <CardDescription>
-            Generate tailored interview questions based on the job description. Practice your answers to ace the
-            interview!
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="job-description">
-              Job Description <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              id="job-description"
-              placeholder="Paste the job description here... (minimum 50 characters)"
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              className="min-h-[120px] resize-none"
-              disabled={isDisabled}
-            />
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>{jobDescription.length} characters</span>
-              <span>Minimum: 50 characters</span>
-            </div>
-          </div>
+      <div className="text-center space-y-4">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+          <MessageSquare className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">AI Interview Preparation</span>
+        </div>
+        <h3 className="text-2xl font-bold">Practice with Confidence</h3>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Get personalized interview questions based on the job description. Practice your responses and build
+          confidence for the real interview.
+        </p>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="role">Role/Position (Optional)</Label>
-              <Input
-                id="role"
-                placeholder="e.g., Software Engineer, Marketing Manager"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                disabled={isDisabled}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="experience">Experience Level</Label>
-              <Select value={experience} onValueChange={setExperience} disabled={isDisabled}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select experience level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="entry-level">Entry Level (0-2 years)</SelectItem>
-                  <SelectItem value="mid-level">Mid Level (3-5 years)</SelectItem>
-                  <SelectItem value="senior-level">Senior Level (6+ years)</SelectItem>
-                  <SelectItem value="executive">Executive/Leadership</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-              {error}
-            </div>
-          )}
-
-          <Button
-            onClick={handleGenerate}
-            disabled={isLoading || isDisabled || !jobDescription.trim() || jobDescription.length < 50}
-            className="w-full"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating Questions...
-              </>
-            ) : (
-              <>
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Generate Interview Questions
-              </>
-            )}
-          </Button>
-
-          {isDisabled && (
-            <div className="p-3 text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
-              Demo limit reached. Sign up to generate unlimited interview questions!
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {questions.length > 0 && (
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <div>
-              <CardTitle>Interview Questions</CardTitle>
-              <CardDescription>Practice these questions to prepare for your interview</CardDescription>
-            </div>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5" />
+              Job Position
+            </CardTitle>
+            <CardDescription>The AI will generate questions specific to this role</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-4">
-              {questions.map((question, index) => (
-                <div key={index} className="p-4 border rounded-lg bg-card">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-muted-foreground">Question {index + 1}</span>
+            <div className="p-4 bg-muted rounded-lg">
+              <h4 className="font-semibold text-lg">{jobTitle}</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                We're looking for an experienced frontend developer to join our team and help build the next generation
+                of our web applications using React, TypeScript, and modern development practices.
+              </p>
+            </div>
+            <Button onClick={generateQuestions} disabled={isGenerating} className="w-full">
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating Questions...
+                </>
+              ) : (
+                "Generate Interview Questions"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Interview Questions
+              {questions.length > 0 && (
+                <Badge variant="secondary" className="ml-auto">
+                  {questions.length} questions
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              {questions.length > 0
+                ? "Practice these questions to prepare for your interview"
+                : "Click generate to see personalized questions"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {questions.length > 0 ? (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {questions.map((question, index) => (
+                  <div key={index} className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                        {index + 1}
                       </div>
-                      <p className="font-medium leading-relaxed">{question}</p>
+                      <p className="text-sm leading-relaxed flex-1">{question}</p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Generate questions to start practicing</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Lightbulb className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
-                <div className="space-y-2">
-                  <h4 className="font-medium text-blue-900 dark:text-blue-100">Interview Tips</h4>
-                  <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                    <li>• Practice your answers out loud before the interview</li>
-                    <li>• Use the STAR method (Situation, Task, Action, Result) for behavioral questions</li>
-                    <li>• Research the company and prepare thoughtful questions to ask</li>
-                    <li>• Have specific examples ready that demonstrate your skills</li>
-                  </ul>
+      {questions.length > 0 && (
+        <Card className="bg-gradient-to-r from-purple-50 to-cyan-50 dark:from-purple-950/20 dark:to-cyan-950/20 border-purple-200 dark:border-purple-800">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-lg">Practice Tips</h4>
+                <p className="text-sm text-muted-foreground">
+                  Practice answering these questions out loud. Use the STAR method (Situation, Task, Action, Result) for
+                  behavioral questions. Take your time and provide specific examples from your experience.
+                </p>
               </div>
             </div>
           </CardContent>

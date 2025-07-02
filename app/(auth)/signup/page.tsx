@@ -1,10 +1,45 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Clock, Sparkles, Zap, Target, Users, ArrowLeft } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { CheckCircle, Clock, Sparkles, Zap, Target, Users, ArrowLeft, Loader2, Mail } from "lucide-react"
 
 export default function SignUpPage() {
+  const [email, setEmail] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email || !email.includes("@")) {
+      setError("Please enter a valid email address")
+      return
+    }
+
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      // Simulate API call - replace with actual waitlist API
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      setIsSubmitted(true)
+      setEmail("")
+    } catch (err) {
+      setError("Something went wrong. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left side with gradient - matching landing page style */}
@@ -112,6 +147,89 @@ export default function SignUpPage() {
                 </p>
               </div>
 
+              {/* Waitlist Form */}
+              {!isSubmitted ? (
+                <Card className="bg-white/80 backdrop-blur-sm border-purple-200 shadow-lg">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-xl bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent flex items-center justify-center gap-2">
+                      <Mail className="w-5 h-5 text-purple-600" />
+                      Join Our Waitlist
+                    </CardTitle>
+                    <CardDescription>
+                      Be the first to know when we launch and get exclusive early access
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+                      {error && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email Address</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Enter your email address"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="border-purple-200 focus:border-purple-400"
+                          disabled={isSubmitting}
+                          required
+                        />
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting || !email}
+                        className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Joining Waitlist...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Join Waitlist
+                          </>
+                        )}
+                      </Button>
+
+                      <p className="text-xs text-center text-slate-500">
+                        No spam, unsubscribe at any time. We respect your privacy.
+                      </p>
+                    </form>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-lg">
+                  <CardContent className="pt-6">
+                    <div className="text-center space-y-4">
+                      <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                        <CheckCircle className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-green-700 mb-2">You're on the list!</h3>
+                        <p className="text-green-600">
+                          Thanks for joining our waitlist. We'll notify you as soon as JobCraft AI launches.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => setIsSubmitted(false)}
+                        variant="outline"
+                        className="border-green-300 text-green-700 hover:bg-green-50"
+                      >
+                        Add Another Email
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Feature Preview Cards */}
               <div className="space-y-4">
                 <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
@@ -203,17 +321,6 @@ export default function SignUpPage() {
 
               {/* CTA Section */}
               <div className="text-center space-y-4">
-                <p className="text-slate-600">Want to be notified when we launch?</p>
-                <Button
-                  asChild
-                  className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
-                >
-                  <Link href="/">
-                    <Zap className="w-4 h-4 mr-2" />
-                    Join Our Waitlist
-                  </Link>
-                </Button>
-
                 <div className="pt-4">
                   <Link
                     href="/login"
