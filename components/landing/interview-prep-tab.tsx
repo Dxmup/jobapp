@@ -187,18 +187,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
             )}
           </div>
 
-          {/* Progress Indicator */}
-          <div className="flex items-center justify-center gap-4">
-            <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-              {playedAudioFiles.length} / {audioFiles.length} Questions Practiced
-            </Badge>
-            {availableAudioFiles.length > 0 && (
-              <Badge variant="outline" className="border-cyan-200 text-cyan-700">
-                {availableAudioFiles.length} Remaining
-              </Badge>
-            )}
-          </div>
-
           {currentAudio && (
             <div className="text-center">
               <Badge variant="secondary" className="bg-purple-100 text-purple-700">
