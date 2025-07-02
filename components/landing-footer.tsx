@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-export function LandingFooter() {
+export default function LandingFooter() {
   return (
     <footer className="border-t py-12 bg-muted/30">
       <div className="container">

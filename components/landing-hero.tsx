@@ -30,7 +30,7 @@ const EnhancedHeroDemoTabs = dynamic(
   },
 )
 
-export function LandingHero() {
+export default function LandingHero() {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-purple-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/30">
       {/* Animated background elements */}
