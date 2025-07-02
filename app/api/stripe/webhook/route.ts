@@ -1,136 +1,164 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { headers } from "next/headers"
-import { stripe } from "@/lib/stripe"
+import Stripe from "stripe"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { updateUserSubscription, getSubscriptionTierFromProduct } from "@/lib/subscription-service"
 
-export async function POST(request: Request) {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-06-20",
+})
+
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!
+
+export async function POST(request: NextRequest) {
   const body = await request.text()
-  const signature = headers().get("stripe-signature") as string
+  const headersList = headers()
+  const sig = headersList.get("stripe-signature")!
 
-  if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    return NextResponse.json({ error: "Stripe webhook secret is not set" }, { status: 500 })
-  }
-
-  let event
+  let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET)
-  } catch (error: any) {
-    console.error(`Webhook signature verification failed: ${error.message}`)
-    return NextResponse.json({ error: `Webhook signature verification failed` }, { status: 400 })
+    event = stripe.webhooks.constructEvent(body, sig, endpointSecret)
+  } catch (err: any) {
+    console.error(`Webhook signature verification failed.`, err.message)
+    return NextResponse.json({ error: "Webhook signature verification failed" }, { status: 400 })
   }
 
   const supabase = createServerSupabaseClient()
 
-  // Handle the event
-  switch (event.type) {
-    case "customer.subscription.created":
-    case "customer.subscription.updated": {
-      const subscription = event.data.object as any
-      const userId = subscription.metadata.supabase_user_id
+  try {
+    switch (event.type) {
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
 
-      if (!userId) {
-        console.error("No user ID found in subscription metadata")
+        // Get customer details
+        const customer = await stripe.customers.retrieve(customerId)
+        if (!customer || customer.deleted) {
+          throw new Error("Customer not found")
+        }
+
+        const email = (customer as Stripe.Customer).email
+        if (!email) {
+          throw new Error("Customer email not found")
+        }
+
+        // Update user subscription in database
+        const { error } = await supabase
+          .from("user_profiles")
+          .update({
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscription.id,
+            subscription_status: subscription.status,
+            subscription_plan: subscription.items.data[0]?.price.id,
+            subscription_current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+            subscription_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("email", email)
+
+        if (error) {
+          console.error("Error updating subscription:", error)
+          throw error
+        }
+
+        console.log(`Subscription ${subscription.status} for customer ${customerId}`)
         break
       }
 
-      // Get the price details
-      const price = await stripe.prices.retrieve(subscription.items.data[0].price.id)
-      const productId = price.product as string
-      const product = await stripe.products.retrieve(productId)
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
 
-      // Determine subscription tier from product name
-      const tier = getSubscriptionTierFromProduct(product.name)
+        // Get customer details
+        const customer = await stripe.customers.retrieve(customerId)
+        if (!customer || customer.deleted) {
+          throw new Error("Customer not found")
+        }
 
-      // Update or insert the subscription in our database
-      const { error } = await supabase.from("subscriptions").upsert(
-        {
-          user_id: userId,
-          stripe_subscription_id: subscription.id,
-          stripe_customer_id: subscription.customer,
-          stripe_price_id: subscription.items.data[0].price.id,
-          stripe_product_id: productId,
-          product_name: product.name,
-          price_amount: price.unit_amount,
-          price_interval: price.recurring?.interval,
-          status: subscription.status,
-          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-          cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
-          canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
-        },
-        {
-          onConflict: "stripe_subscription_id",
-        },
-      )
+        const email = (customer as Stripe.Customer).email
+        if (!email) {
+          throw new Error("Customer email not found")
+        }
 
-      if (error) {
-        console.error("Error updating subscription:", error)
+        // Update user subscription status to cancelled
+        const { error } = await supabase
+          .from("user_profiles")
+          .update({
+            subscription_status: "canceled",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("email", email)
+
+        if (error) {
+          console.error("Error cancelling subscription:", error)
+          throw error
+        }
+
+        console.log(`Subscription cancelled for customer ${customerId}`)
+        break
       }
 
-      // Update the user's subscription status and tier
-      await updateUserSubscription(userId, {
-        tier,
-        status: subscription.status === "active" ? "active" : subscription.status,
-        expiresAt: new Date(subscription.current_period_end * 1000),
-        stripeCustomerId: subscription.customer,
-      })
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as Stripe.Invoice
+        const customerId = invoice.customer as string
 
-      break
-    }
-    case "customer.subscription.deleted": {
-      const subscription = event.data.object as any
-      const userId = subscription.metadata.supabase_user_id
+        // Get customer details
+        const customer = await stripe.customers.retrieve(customerId)
+        if (!customer || customer.deleted) {
+          throw new Error("Customer not found")
+        }
 
-      // Update the subscription status in our database
-      await supabase
-        .from("subscriptions")
-        .update({
-          status: "canceled",
-          canceled_at: new Date().toISOString(),
-        })
-        .eq("stripe_subscription_id", subscription.id)
+        const email = (customer as Stripe.Customer).email
+        if (!email) {
+          throw new Error("Customer email not found")
+        }
 
-      // Reset the user's subscription to free tier
-      if (userId) {
-        await updateUserSubscription(userId, {
-          tier: "free",
-          status: "active",
-          expiresAt: undefined,
-        })
+        // Update payment status
+        const { error } = await supabase
+          .from("user_profiles")
+          .update({
+            last_payment_date: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("email", email)
+
+        if (error) {
+          console.error("Error updating payment status:", error)
+          throw error
+        }
+
+        console.log(`Payment succeeded for customer ${customerId}`)
+        break
       }
 
-      break
-    }
-    case "invoice.payment_failed": {
-      const invoice = event.data.object as any
-      const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
-      const userId = subscription.metadata.supabase_user_id
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice
+        const customerId = invoice.customer as string
 
-      if (userId) {
-        await updateUserSubscription(userId, {
-          status: "past_due",
-        })
+        // Get customer details
+        const customer = await stripe.customers.retrieve(customerId)
+        if (!customer || customer.deleted) {
+          throw new Error("Customer not found")
+        }
+
+        const email = (customer as Stripe.Customer).email
+        if (!email) {
+          throw new Error("Customer email not found")
+        }
+
+        // Handle failed payment - could send notification, update status, etc.
+        console.log(`Payment failed for customer ${customerId}`)
+        break
       }
 
-      break
+      default:
+        console.log(`Unhandled event type ${event.type}`)
     }
-    case "invoice.payment_succeeded": {
-      const invoice = event.data.object as any
-      const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
-      const userId = subscription.metadata.supabase_user_id
 
-      if (userId) {
-        await updateUserSubscription(userId, {
-          status: "active",
-          expiresAt: new Date(subscription.current_period_end * 1000),
-        })
-      }
-
-      break
-    }
+    return NextResponse.json({ received: true })
+  } catch (error) {
+    console.error("Error processing webhook:", error)
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 })
   }
-
-  return NextResponse.json({ received: true })
 }
