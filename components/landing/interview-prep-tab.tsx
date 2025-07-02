@@ -216,17 +216,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
               </p>
             </div>
           )}
-
-          <div className="bg-white/80 p-4 rounded-lg border border-purple-100">
-            <h4 className="font-medium text-purple-800 mb-2">🎯 How to Practice:</h4>
-            <ul className="text-sm text-purple-700 space-y-1">
-              <li>• Click "Play Random Question" to hear a unique interview question</li>
-              <li>• Each question will only play once until you reset the queue</li>
-              <li>• Listen carefully and take a moment to think</li>
-              <li>• Answer out loud as if you're in a real interview</li>
-              <li>• Track your progress as you complete each question</li>
-            </ul>
-          </div>
         </CardContent>
       </Card>
 
