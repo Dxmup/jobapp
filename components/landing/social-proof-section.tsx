@@ -74,11 +74,7 @@ export function SocialProofSection() {
                 ))}
               </div>
               <blockquote className="text-2xl md:text-3xl font-medium text-white mb-6 leading-relaxed">
-                "JobCraft AI didn't just help me get a job—it helped me land my dream role at Google. The AI-optimized
-                resume got me 5x more interviews than my old one."
-              </blockquote>
-              <div className="flex items-center justify-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                "JobCraft AI didn't just help me get a job—it helped me land my dream role at Google. The AI-optimized practice interviews gave me the confidence I needed to crush my interviews."terviews">
                   SM
                 </div>
                 <div className="text-left">
