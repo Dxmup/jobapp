@@ -1,10 +1,35 @@
-import { createServerClient } from "@supabase/ssr"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createServerClient as createSSRClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
-export function createServerSupabaseClient() {
+/**
+ * Creates a Supabase client with service role privileges for server-side operations.
+ * This client has full access to the database and bypasses Row Level Security (RLS).
+ */
+export function createClient() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      persistSession: false,
+    },
+  })
+}
+
+/**
+ * Creates a Supabase client with user session for server-side operations.
+ * This client respects Row Level Security (RLS) policies.
+ */
+export function createServerClient() {
   const cookieStore = cookies()
 
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createSSRClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -14,23 +39,40 @@ export function createServerSupabaseClient() {
           cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
         } catch {
           // The `setAll` method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing
-          // user sessions.
+          // This can be ignored if you have middleware refreshing user sessions.
         }
       },
     },
   })
 }
 
-export function createServiceRoleClient() {
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    cookies: {
-      getAll() {
-        return []
-      },
-      setAll() {
-        // No-op for service role client
+/**
+ * Creates a Supabase client with service role privileges.
+ * Alias for createClient() for backward compatibility.
+ */
+export function createServerSupabaseClient() {
+  return createClient()
+}
+
+/**
+ * Creates an admin Supabase client with full privileges.
+ */
+export function createAdminClient() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Missing Supabase admin environment variables")
+  }
+
+  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        "Content-Type": "application/json",
       },
     },
   })
 }
+
+// Export default for backward compatibility
+export default createClient
