@@ -1,22 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-
-export type SubscriptionTier = "free" | "pro" | "premium"
-
-interface Subscription {
-  id: string
-  product_name: string
-  price_amount: number
-  price_interval: string
-  current_period_end: string
-  cancel_at: string | null
-  status: string
-}
+import { type UserSubscription, hasFeatureAccess, getSubscriptionLimits } from "@/lib/subscription-service"
 
 export function useSubscription() {
-  const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [tier, setTier] = useState<SubscriptionTier>("free")
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,30 +12,18 @@ export function useSubscription() {
     async function fetchSubscription() {
       try {
         setIsLoading(true)
-        const response = await fetch("/api/stripe/subscription")
+        const response = await fetch("/api/user/subscription")
         const data = await response.json()
 
         if (data.subscription) {
           setSubscription(data.subscription)
-
-          // Set the tier based on the subscription
-          if (data.subscription.product_name.toLowerCase().includes("pro")) {
-            setTier("pro")
-          } else if (
-            data.subscription.product_name.toLowerCase().includes("premium") ||
-            data.subscription.product_name.toLowerCase().includes("enterprise")
-          ) {
-            setTier("premium")
-          } else {
-            setTier("free")
-          }
         } else {
-          setTier("free")
+          setSubscription({ tier: "free", status: "active" })
         }
       } catch (err) {
         console.error("Error fetching subscription:", err)
         setError("Failed to load subscription data")
-        setTier("free") // Default to free on error
+        setSubscription({ tier: "free", status: "active" }) // Default to free on error
       } finally {
         setIsLoading(false)
       }
@@ -58,10 +34,13 @@ export function useSubscription() {
 
   return {
     subscription,
-    tier,
     isLoading,
     error,
-    isPro: tier === "pro" || tier === "premium",
-    isPremium: tier === "premium",
+    tier: subscription?.tier || "free",
+    status: subscription?.status || "active",
+    isPro: subscription?.tier === "pro" || subscription?.tier === "premium",
+    isPremium: subscription?.tier === "premium",
+    hasFeature: (feature: string) => hasFeatureAccess(subscription?.tier || "free", feature),
+    limits: getSubscriptionLimits(subscription?.tier || "free"),
   }
 }

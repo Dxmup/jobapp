@@ -1,115 +1,30 @@
-"use server"
-
+import { getCurrentUserId } from "@/lib/auth-cookie"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getUserIdentity } from "@/lib/user-identity"
 
-/**
- * Fetches dashboard statistics for the current user
- * @returns Object containing dashboard statistics or error information
- */
 export async function getDashboardStats() {
   try {
-    // Get the current user
-    const user = await getUserIdentity()
-
-    if (!user) {
-      console.log("No authenticated user found in getDashboardStats")
-      // Return empty stats instead of throwing an error
-      return {
-        success: true,
-        stats: {
-          activeApplications: 0,
-          interviewCount: 0,
-          resumesCreated: 0,
-          coverLetters: 0,
-          applicationStreak: 0,
-        },
-      }
-    }
-
-    console.log("User found in getDashboardStats:", user.id)
-    const userId = user.id
-
-    // Initialize stats object
-    const stats = {
-      activeApplications: 0,
-      interviewCount: 0,
-      resumesCreated: 0,
-      coverLetters: 0,
-      applicationStreak: 0,
-    }
+    const userId = await getCurrentUserId()
+    console.log("User ID from centralized auth in getDashboardStats:", userId)
 
     const supabase = createServerSupabaseClient()
 
-    // Get active applications count and job status data
-    const { data: activeJobs, error: activeJobsError } = await supabase
+    // Get job applications count
+    const { data: jobs, error: jobsError } = await supabase
       .from("jobs")
-      .select("id, status, updated_at")
+      .select("id, status, created_at")
       .eq("user_id", userId)
 
-    if (!activeJobsError && activeJobs) {
-      // Count active applications (status is 'applied', 'interview', or 'offer')
-      stats.activeApplications = activeJobs.filter((job) =>
-        ["applied", "interview", "offer"].includes(job.status),
-      ).length
-
-      stats.interviewCount = activeJobs.filter((job) => job.status === "interview").length
-
-      // Calculate streak based on days when job status was updated to "applied"
-      const appliedJobs = activeJobs.filter((job) => job.status === "applied")
-
-      if (appliedJobs.length > 0) {
-        // Get all dates when jobs were marked as applied
-        const applicationDates = appliedJobs
-          .map((job) => {
-            const date = new Date(job.updated_at)
-            date.setHours(0, 0, 0, 0) // Normalize to start of day
-            return date.toISOString().split("T")[0] // Format as YYYY-MM-DD
-          })
-          .filter((date, index, self) => self.indexOf(date) === index) // Get unique dates
-          .sort((a, b) => new Date(b).getTime() - new Date(a).getTime()) // Sort descending
-
-        console.log("Application dates:", applicationDates)
-
-        // Check if there's an application today
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const todayStr = today.toISOString().split("T")[0]
-
-        // Calculate streak
-        let streak = 0
-        const currentDate = new Date(today)
-
-        // If no application today, start checking from yesterday
-        if (!applicationDates.includes(todayStr)) {
-          currentDate.setDate(currentDate.getDate() - 1)
-        }
-
-        // Check consecutive days backward
-        while (true) {
-          const dateStr = currentDate.toISOString().split("T")[0]
-          if (applicationDates.includes(dateStr)) {
-            streak++
-            currentDate.setDate(currentDate.getDate() - 1)
-          } else {
-            break
-          }
-        }
-
-        stats.applicationStreak = streak
-        console.log("Calculated application streak:", streak)
-      }
-    } else if (activeJobsError) {
-      console.error("Error fetching active jobs:", activeJobsError)
+    if (jobsError) {
+      console.error("Error fetching jobs:", jobsError)
+      throw new Error("Failed to fetch jobs")
     }
 
     // Get resumes count
     const { data: resumes, error: resumesError } = await supabase.from("resumes").select("id").eq("user_id", userId)
 
-    if (!resumesError && resumes) {
-      stats.resumesCreated = resumes.length
-    } else if (resumesError) {
+    if (resumesError) {
       console.error("Error fetching resumes:", resumesError)
+      throw new Error("Failed to fetch resumes")
     }
 
     // Get cover letters count
@@ -118,13 +33,44 @@ export async function getDashboardStats() {
       .select("id")
       .eq("user_id", userId)
 
-    if (!coverLettersError && coverLetters) {
-      stats.coverLetters = coverLetters.length
-    } else if (coverLettersError) {
+    if (coverLettersError) {
       console.error("Error fetching cover letters:", coverLettersError)
+      throw new Error("Failed to fetch cover letters")
     }
 
-    console.log("Dashboard stats calculated:", stats)
+    // Calculate stats
+    const activeApplications =
+      jobs?.filter((job) => ["applied", "interviewing", "offer"].includes(job.status?.toLowerCase())).length || 0
+
+    const interviewCount = jobs?.filter((job) => job.status?.toLowerCase() === "interviewing").length || 0
+
+    // Calculate application streak (consecutive days with applications)
+    const sortedJobs = jobs?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || []
+
+    let applicationStreak = 0
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    for (let i = 0; i < sortedJobs.length; i++) {
+      const jobDate = new Date(sortedJobs[i].created_at)
+      jobDate.setHours(0, 0, 0, 0)
+
+      const daysDiff = Math.floor((today.getTime() - jobDate.getTime()) / (1000 * 60 * 60 * 24))
+
+      if (daysDiff === applicationStreak) {
+        applicationStreak++
+      } else {
+        break
+      }
+    }
+
+    const stats = {
+      activeApplications,
+      interviewCount,
+      resumesCreated: resumes?.length || 0,
+      coverLetters: coverLetters?.length || 0,
+      applicationStreak,
+    }
 
     return {
       success: true,
