@@ -1,70 +1,65 @@
+#!/usr/bin/env node
+
 /**
  * Deployment Verification Script
  * Run this after deployment to verify all systems are working
  */
 
-interface VerificationResult {
-  service: string
-  status: "success" | "error" | "warning"
-  message: string
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+
+async function checkEndpoint(path: string, description: string) {
+  try {
+    const response = await fetch(`${SITE_URL}${path}`)
+    const status = response.status
+    console.log(`✅ ${description}: ${status}`)
+    return status < 400
+  } catch (error) {
+    console.log(`❌ ${description}: Failed - ${error.message}`)
+    return false
+  }
 }
 
-async function verifyDeployment(baseUrl: string): Promise<VerificationResult[]> {
-  const results: VerificationResult[] = []
+async function verifyDeployment() {
+  console.log("🚀 Verifying JobCraft AI Deployment...\n")
 
-  // Test basic connectivity
-  try {
-    const response = await fetch(`${baseUrl}/api/debug/session`)
-    results.push({
-      service: "API Connectivity",
-      status: response.ok ? "success" : "error",
-      message: response.ok ? "API is responding" : `HTTP ${response.status}`,
-    })
-  } catch (error) {
-    results.push({
-      service: "API Connectivity",
-      status: "error",
-      message: "Failed to connect to API",
-    })
+  const checks = [
+    ["/api/health", "Health Check"],
+    ["/api/auth/check-session", "Auth System"],
+    ["/api/waitlist", "Waitlist API"],
+    ["/api/landing/generate-interview-questions", "AI Interview Questions"],
+    ["/api/landing/optimize-resume", "AI Resume Optimization"],
+    ["/api/landing/generate-cover-letter", "AI Cover Letter Generation"],
+  ]
+
+  let passed = 0
+  const total = checks.length
+
+  for (const [path, description] of checks) {
+    const success = await checkEndpoint(path, description)
+    if (success) passed++
   }
 
-  // Test database connection
-  try {
-    const response = await fetch(`${baseUrl}/api/debug/direct-query`)
-    const data = await response.json()
-    results.push({
-      service: "Database",
-      status: data.success ? "success" : "error",
-      message: data.success ? "Database connected" : data.error,
-    })
-  } catch (error) {
-    results.push({
-      service: "Database",
-      status: "error",
-      message: "Database connection failed",
-    })
+  console.log(`\n📊 Results: ${passed}/${total} checks passed`)
+
+  if (passed === total) {
+    console.log("🎉 All systems operational! Deployment successful.")
+  } else {
+    console.log("⚠️  Some systems need attention. Check the logs above.")
   }
 
-  // Test Stripe configuration
-  try {
-    const response = await fetch(`${baseUrl}/api/stripe/subscription`)
-    results.push({
-      service: "Stripe",
-      status: response.status === 401 ? "success" : "warning",
-      message: response.status === 401 ? "Stripe configured (auth required)" : "Check Stripe configuration",
-    })
-  } catch (error) {
-    results.push({
-      service: "Stripe",
-      status: "warning",
-      message: "Stripe configuration needs verification",
-    })
-  }
+  // Check environment variables
+  console.log("\n🔧 Environment Variables Check:")
+  const requiredEnvs = [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "GOOGLE_AI_API_KEY",
+  ]
 
-  return results
+  for (const env of requiredEnvs) {
+    const exists = process.env[env] ? "✅" : "❌"
+    console.log(`${exists} ${env}`)
+  }
 }
 
-// Usage example:
-// verifyDeployment('https://your-app.vercel.app').then(console.log);
-
-export { verifyDeployment }
+verifyDeployment().catch(console.error)
