@@ -79,7 +79,7 @@ export function EnhancedHeroDemoTabs() {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="text-center space-y-4">
-        <h2 className="text-3xl font-bold">See What Our AI Can Do — No Sign-Up Needed</h2>
+        <h2 className="text-3xl font-bold">See How Our AI Turns Job Hunts Into Job Offers. No Sign-Up Needed</h2>
         <p className="text-lg text-muted-foreground max-w-4xl mx-auto">
           See what questions they'll likely ask and practice your responses before the interview. Try it below to see
           how our AI works—your first few questions are free. Sign up for complete preparation.
