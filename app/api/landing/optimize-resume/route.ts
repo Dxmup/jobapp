@@ -143,31 +143,38 @@ ${resumeContent}`
     try {
       console.log("Calling Gemini API...")
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          signal: controller.signal,
           body: JSON.stringify({
             contents: [
               {
-                role: "user",
                 parts: [{ text: prompt }],
               },
             ],
-            generation_config: {
+            generationConfig: {
               temperature: 0.3,
-              top_p: 0.8,
-              top_k: 40,
-              max_output_tokens: 4096,
+              topP: 0.8,
+              topK: 40,
+              maxOutputTokens: 4096,
             },
           }),
         },
       )
 
+      clearTimeout(timeoutId)
+
       if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error")
+        console.error(`Gemini API error: ${response.status} - ${errorText}`)
         throw new Error(`Gemini API error: ${response.status}`)
       }
 
@@ -224,6 +231,15 @@ ${resumeContent}`
     } catch (aiError) {
       console.error("Gemini AI error:", aiError)
 
+      // Check if it's a timeout or network error
+      if (aiError instanceof Error) {
+        if (aiError.name === "AbortError") {
+          console.log("Request timed out, using fallback")
+        } else if (aiError.message.includes("fetch")) {
+          console.log("Network error, using fallback")
+        }
+      }
+
       // Provide fallback optimization with diff detection
       const fallbackOptimized = resumeContent
         .replace(/was responsible for/gi, "managed")
@@ -275,7 +291,7 @@ ${resumeContent}`
         originalResume: resumeContent,
         optimizedResume: fallbackOptimized,
         changes: fallbackChanges,
-        note: "Your resume has been enhanced with professional improvements (using backup optimization).",
+        note: "Your resume has been enhanced with professional improvements (using backup optimization due to network issues).",
       })
     }
   } catch (error) {

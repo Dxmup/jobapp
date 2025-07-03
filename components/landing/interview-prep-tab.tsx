@@ -1,341 +1,182 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import type React from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Loader2, Sparkles, BrainCircuit, MessageSquare, Play, Pause, Volume2 } from "lucide-react"
-
-const sampleQuestions = [
-  "Tell me about yourself and your background.",
-  "Why are you interested in this position?",
-  "What are your greatest strengths and weaknesses?",
-  "Describe a challenging project you worked on and how you overcame obstacles.",
-  "Where do you see yourself in 5 years?",
-  "Why are you leaving your current position?",
-  "How do you handle stress and pressure?",
-  "What questions do you have for us?",
-]
-
-const audioFiles = [
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/difficultteammatequestion-hPIXXsN5e15tA3YlhGky9PIeJWcZUb.wav",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/newtechquestion-3vsI3VbdOCoyszqpNAapMKUS8scz9i.wav",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/codemistakequestion-s5LhJ5QiYjKSyfNLrUksMgFePT4mWz.wav",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download-jhC1raOD49xzJHMVoOOJ3RHXCa3iwz.wav",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download%20%281%29-U3vEdmwNUMLvvYIbAzyVcQXKo9Djjm.wav",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download%20%282%29-S4u2yrMQHemhK7S8K1ip1MRQ8I8Rzx.wav",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download%20%283%29-eUh0v4ExZM8ZPI6yet2IoYN8T3VvSO.wav",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download%20%284%29-bLtfrfbqEWvee9WFcOVpF0K2TnK04x.wav",
-]
+import { toast } from "@/components/ui/use-toast"
+import { useAction } from "@/hooks/use-action"
 
 interface InterviewPrepTabProps {
-  onActionUsed?: () => void
-  isDisabled?: boolean
+  onActionUsed: () => void
 }
 
-export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabProps) {
+const InterviewPrepTab: React.FC<InterviewPrepTabProps> = ({ onActionUsed }) => {
   const [jobTitle, setJobTitle] = useState("")
   const [jobDescription, setJobDescription] = useState("")
-  const [questions, setQuestions] = useState<string[]>([])
+  const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentAudio, setCurrentAudio] = useState<string | null>(null)
-  const [audioError, setAudioError] = useState<string | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const { incrementUsageCount } = useAction()
 
-  // Cleanup audio on unmount
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
+  const handleGenerateQuestions = async () => {
+    if (!jobTitle.trim()) {
+      toast({
+        title: "Job title required",
+        description: "Please enter a job title to generate interview questions.",
+        variant: "destructive",
+      })
+      return
     }
-  }, [])
-
-  const generateQuestions = async () => {
-    if (!jobTitle.trim() || isDisabled) return
 
     setIsGenerating(true)
-    onActionUsed?.()
 
     try {
+      console.log("Making request to generate interview questions...")
+
       const response = await fetch("/api/landing/generate-interview-questions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jobDescription: jobDescription.trim() || `Job Title: ${jobTitle.trim()}`,
-          role: jobTitle.trim(),
-          experience: "entry to mid-level",
+          jobTitle: jobTitle.trim(),
+          jobDescription: jobDescription.trim() || undefined,
         }),
       })
 
+      console.log("Response status:", response.status)
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Server error: ${response.status}`)
       }
 
       const data = await response.json()
+      console.log("Parsed response data:", data)
 
-      if (data.success && data.questions) {
-        setQuestions(data.questions)
-      } else {
-        throw new Error(data.error || "Failed to generate questions")
+      if (!data.success) {
+        throw new Error(data.error || "Failed to generate interview questions")
       }
+
+      if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+        throw new Error("No questions received from AI")
+      }
+
+      setGeneratedQuestions(data.questions)
+      onActionUsed() // Increment the usage counter
+
+      toast({
+        title: "Questions generated!",
+        description: `Generated ${data.questions.length} personalized interview questions.`,
+      })
     } catch (error) {
       console.error("Error generating questions:", error)
-      // Fallback to sample questions only on error
-      const jobSpecificQuestions = [
-        `What specific experience do you have with ${jobTitle} responsibilities?`,
-        `How would you approach the key challenges in ${jobTitle}?`,
-        `What tools and technologies are you familiar with for ${jobTitle}?`,
-        ...sampleQuestions.slice(0, 2),
-      ]
-      setQuestions(jobSpecificQuestions)
+
+      // Fallback to job-specific questions based on job title
+      const fallbackQuestions = getFallbackQuestions(jobTitle)
+      setGeneratedQuestions(fallbackQuestions)
+
+      toast({
+        title: "Using backup questions",
+        description: error instanceof Error ? error.message : "Using job-specific questions instead.",
+        variant: "destructive",
+      })
     } finally {
       setIsGenerating(false)
     }
   }
 
-  const playRandomAudio = async () => {
-    if (isDisabled) return
+  // Add this helper function for fallback questions
+  const getFallbackQuestions = (jobTitle: string): string[] => {
+    const title = jobTitle.toLowerCase()
 
-    // If currently playing, stop the audio
-    if (isPlaying && audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      setIsPlaying(false)
-      setCurrentAudio(null)
-      setAudioError(null)
-      return
-    }
-
-    // Clear any previous errors
-    setAudioError(null)
-
-    // Select random audio file
-    const randomIndex = Math.floor(Math.random() * audioFiles.length)
-    const selectedAudio = audioFiles[randomIndex]
-
-    setCurrentAudio(selectedAudio)
-    onActionUsed?.()
-
-    try {
-      // Stop any existing audio
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current.currentTime = 0
-      }
-
-      // Create new audio instance
-      const audio = new Audio()
-      audioRef.current = audio
-
-      // Set up event listeners before setting src
-      audio.addEventListener("loadstart", () => {
-        console.log("Audio loading started")
-      })
-
-      audio.addEventListener("canplay", () => {
-        console.log("Audio can start playing")
-        setIsPlaying(true)
-      })
-
-      audio.addEventListener("play", () => {
-        console.log("Audio started playing")
-        setIsPlaying(true)
-      })
-
-      audio.addEventListener("ended", () => {
-        console.log("Audio ended")
-        setIsPlaying(false)
-        setCurrentAudio(null)
-      })
-
-      audio.addEventListener("error", (e) => {
-        console.error("Audio error:", e)
-        setIsPlaying(false)
-        setCurrentAudio(null)
-        setAudioError(`Failed to load audio: ${selectedAudio}`)
-      })
-
-      audio.addEventListener("pause", () => {
-        console.log("Audio paused")
-        setIsPlaying(false)
-      })
-
-      // Set the source and load
-      audio.src = selectedAudio
-      audio.load()
-
-      // Attempt to play
-      const playPromise = audio.play()
-
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log("Audio playback started successfully")
-            setIsPlaying(true)
-          })
-          .catch((error) => {
-            console.error("Audio playback failed:", error)
-            setIsPlaying(false)
-            setCurrentAudio(null)
-            setAudioError("Audio playback failed. Please try again.")
-          })
-      }
-    } catch (error) {
-      console.error("Error setting up audio:", error)
-      setIsPlaying(false)
-      setCurrentAudio(null)
-      setAudioError("Failed to initialize audio player.")
+    if (title.includes("software") || title.includes("developer") || title.includes("engineer")) {
+      return [
+        "Tell me about a challenging technical problem you solved recently.",
+        "How do you approach debugging complex issues?",
+        "Describe your experience with version control and collaboration.",
+        "What's your process for learning new technologies?",
+        "How do you ensure code quality in your projects?",
+      ]
+    } else if (title.includes("marketing") || title.includes("sales")) {
+      return [
+        "How do you measure the success of a marketing campaign?",
+        "Describe a time when you had to pivot your strategy.",
+        "How do you stay current with industry trends?",
+        "Tell me about a successful project you led.",
+        "How do you handle competing priorities and deadlines?",
+      ]
+    } else if (title.includes("manager") || title.includes("lead")) {
+      return [
+        "How do you motivate team members who are struggling?",
+        "Describe your approach to giving constructive feedback.",
+        "Tell me about a time you had to make a difficult decision.",
+        "How do you handle conflicts within your team?",
+        "What's your strategy for setting and achieving team goals?",
+      ]
+    } else {
+      return [
+        "Tell me about yourself and your career journey.",
+        "What interests you most about this role?",
+        "Describe a challenge you overcame in your previous position.",
+        "How do you handle stress and tight deadlines?",
+        "Where do you see yourself in five years?",
+      ]
     }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Audio Practice Section */}
-      <Card className="bg-gradient-to-r from-purple-50 to-cyan-50 border-purple-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-700">
-            <Volume2 className="w-5 h-5" />
-            Practice with Real Interview Questions
-          </CardTitle>
-          <CardDescription>Listen to actual interview questions and practice your responses out loud</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <Button
-              onClick={playRandomAudio}
-              disabled={isDisabled}
-              size="lg"
-              className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700"
-            >
-              {isPlaying ? (
-                <>
-                  <Pause className="w-5 h-5 mr-2" />
-                  Stop Audio
-                </>
-              ) : (
-                <>
-                  <Play className="w-5 h-5 mr-2" />
-                  Play Random Question
-                </>
-              )}
-            </Button>
-
-            {currentAudio && <p className="text-sm text-purple-600">Playing: {currentAudio.split("/").pop()}</p>}
-
-            {audioError && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">{audioError}</p>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Input Form */}
-      <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-700">
-            <BrainCircuit className="w-5 h-5" />
-            Generate Custom Questions
-          </CardTitle>
-          <CardDescription>
-            Get personalized interview questions based on the specific job you're applying for
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="job-title">Job Title</Label>
-            <Input
-              id="job-title"
-              placeholder="e.g., Senior Software Engineer"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              className="border-purple-200 focus:border-purple-400"
-              disabled={isDisabled}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="job-description">Job Description (Optional)</Label>
-            <Textarea
-              id="job-description"
-              placeholder="Paste the job description here for more targeted questions..."
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              className="border-purple-200 focus:border-purple-400 min-h-[100px]"
-              disabled={isDisabled}
-            />
-          </div>
-
-          <Button
-            onClick={generateQuestions}
-            disabled={!jobTitle.trim() || isGenerating || isDisabled}
-            className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating Questions...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Interview Questions
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {questions.length > 0 && (
-        <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-purple-700">
-                <MessageSquare className="w-5 h-5" />
-                Interview Questions
-              </CardTitle>
-              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-                {questions.length} Questions
-              </Badge>
-            </div>
-            <CardDescription>
-              Practice these questions to prepare for your interview. Take time to think through your responses.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {questions.map((question, index) => (
-                <div
-                  key={index}
-                  className="p-4 bg-gradient-to-r from-purple-50 to-cyan-50 rounded-lg border border-purple-100"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                      {index + 1}
-                    </div>
-                    <p className="text-slate-700 leading-relaxed">{question}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-800 mb-2">💡 Practice Tips:</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Practice answering out loud, not just in your head</li>
-                <li>• Use the STAR method (Situation, Task, Action, Result) for behavioral questions</li>
-                <li>• Prepare specific examples from your experience</li>
-                <li>• Practice with a friend or record yourself</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="jobTitle" className="block text-sm font-medium leading-6 text-gray-900">
+          Job Title
+        </label>
+        <div className="mt-2">
+          <Input
+            type="text"
+            name="jobTitle"
+            id="jobTitle"
+            placeholder="e.g., Software Engineer"
+            value={jobTitle}
+            onChange={(e) => setJobTitle(e.target.value)}
+            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+          />
+        </div>
+      </div>
+      <div>
+        <label htmlFor="jobDescription" className="block text-sm font-medium leading-6 text-gray-900">
+          Job Description (Optional)
+        </label>
+        <div className="mt-2">
+          <Textarea
+            id="jobDescription"
+            name="jobDescription"
+            rows={3}
+            placeholder="e.g., We are looking for a highly motivated software engineer..."
+            value={jobDescription}
+            onChange={(e) => setJobDescription(e.target.value)}
+            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+          />
+        </div>
+      </div>
+      <div>
+        <Button onClick={handleGenerateQuestions} disabled={isGenerating}>
+          {isGenerating ? "Generating..." : "Generate Interview Questions"}
+        </Button>
+      </div>
+      {generatedQuestions.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold">Generated Questions:</h2>
+          <ul className="list-disc pl-5">
+            {generatedQuestions.map((question, index) => (
+              <li key={index}>{question}</li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )
 }
+
+export default InterviewPrepTab
