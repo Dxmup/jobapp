@@ -7,7 +7,7 @@ export function middleware(request: NextRequest) {
   // Allow public routes
   const publicRoutes = ["/", "/signup", "/api/waitlist", "/_next", "/favicon.ico", "/audio", "/public"]
 
-  // Check if the current path is a public route or starts with a public route
+  // Check if the current path is a public route
   const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route + "/"))
 
   // If it's not a public route, redirect to home

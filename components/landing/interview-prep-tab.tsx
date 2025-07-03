@@ -107,10 +107,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
     })
   }
 
-  const getAudioFileName = (filePath: string) => {
-    return filePath.split("/").pop()?.replace(".wav", "") || ""
-  }
-
   return (
     <div className="space-y-6">
       {/* Audio Practice Section */}
@@ -143,14 +139,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
               )}
             </Button>
           </div>
-
-          {currentAudio && (
-            <div className="text-center">
-              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-                🎧 Playing: {getAudioFileName(currentAudio)}
-              </Badge>
-            </div>
-          )}
         </CardContent>
       </Card>
 
