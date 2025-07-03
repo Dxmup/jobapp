@@ -219,10 +219,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
                 </>
               )}
             </Button>
-
-            {currentAudioFile && (
-              <p className="text-xs text-muted-foreground text-center">Playing: {currentAudioFile.split("/").pop()}</p>
-            )}
           </div>
         </div>
 
