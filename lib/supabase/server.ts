@@ -86,5 +86,5 @@ export function createAdminSupabaseClient() {
   })
 }
 
-// Export createClient as a named export for compatibility
+// Export createClient as an alias for backward compatibility
 export { createClient }

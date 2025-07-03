@@ -13,14 +13,14 @@ import {
   Activity,
   Home,
   TestTube,
-  Wrench,
+  Lock,
   BookOpen,
   Zap,
 } from "lucide-react"
 
-const sidebarItems = [
+const adminNavItems = [
   {
-    title: "Overview",
+    title: "Dashboard",
     href: "/admin",
     icon: Home,
   },
@@ -70,14 +70,14 @@ const sidebarItems = [
     icon: Database,
   },
   {
+    title: "2FA Setup",
+    href: "/admin/verify-2fa",
+    icon: Lock,
+  },
+  {
     title: "Settings",
     href: "/admin/settings",
     icon: Settings,
-  },
-  {
-    title: "Setup",
-    href: "/admin/setup",
-    icon: Wrench,
   },
 ]
 
@@ -90,10 +90,8 @@ export function AdminSidebar() {
         <h1 className="text-xl font-bold">Admin Panel</h1>
       </div>
       <nav className="flex-1 space-y-1 px-2 py-4">
-        {sidebarItems.map((item) => {
-          const Icon = item.icon
+        {adminNavItems.map((item) => {
           const isActive = pathname === item.href
-
           return (
             <Link
               key={item.href}
@@ -103,7 +101,7 @@ export function AdminSidebar() {
                 isActive ? "bg-gray-800 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white",
               )}
             >
-              <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
+              <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
               {item.title}
             </Link>
           )
