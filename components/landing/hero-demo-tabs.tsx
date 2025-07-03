@@ -20,8 +20,6 @@ export function HeroDemoTabs() {
     const newCount = actionCount + 1
     setActionCount(newCount)
 
-    console.log(`Demo action used. Count: ${newCount}/${MAX_DEMO_ACTIONS}`)
-
     if (newCount >= MAX_DEMO_ACTIONS) {
       setShowSignupPrompt(true)
     }
@@ -84,15 +82,6 @@ export function HeroDemoTabs() {
           Instantly improve your resume, cover letter, or interview prep. Just try one of the tools below to see how our
           AI works—your first few actions are free. Sign up for full powered results.
         </p>
-
-        {/* Action Counter Display */}
-        {actionCount > 0 && (
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <span className="text-xs bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-              {MAX_DEMO_ACTIONS - actionCount} demo actions remaining
-            </span>
-          </div>
-        )}
       </div>
 
       <Tabs defaultValue="interview" className="w-full">

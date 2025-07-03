@@ -1,29 +1,45 @@
 import { type NextRequest, NextResponse } from "next/server"
-import {
-  getClientIP,
-  checkEnhancedRateLimit,
-  validateJobDescription,
-  sanitizeInput,
-  detectAbusePatterns,
-} from "@/lib/security-utils"
+
+// Simple rate limiting without external dependencies
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+
+function checkRateLimit(identifier: string): boolean {
+  const now = Date.now()
+  const windowMs = 10 * 60 * 1000 // 10 minutes
+  const maxRequests = 3
+
+  const entry = rateLimitMap.get(identifier)
+
+  // Reset if window expired
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(identifier, { count: 1, resetTime: now + windowMs })
+    return true
+  }
+
+  // Check limit
+  if (entry.count >= maxRequests) {
+    return false
+  }
+
+  // Increment
+  entry.count++
+  rateLimitMap.set(identifier, entry)
+  return true
+}
 
 export async function POST(request: NextRequest) {
   console.log("🎯 Interview questions API called")
 
   try {
-    // Get client IP for rate limiting
-    const clientIP = getClientIP(request)
+    // Rate limiting
+    const clientIP = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "anonymous"
 
-    // Strict rate limiting for AI endpoints
-    const rateLimit = checkEnhancedRateLimit(clientIP, "interview-questions", "strict")
-
-    if (!rateLimit.success) {
+    if (!checkRateLimit(clientIP)) {
       console.log("❌ Rate limit exceeded for:", clientIP)
       return NextResponse.json(
         {
           success: false,
           error: "Rate limit exceeded. Please try again later.",
-          resetTime: rateLimit.resetTime,
         },
         { status: 429 },
       )
@@ -44,31 +60,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Sanitize inputs
-    const jobDescription = sanitizeInput(body.jobDescription, 10000)
-    const role = sanitizeInput(body.role, 200)
-    const experience = sanitizeInput(body.experience, 100)
+    const { jobDescription, role, experience } = body
 
-    // Validate job description
-    const validation = validateJobDescription(jobDescription)
-    if (!validation.valid) {
+    // Validation
+    if (!jobDescription || typeof jobDescription !== "string") {
       return NextResponse.json(
         {
           success: false,
-          error: validation.error,
+          error: "Job description is required",
         },
         { status: 400 },
       )
     }
 
-    // Check for abuse patterns
-    const abuseCheck = detectAbusePatterns(jobDescription)
-    if (abuseCheck.suspicious) {
-      console.log("Suspicious content detected:", abuseCheck.reasons)
+    if (jobDescription.length < 50) {
       return NextResponse.json(
         {
           success: false,
-          error: "Content appears to be invalid. Please provide a genuine job description.",
+          error: "Job description must be at least 50 characters",
+        },
+        { status: 400 },
+      )
+    }
+
+    if (jobDescription.length > 5000) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Job description must be less than 5000 characters",
         },
         { status: 400 },
       )
@@ -87,15 +106,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("📝 Generating questions for role:", role || "general position")
+    // Prepare data
+    const sanitizedJobDescription = jobDescription.trim()
+    const sanitizedRole = role?.trim() || "the position"
+    const sanitizedExperience = experience?.trim() || "entry to mid-level"
+
+    console.log("📝 Generating questions for role:", sanitizedRole)
 
     // Create prompt
     const prompt = `You are an experienced hiring manager. Generate exactly 5 interview questions for this job.
 
-Job Description: ${jobDescription}
+Job Description: ${sanitizedJobDescription}
 
-Role: ${role || "the position"}
-Experience Level: ${experience || "entry to mid-level"}
+Role: ${sanitizedRole}
+Experience Level: ${sanitizedExperience}
 
 Return only a JSON object in this exact format:
 {
