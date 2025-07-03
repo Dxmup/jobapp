@@ -4,24 +4,14 @@ import type { NextRequest } from "next/server"
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow landing page, signup, and essential assets
-  const allowedPaths = [
-    "/",
-    "/signup",
-    "/api/waitlist",
-    "/_next",
-    "/favicon.ico",
-    "/audio",
-    "/public",
-    "/placeholder.svg",
-    "/placeholder.jpg",
-  ]
+  // Allow public routes
+  const publicRoutes = ["/", "/signup", "/api/waitlist", "/_next", "/favicon.ico", "/audio", "/public"]
 
-  // Check if the path is allowed
-  const isAllowed = allowedPaths.some((path) => pathname === path || pathname.startsWith(path))
+  // Check if the current path is a public route or starts with a public route
+  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route + "/"))
 
-  // Redirect all other paths to landing page
-  if (!isAllowed) {
+  // If it's not a public route, redirect to home
+  if (!isPublicRoute) {
     return NextResponse.redirect(new URL("/", request.url))
   }
 
@@ -32,6 +22,7 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
+     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Sparkles, BrainCircuit, MessageSquare, Play, Pause, Volume2, RotateCcw } from "lucide-react"
+import { Loader2, Sparkles, BrainCircuit, MessageSquare, Play, Pause, Volume2 } from "lucide-react"
 
 const sampleQuestions = [
   "Tell me about yourself and your background.",
@@ -21,10 +21,10 @@ const sampleQuestions = [
 ]
 
 const audioFiles = [
-  "/audio/difficultteammatequestion.wav",
-  "/audio/newtechquestion.wav",
-  "/audio/codemistakequestion.wav",
-  "/audio/genzquestion.wav",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/difficultteammatequestion-hPIXXsN5e15tA3YlhGky9PIeJWcZUb.wav",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/newtechquestion-3vsI3VbdOCoyszqpNAapMKUS8scz9i.wav",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/codemistakequestion-s5LhJ5QiYjKSyfNLrUksMgFePT4mWz.wav",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/genzquestion-RdP2yWQ9GjjI3s2BXN1l8X3UfgcqRg.wav",
 ]
 
 interface InterviewPrepTabProps {
@@ -39,8 +39,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
   const [isGenerating, setIsGenerating] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentAudio, setCurrentAudio] = useState<string | null>(null)
-  const [playedAudioFiles, setPlayedAudioFiles] = useState<string[]>([])
-  const [availableAudioFiles, setAvailableAudioFiles] = useState<string[]>(audioFiles)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const generateQuestions = async () => {
@@ -69,16 +67,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
     }
   }
 
-  const resetAudioQueue = () => {
-    setPlayedAudioFiles([])
-    setAvailableAudioFiles(audioFiles)
-    if (audioRef.current) {
-      audioRef.current.pause()
-    }
-    setIsPlaying(false)
-    setCurrentAudio(null)
-  }
-
   const playRandomAudio = () => {
     if (isDisabled) return
 
@@ -89,12 +77,8 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
       return
     }
 
-    if (availableAudioFiles.length === 0) {
-      return
-    }
-
-    const randomIndex = Math.floor(Math.random() * availableAudioFiles.length)
-    const selectedAudio = availableAudioFiles[randomIndex]
+    const randomIndex = Math.floor(Math.random() * audioFiles.length)
+    const selectedAudio = audioFiles[randomIndex]
 
     setCurrentAudio(selectedAudio)
     setIsPlaying(true)
@@ -110,8 +94,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
     audio.onended = () => {
       setIsPlaying(false)
       setCurrentAudio(null)
-      setPlayedAudioFiles((prev) => [...prev, selectedAudio])
-      setAvailableAudioFiles((prev) => prev.filter((file) => file !== selectedAudio))
     }
 
     audio.onerror = () => {
@@ -141,10 +123,10 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
           <CardDescription>Listen to actual interview questions and practice your responses out loud</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center">
             <Button
               onClick={playRandomAudio}
-              disabled={isDisabled || availableAudioFiles.length === 0}
+              disabled={isDisabled}
               size="lg"
               className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700"
             >
@@ -153,11 +135,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
                   <Pause className="w-5 h-5 mr-2" />
                   Stop Audio
                 </>
-              ) : availableAudioFiles.length === 0 ? (
-                <>
-                  <Play className="w-5 h-5 mr-2" />
-                  All Questions Completed!
-                </>
               ) : (
                 <>
                   <Play className="w-5 h-5 mr-2" />
@@ -165,19 +142,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
                 </>
               )}
             </Button>
-
-            {playedAudioFiles.length > 0 && (
-              <Button
-                onClick={resetAudioQueue}
-                disabled={isDisabled}
-                variant="outline"
-                size="lg"
-                className="border-purple-200 text-purple-700 hover:bg-purple-50 bg-transparent"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Reset Queue
-              </Button>
-            )}
           </div>
 
           {currentAudio && (
@@ -185,15 +149,6 @@ export function InterviewPrepTab({ onActionUsed, isDisabled }: InterviewPrepTabP
               <Badge variant="secondary" className="bg-purple-100 text-purple-700">
                 🎧 Playing: {getAudioFileName(currentAudio)}
               </Badge>
-            </div>
-          )}
-
-          {availableAudioFiles.length === 0 && playedAudioFiles.length > 0 && (
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
-              <h4 className="font-medium text-green-800 mb-2">🎉 Great job!</h4>
-              <p className="text-sm text-green-700">
-                You've practiced all {audioFiles.length} interview questions. Click "Reset Queue" to practice again.
-              </p>
             </div>
           )}
         </CardContent>

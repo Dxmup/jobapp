@@ -6,14 +6,16 @@ import { ArrowLeft, Home } from "lucide-react"
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
-      <div className="text-center space-y-6 max-w-md mx-auto px-4">
-        <div className="space-y-2">
-          <h1 className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/30 flex items-center justify-center px-4">
+      <div className="text-center space-y-8 max-w-md">
+        <div className="space-y-4">
+          <h1 className="text-8xl font-bold bg-gradient-to-r from-purple-600 to-cyan-600 bg-clip-text text-transparent">
             404
           </h1>
-          <h2 className="text-2xl font-semibold text-slate-800">Page Not Found</h2>
-          <p className="text-slate-600">The page you're looking for doesn't exist or is currently under development.</p>
+          <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Page Not Found</h2>
+          <p className="text-slate-600 dark:text-slate-400">
+            The page you're looking for doesn't exist or has been moved.
+          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
