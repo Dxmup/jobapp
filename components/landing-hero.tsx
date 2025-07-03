@@ -68,11 +68,12 @@ export function LandingHero() {
 
           {/* Enhanced subtitle */}
           <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-12 max-w-4xl mx-auto leading-relaxed font-medium">
-            While you're getting rejected, smart job seekers are using AI to get{" "}
+            While you're bombing interviews you should have aced, smart job seekers are using AI to practice the exact
+            questions and get{" "}
             <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-bold">
-              3x more interviews
+              hired 3x faster
             </span>
-            . Don't get left behind.
+            . Join them.
           </p>
 
           {/* Enhanced CTA buttons */}
