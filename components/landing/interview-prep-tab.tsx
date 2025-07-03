@@ -5,8 +5,9 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { toast } from "@/components/ui/use-toast"
-import { useAction } from "@/hooks/use-action"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, Sparkles, BrainCircuit, MessageSquare } from "lucide-react"
 
 interface InterviewPrepTabProps {
   onActionUsed: () => void
@@ -17,19 +18,16 @@ const InterviewPrepTab: React.FC<InterviewPrepTabProps> = ({ onActionUsed }) => 
   const [jobDescription, setJobDescription] = useState("")
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const { incrementUsageCount } = useAction()
+  const [error, setError] = useState<string | null>(null)
 
   const handleGenerateQuestions = async () => {
     if (!jobTitle.trim()) {
-      toast({
-        title: "Job title required",
-        description: "Please enter a job title to generate interview questions.",
-        variant: "destructive",
-      })
+      setError("Please enter a job title to generate interview questions.")
       return
     }
 
     setIsGenerating(true)
+    setError(null)
 
     try {
       console.log("Making request to generate interview questions...")
@@ -65,11 +63,6 @@ const InterviewPrepTab: React.FC<InterviewPrepTabProps> = ({ onActionUsed }) => 
 
       setGeneratedQuestions(data.questions)
       onActionUsed() // Increment the usage counter
-
-      toast({
-        title: "Questions generated!",
-        description: `Generated ${data.questions.length} personalized interview questions.`,
-      })
     } catch (error) {
       console.error("Error generating questions:", error)
 
@@ -77,11 +70,7 @@ const InterviewPrepTab: React.FC<InterviewPrepTabProps> = ({ onActionUsed }) => 
       const fallbackQuestions = getFallbackQuestions(jobTitle)
       setGeneratedQuestions(fallbackQuestions)
 
-      toast({
-        title: "Using backup questions",
-        description: error instanceof Error ? error.message : "Using job-specific questions instead.",
-        variant: "destructive",
-      })
+      setError(error instanceof Error ? error.message : "Failed to generate questions. Using backup questions instead.")
     } finally {
       setIsGenerating(false)
     }
@@ -127,53 +116,119 @@ const InterviewPrepTab: React.FC<InterviewPrepTabProps> = ({ onActionUsed }) => 
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label htmlFor="jobTitle" className="block text-sm font-medium leading-6 text-gray-900">
-          Job Title
-        </label>
-        <div className="mt-2">
-          <Input
-            type="text"
-            name="jobTitle"
-            id="jobTitle"
-            placeholder="e.g., Software Engineer"
-            value={jobTitle}
-            onChange={(e) => setJobTitle(e.target.value)}
-            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-          />
-        </div>
-      </div>
-      <div>
-        <label htmlFor="jobDescription" className="block text-sm font-medium leading-6 text-gray-900">
-          Job Description (Optional)
-        </label>
-        <div className="mt-2">
-          <Textarea
-            id="jobDescription"
-            name="jobDescription"
-            rows={3}
-            placeholder="e.g., We are looking for a highly motivated software engineer..."
-            value={jobDescription}
-            onChange={(e) => setJobDescription(e.target.value)}
-            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-          />
-        </div>
-      </div>
-      <div>
-        <Button onClick={handleGenerateQuestions} disabled={isGenerating}>
-          {isGenerating ? "Generating..." : "Generate Interview Questions"}
-        </Button>
-      </div>
+    <div className="space-y-6">
+      {/* Input Form */}
+      <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-purple-700">
+            <BrainCircuit className="w-5 h-5" />
+            Generate Custom Questions
+          </CardTitle>
+          <CardDescription>
+            Get personalized interview questions based on the specific job you're applying for
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="jobTitle" className="block text-sm font-medium leading-6 text-gray-900">
+              Job Title
+            </label>
+            <Input
+              type="text"
+              name="jobTitle"
+              id="jobTitle"
+              placeholder="e.g., Software Engineer"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              className="border-purple-200 focus:border-purple-400"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="jobDescription" className="block text-sm font-medium leading-6 text-gray-900">
+              Job Description (Optional)
+            </label>
+            <Textarea
+              id="jobDescription"
+              name="jobDescription"
+              rows={3}
+              placeholder="Paste the job description here for more targeted questions..."
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              className="border-purple-200 focus:border-purple-400 min-h-[100px]"
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <Button
+            onClick={handleGenerateQuestions}
+            disabled={!jobTitle.trim() || isGenerating}
+            className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating Questions...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Interview Questions
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
       {generatedQuestions.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold">Generated Questions:</h2>
-          <ul className="list-disc pl-5">
-            {generatedQuestions.map((question, index) => (
-              <li key={index}>{question}</li>
-            ))}
-          </ul>
-        </div>
+        <Card className="bg-white/80 backdrop-blur-sm border-purple-200">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-purple-700">
+                <MessageSquare className="w-5 h-5" />
+                Interview Questions
+              </CardTitle>
+              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                {generatedQuestions.length} Questions
+              </Badge>
+            </div>
+            <CardDescription>
+              Practice these questions to prepare for your interview. Take time to think through your responses.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {generatedQuestions.map((question, index) => (
+                <div
+                  key={index}
+                  className="p-4 bg-gradient-to-r from-purple-50 to-cyan-50 rounded-lg border border-purple-100"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                      {index + 1}
+                    </div>
+                    <p className="text-slate-700 leading-relaxed">{question}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-medium text-blue-800 mb-2">💡 Practice Tips:</h4>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• Practice answering out loud, not just in your head</li>
+                <li>• Use the STAR method (Situation, Task, Action, Result) for behavioral questions</li>
+                <li>• Prepare specific examples from your experience</li>
+                <li>• Practice with a friend or record yourself</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

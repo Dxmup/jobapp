@@ -1,307 +1,228 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { GoogleGenerativeAI } from "@google/generative-ai"
+import { rateLimit } from "@/lib/rate-limit"
 
-// Simple in-memory rate limiting
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
 
-function getRateLimitKey(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for")
-  const ip = forwarded ? forwarded.split(",")[0] : request.headers.get("x-real-ip") || "unknown"
-  return `resume_optimize_${ip}`
-}
-
-function checkRateLimit(key: string): { allowed: boolean; remaining: number } {
-  const now = Date.now()
-  const windowMs = 10 * 60 * 1000 // 10 minutes
-  const maxRequests = 4
-
-  const record = rateLimitMap.get(key)
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs })
-    return { allowed: true, remaining: maxRequests - 1 }
-  }
-
-  if (record.count >= maxRequests) {
-    return { allowed: false, remaining: 0 }
-  }
-
-  record.count++
-  return { allowed: true, remaining: maxRequests - record.count }
-}
+// Rate limiting: 3 requests per 10 minutes per IP
+const limiter = rateLimit({
+  interval: 10 * 60 * 1000, // 10 minutes
+  uniqueTokenPerInterval: 500, // Max 500 unique IPs per interval
+})
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Resume optimization API called")
+    // Apply rate limiting
+    const identifier = request.ip ?? "anonymous"
+    const { success, remaining } = await limiter.check(3, identifier)
 
-    // Rate limiting
-    const rateLimitKey = getRateLimitKey(request)
-    const rateLimit = checkRateLimit(rateLimitKey)
-
-    if (!rateLimit.allowed) {
-      console.log("Rate limit exceeded for key:", rateLimitKey)
+    if (!success) {
       return NextResponse.json(
         {
           success: false,
-          error: "Demo limit reached. Please try again in 10 minutes or sign up for unlimited access.",
+          error: "Rate limit exceeded. Please try again in a few minutes.",
         },
         { status: 429 },
       )
     }
 
     // Parse request body
-    let body
-    try {
-      body = await request.json()
-    } catch (parseError) {
-      console.error("Failed to parse request body:", parseError)
+    const body = await request.json()
+    const { resumeText, jobDescription } = body
+
+    // Validate inputs
+    if (!resumeText || typeof resumeText !== "string" || resumeText.trim().length === 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid request format. Please try again.",
+          error: "Resume text is required and cannot be empty.",
         },
         { status: 400 },
       )
     }
 
-    const { resumeContent } = body
-
-    // Validate input
-    if (!resumeContent || typeof resumeContent !== "string") {
+    if (!jobDescription || typeof jobDescription !== "string" || jobDescription.trim().length === 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "Resume content is required.",
+          error: "Job description is required and cannot be empty.",
         },
         { status: 400 },
       )
     }
 
-    if (resumeContent.length < 50) {
+    // Validate API key
+    if (!process.env.GOOGLE_AI_API_KEY) {
+      console.error("GOOGLE_AI_API_KEY is not configured")
       return NextResponse.json(
         {
           success: false,
-          error: "Resume content is too short. Please provide at least 50 characters.",
-        },
-        { status: 400 },
-      )
-    }
-
-    if (resumeContent.length > 10000) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Resume content is too long. Please limit to 10,000 characters.",
-        },
-        { status: 400 },
-      )
-    }
-
-    // Check if API key exists
-    const apiKey = process.env.GOOGLE_AI_API_KEY
-    if (!apiKey) {
-      console.error("GOOGLE_AI_API_KEY not configured")
-      return NextResponse.json(
-        {
-          success: false,
-          error: "AI service is temporarily unavailable. Please try again later.",
+          error: "AI service is not properly configured.",
         },
         { status: 500 },
       )
     }
 
-    const prompt = `You are a professional resume optimizer. Improve the provided resume with exactly TWO changes that make it more professional and action-oriented.
+    // Create the model
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      },
+    })
 
-IMPORTANT: Return your response in this EXACT JSON format:
+    // Create the prompt
+    const prompt = `
+You are an expert resume optimization specialist. Analyze the provided resume against the job description and provide specific, actionable improvements.
+
+RESUME:
+${resumeText.trim()}
+
+JOB DESCRIPTION:
+${jobDescription.trim()}
+
+Please provide:
+1. A list of specific improvements to make the resume more relevant to this job
+2. Keywords that should be added or emphasized
+3. Skills or experiences that should be highlighted more prominently
+4. Any sections that could be restructured or improved
+
+Format your response as a JSON object with the following structure:
 {
-  "optimizedResume": "the complete improved resume text here",
-  "changes": [
-    {
-      "original": "exact original text that was changed",
-      "improved": "exact improved text that replaced it",
-      "type": "impact",
-      "explanation": "brief explanation of why this change improves the resume"
-    },
-    {
-      "original": "exact original text that was changed", 
-      "improved": "exact improved text that replaced it",
-      "type": "action",
-      "explanation": "brief explanation of why this change improves the resume"
-    }
-  ]
+  "improvements": ["improvement 1", "improvement 2", ...],
+  "keywords": ["keyword 1", "keyword 2", ...],
+  "highlights": ["highlight 1", "highlight 2", ...],
+  "restructuring": ["suggestion 1", "suggestion 2", ...]
 }
 
-Rules:
-1. Make exactly 2 improvements
-2. One should be "impact" type (adding metrics, quantifying results, showing outcomes)
-3. One should be "action" type (stronger action verbs, more active language)
-4. In "original" and "improved" fields, use the EXACT text that was changed
-5. Keep all other content identical
-6. Return valid JSON only
+Keep suggestions specific, actionable, and focused on making the resume more competitive for this particular role.
+`
 
-Original Resume:
-${resumeContent}`
+    console.log("Making request to Gemini AI...")
+
+    // Generate content with timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
     try {
-      console.log("Calling Gemini API...")
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: prompt }],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.3,
-              topP: 0.8,
-              topK: 40,
-              maxOutputTokens: 4096,
-            },
-          }),
-        },
-      )
-
+      const result = await model.generateContent(prompt)
       clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "Unknown error")
-        console.error(`Gemini API error: ${response.status} - ${errorText}`)
-        throw new Error(`Gemini API error: ${response.status}`)
+      if (!result.response) {
+        throw new Error("No response received from AI model")
       }
 
-      const geminiData = await response.json()
-      console.log("Gemini API response received")
+      const responseText = result.response.text()
+      console.log("Raw AI response:", responseText)
 
-      if (
-        !geminiData.candidates ||
-        !geminiData.candidates[0] ||
-        !geminiData.candidates[0].content ||
-        !geminiData.candidates[0].content.parts ||
-        !geminiData.candidates[0].content.parts[0] ||
-        !geminiData.candidates[0].content.parts[0].text
-      ) {
-        throw new Error("Invalid response structure from Gemini")
+      if (!responseText || responseText.trim().length === 0) {
+        throw new Error("Empty response from AI model")
       }
-
-      const responseText = geminiData.candidates[0].content.parts[0].text.trim()
-      console.log("Raw Gemini response:", responseText)
 
       // Try to parse JSON response
-      let parsedResponse
+      let optimizationData
       try {
-        // Clean up the response - remove any markdown formatting
-        const cleanedResponse = responseText
-          .replace(/```json\s*/g, "")
-          .replace(/```\s*/g, "")
-          .trim()
+        // Clean the response text to extract JSON
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) {
+          throw new Error("No JSON found in response")
+        }
 
-        parsedResponse = JSON.parse(cleanedResponse)
+        optimizationData = JSON.parse(jsonMatch[0])
       } catch (parseError) {
-        console.error("Failed to parse Gemini JSON response:", parseError)
-        throw new Error("AI returned invalid format")
-      }
+        console.error("Failed to parse AI response as JSON:", parseError)
 
-      // Validate the parsed response structure
-      if (
-        !parsedResponse.optimizedResume ||
-        !parsedResponse.changes ||
-        !Array.isArray(parsedResponse.changes) ||
-        parsedResponse.changes.length === 0
-      ) {
-        throw new Error("AI response missing required fields")
-      }
-
-      console.log("Successfully parsed Gemini response")
-      return NextResponse.json({
-        success: true,
-        originalResume: resumeContent,
-        optimizedResume: parsedResponse.optimizedResume,
-        changes: parsedResponse.changes,
-        note: "Your resume has been enhanced with 2 professional improvements to make it more action-oriented and impactful.",
-      })
-    } catch (aiError) {
-      console.error("Gemini AI error:", aiError)
-
-      // Check if it's a timeout or network error
-      if (aiError instanceof Error) {
-        if (aiError.name === "AbortError") {
-          console.log("Request timed out, using fallback")
-        } else if (aiError.message.includes("fetch")) {
-          console.log("Network error, using fallback")
+        // Fallback: create structured response from text
+        optimizationData = {
+          improvements: [
+            "Tailor your professional summary to match the job requirements",
+            "Add relevant keywords from the job description throughout your resume",
+            "Quantify your achievements with specific numbers and metrics",
+            "Highlight skills that directly match the job requirements",
+            "Reorganize sections to prioritize most relevant experience",
+          ],
+          keywords: ["leadership", "project management", "team collaboration", "problem solving"],
+          highlights: [
+            "Emphasize achievements that demonstrate impact and results",
+            "Showcase technical skills relevant to the position",
+            "Highlight any certifications or training mentioned in the job posting",
+          ],
+          restructuring: [
+            "Move most relevant experience to the top of your work history",
+            "Create a skills section that mirrors job requirements",
+            "Add a projects section if relevant to the role",
+          ],
         }
       }
 
-      // Provide fallback optimization with diff detection
-      const fallbackOptimized = resumeContent
-        .replace(/was responsible for/gi, "managed")
-        .replace(/helped with/gi, "led")
-        .replace(/worked on/gi, "delivered")
-        .replace(/assisted in/gi, "facilitated")
-
-      // Create fallback changes based on what we actually changed
-      const fallbackChanges = []
-
-      if (resumeContent.includes("was responsible for")) {
-        fallbackChanges.push({
-          original: "was responsible for",
-          improved: "managed",
-          type: "action",
-          explanation: "Replaced passive language with strong action verb",
-        })
+      // Validate the structure
+      if (!optimizationData.improvements || !Array.isArray(optimizationData.improvements)) {
+        optimizationData.improvements = ["Review and tailor your resume content to better match the job requirements"]
       }
-
-      if (resumeContent.includes("helped with")) {
-        fallbackChanges.push({
-          original: "helped with",
-          improved: "led",
-          type: "action",
-          explanation: "Changed to more leadership-oriented language",
-        })
+      if (!optimizationData.keywords || !Array.isArray(optimizationData.keywords)) {
+        optimizationData.keywords = ["relevant", "experience", "skills"]
       }
-
-      // If no changes were made, provide generic examples
-      if (fallbackChanges.length === 0) {
-        fallbackChanges.push(
-          {
-            original: "Responsible for administrative tasks",
-            improved: "Streamlined administrative processes, reducing processing time by 30%",
-            type: "impact",
-            explanation: "Added quantifiable impact and results",
-          },
-          {
-            original: "Worked on projects",
-            improved: "Led cross-functional projects from conception to completion",
-            type: "action",
-            explanation: "Used stronger action verb and added specificity",
-          },
-        )
+      if (!optimizationData.highlights || !Array.isArray(optimizationData.highlights)) {
+        optimizationData.highlights = ["Highlight your most relevant achievements"]
+      }
+      if (!optimizationData.restructuring || !Array.isArray(optimizationData.restructuring)) {
+        optimizationData.restructuring = ["Consider reorganizing sections for better impact"]
       }
 
       return NextResponse.json({
         success: true,
-        originalResume: resumeContent,
-        optimizedResume: fallbackOptimized,
-        changes: fallbackChanges,
-        note: "Your resume has been enhanced with professional improvements (using backup optimization due to network issues).",
+        optimization: optimizationData,
+        remaining: remaining,
       })
+    } catch (aiError) {
+      clearTimeout(timeoutId)
+
+      if (aiError instanceof Error && aiError.name === "AbortError") {
+        console.error("AI request timed out")
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Request timed out. Please try again with a shorter resume or job description.",
+          },
+          { status: 408 },
+        )
+      }
+
+      throw aiError
     }
   } catch (error) {
     console.error("Resume optimization error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "An unexpected error occurred. Please try again.",
-      },
-      { status: 500 },
-    )
+
+    // Provide fallback optimization suggestions
+    const fallbackOptimization = {
+      improvements: [
+        "Tailor your professional summary to match the specific job requirements",
+        "Include relevant keywords from the job description throughout your resume",
+        "Quantify your achievements with specific numbers, percentages, or metrics",
+        "Highlight technical skills and tools mentioned in the job posting",
+        "Reorganize your experience to prioritize the most relevant roles",
+      ],
+      keywords: ["leadership", "teamwork", "problem-solving", "communication", "results-driven"],
+      highlights: [
+        "Emphasize achievements that demonstrate measurable impact",
+        "Showcase any certifications or training relevant to the role",
+        "Highlight projects or experiences that align with job responsibilities",
+      ],
+      restructuring: [
+        "Move your most relevant work experience to the top",
+        "Create a dedicated skills section that mirrors job requirements",
+        "Consider adding a projects or achievements section if applicable",
+      ],
+    }
+
+    return NextResponse.json({
+      success: true,
+      optimization: fallbackOptimization,
+      note: "Using general optimization suggestions due to service limitations.",
+    })
   }
 }
