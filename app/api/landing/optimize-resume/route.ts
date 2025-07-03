@@ -1,47 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-// Simple in-memory rate limiting
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
-
-function getRateLimitKey(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for")
-  const ip = forwarded ? forwarded.split(",")[0] : request.headers.get("x-real-ip") || "unknown"
-  return `resume_optimize_${ip}`
-}
-
-function checkRateLimit(key: string): { allowed: boolean; remaining: number } {
-  const now = Date.now()
-  const windowMs = 10 * 60 * 1000 // 10 minutes
-  const maxRequests = 4
-
-  const record = rateLimitMap.get(key)
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs })
-    return { allowed: true, remaining: maxRequests - 1 }
-  }
-
-  if (record.count >= maxRequests) {
-    return { allowed: false, remaining: 0 }
-  }
-
-  record.count++
-  return { allowed: true, remaining: maxRequests - record.count }
-}
+import {
+  getClientIP,
+  checkEnhancedRateLimit,
+  validateResumeContent,
+  sanitizeInput,
+  detectAbusePatterns,
+} from "@/lib/security-utils"
 
 export async function POST(request: NextRequest) {
   try {
     console.log("Resume optimization API called")
 
-    // Rate limiting
-    const rateLimitKey = getRateLimitKey(request)
-    const rateLimit = checkRateLimit(rateLimitKey)
+    // Get client IP for rate limiting
+    const clientIP = getClientIP(request)
 
-    if (!rateLimit.allowed) {
-      console.log("Rate limit exceeded for key:", rateLimitKey)
+    // Strict rate limiting for AI endpoints
+    const rateLimit = checkEnhancedRateLimit(clientIP, "resume-optimization", "strict")
+
+    if (!rateLimit.success) {
+      console.log("Rate limit exceeded for IP:", clientIP)
       return NextResponse.json(
         {
           success: false,
-          error: "Demo limit reached. Please try again in 10 minutes or sign up for unlimited access.",
+          error: "Demo limit reached. Please try again in 15 minutes or sign up for unlimited access.",
+          resetTime: rateLimit.resetTime,
         },
         { status: 429 },
       )
@@ -62,34 +44,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { resumeContent } = body
+    // Sanitize input
+    const resumeContent = sanitizeInput(body.resumeContent, 15000)
 
-    // Validate input
-    if (!resumeContent || typeof resumeContent !== "string") {
+    // Validate resume content
+    const validation = validateResumeContent(resumeContent)
+    if (!validation.valid) {
       return NextResponse.json(
         {
           success: false,
-          error: "Resume content is required.",
+          error: validation.error,
         },
         { status: 400 },
       )
     }
 
-    if (resumeContent.length < 50) {
+    // Check for abuse patterns
+    const abuseCheck = detectAbusePatterns(resumeContent)
+    if (abuseCheck.suspicious) {
+      console.log("Suspicious content detected:", abuseCheck.reasons)
       return NextResponse.json(
         {
           success: false,
-          error: "Resume content is too short. Please provide at least 50 characters.",
-        },
-        { status: 400 },
-      )
-    }
-
-    if (resumeContent.length > 10000) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Resume content is too long. Please limit to 10,000 characters.",
+          error: "Content appears to be invalid. Please provide genuine resume content.",
         },
         { status: 400 },
       )

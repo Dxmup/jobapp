@@ -1,18 +1,22 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { checkRateLimit } from "@/lib/rate-limit"
+import {
+  getClientIP,
+  checkEnhancedRateLimit,
+  validateJobDescription,
+  sanitizeInput,
+  detectAbusePatterns,
+} from "@/lib/security-utils"
 
 export async function POST(request: NextRequest) {
   console.log("Cover letter generation API called")
 
   try {
     // Get client IP for rate limiting
-    const forwarded = request.headers.get("x-forwarded-for")
-    const ip = forwarded ? forwarded.split(",")[0] : (request.ip ?? "127.0.0.1")
-
+    const ip = getClientIP(request)
     console.log("Client IP:", ip)
 
-    // Rate limiting - 3 requests per 10 minutes
-    const rateLimit = checkRateLimit(ip, "cover-letter-generation", 3, 10 * 60 * 1000)
+    // Strict rate limiting for AI endpoints - 2 requests per 15 minutes
+    const rateLimit = checkEnhancedRateLimit(ip, "cover-letter-generation", "strict")
 
     if (!rateLimit.success) {
       console.log("Rate limit exceeded for IP:", ip)
@@ -26,7 +30,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Parse request body
+    // Parse and validate request body
     let body
     try {
       body = await request.json()
@@ -35,23 +39,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid request format" }, { status: 400 })
     }
 
-    const { jobDescription, candidateName, role } = body
+    // Sanitize inputs
+    const jobDescription = sanitizeInput(body.jobDescription, 10000)
+    const candidateName = sanitizeInput(body.candidateName, 100)
+    const role = sanitizeInput(body.role, 200)
 
-    // Validate input
-    if (!jobDescription || typeof jobDescription !== "string") {
-      return NextResponse.json({ success: false, error: "Job description is required" }, { status: 400 })
+    // Validate job description
+    const validation = validateJobDescription(jobDescription)
+    if (!validation.valid) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 })
     }
 
-    if (jobDescription.trim().length < 20) {
+    // Check for abuse patterns
+    const abuseCheck = detectAbusePatterns(jobDescription)
+    if (abuseCheck.suspicious) {
+      console.log("Suspicious content detected:", abuseCheck.reasons)
       return NextResponse.json(
-        { success: false, error: "Please provide a more detailed job description (at least 20 characters)" },
-        { status: 400 },
-      )
-    }
-
-    if (jobDescription.length > 5000) {
-      return NextResponse.json(
-        { success: false, error: "Job description is too long. Please keep it under 5,000 characters" },
+        { success: false, error: "Content appears to be invalid. Please provide a genuine job description." },
         { status: 400 },
       )
     }
