@@ -14,6 +14,9 @@ importers:
       '@google/genai':
         specifier: latest
         version: 1.8.0(@modelcontextprotocol/sdk@1.14.0)
+      '@google/generative-ai':
+        specifier: latest
+        version: 0.24.1
       '@hookform/resolvers':
         specifier: latest
         version: 5.1.1(react-hook-form@7.59.0(react@18.0.0))
@@ -479,6 +482,10 @@ packages:
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
+
+  '@google/generative-ai@0.24.1':
+    resolution: {integrity: sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==}
+    engines: {node: '>=18.0.0'}
 
   '@hookform/resolvers@5.1.1':
     resolution: {integrity: sha512-J/NVING3LMAEvexJkyTLjruSm7aOFx7QX21pzkiJfMoNG0wl5aFEjLTl7ay7IQb9EWY6AkrBy7tHL2Alijpdcg==}
@@ -4345,6 +4352,8 @@ snapshots:
       - encoding
       - supports-color
       - utf-8-validate
+
+  '@google/generative-ai@0.24.1': {}
 
   '@hookform/resolvers@5.1.1(react-hook-form@7.59.0(react@18.0.0))':
     dependencies:

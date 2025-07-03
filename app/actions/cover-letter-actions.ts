@@ -89,6 +89,9 @@ export async function getCoverLetter(id: string) {
   }
 }
 
+// Add missing export alias
+export const getCoverLetterById = getCoverLetter
+
 export async function updateCoverLetter(id: string, data: any) {
   const userId = await getCurrentUserId()
 
@@ -202,5 +205,78 @@ export async function getUserCoverLetters() {
   } catch (error) {
     console.error("Error fetching user cover letters:", error)
     return { success: false, error: "Failed to fetch cover letters" }
+  }
+}
+
+// Add missing generateCoverLetter function
+export async function generateCoverLetter(jobData: any, resumeData: any) {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  try {
+    // Use Gemini AI to generate cover letter
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/ai/generate-cover-letter`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jobTitle: jobData.title,
+        company: jobData.company,
+        jobDescription: jobData.description,
+        resumeContent: resumeData.content,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to generate cover letter")
+    }
+
+    const result = await response.json()
+    return { success: true, content: result.coverLetter }
+  } catch (error) {
+    console.error("Error generating cover letter:", error)
+    return { success: false, error: "Failed to generate cover letter" }
+  }
+}
+
+// Add missing saveCoverLetter function
+export const saveCoverLetter = createCoverLetter
+
+// Add missing getJobResumes function
+export async function getJobResumes(jobId: string) {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const supabase = createServerSupabaseClient()
+
+  try {
+    const { data: jobResumes, error } = await supabase
+      .from("job_resumes")
+      .select(`
+        *,
+        resumes (
+          id,
+          name,
+          content,
+          created_at,
+          updated_at
+        )
+      `)
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+
+    if (error) throw error
+
+    return { success: true, resumes: jobResumes?.map((jr) => jr.resumes) || [] }
+  } catch (error) {
+    console.error("Error fetching job resumes:", error)
+    return { success: false, error: "Failed to fetch job resumes" }
   }
 }

@@ -14,6 +14,7 @@
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
+    "@google/generative-ai": "latest",
     "@hookform/resolvers": "latest",
     "@jest/globals": "latest",
     "@modelcontextprotocol/sdk": "latest",
