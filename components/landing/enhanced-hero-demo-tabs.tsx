@@ -93,13 +93,7 @@ export function EnhancedHeroDemoTabs() {
           </Button>
         </div>
 
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          {actionCount > 0 && (
-            <span className="text-xs bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-              {MAX_DEMO_ACTIONS - actionCount} remaining
-            </span>
-          )}
-        </div>
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground"></div>
       </div>
 
       {/* Animation Demo */}
