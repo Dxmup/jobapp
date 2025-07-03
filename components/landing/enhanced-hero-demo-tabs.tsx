@@ -81,8 +81,8 @@ export function EnhancedHeroDemoTabs() {
       <div className="text-center space-y-4">
         <h2 className="text-3xl font-bold">See What Our AI Can Do — No Sign-Up Needed</h2>
         <p className="text-lg text-muted-foreground max-w-4xl mx-auto">
-          Instantly improve your resume, cover letter, or interview prep. Just try one of the tools below to see how our
-          AI works—your first few actions are free. Sign up for full powered results.
+          See what questions they'll likely ask and practice your responses before the interview. Try it below to see
+          how our AI works—your first few questions are free. Sign up for complete preparation.
         </p>
 
         {/* Animation Demo Button */}
