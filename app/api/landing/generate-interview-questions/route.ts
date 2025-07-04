@@ -7,8 +7,6 @@ export async function POST(request: NextRequest) {
   try {
     const { jobTitle, jobDescription } = await request.json()
 
-    console.log("Received request:", { jobTitle, jobDescription })
-
     if (!jobTitle) {
       return NextResponse.json({ error: "Job title is required" }, { status: 400 })
     }
@@ -19,51 +17,50 @@ export async function POST(request: NextRequest) {
       jobDescription ? `Job description: ${jobDescription}` : ""
     }
 
-    Return the questions as a JSON array of strings. Focus on:
-    - Technical skills relevant to the role
-    - Problem-solving scenarios
-    - Experience-based questions
-    - Behavioral questions
-    
-    Format: ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"]`
+    Return the questions as a JSON array of objects with this format:
+    [
+      {
+        "question": "Tell me about a time when...",
+        "category": "Behavioral"
+      }
+    ]
 
-    console.log("Calling Gemini API with prompt:", prompt)
+    Categories should be one of: Behavioral, Technical, Situational, Company Culture, or Role-Specific.`
 
     const result = await model.generateContent(prompt)
     const response = await result.response
     const text = response.text()
 
-    console.log("Gemini API response:", text)
-
-    // Try to parse the JSON response
+    // Try to parse JSON from the response
     let questions
     try {
-      // Extract JSON from the response if it's wrapped in markdown
+      // Extract JSON from the response (remove any markdown formatting)
       const jsonMatch = text.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
         questions = JSON.parse(jsonMatch[0])
       } else {
-        questions = JSON.parse(text)
+        // Fallback: create questions from plain text
+        const lines = text.split("\n").filter((line) => line.trim())
+        questions = lines.slice(0, 5).map((line, index) => ({
+          question: line.replace(/^\d+\.?\s*/, "").trim(),
+          category: "General",
+        }))
       }
     } catch (parseError) {
-      console.error("Failed to parse JSON:", parseError)
-      // Fallback: split by lines and clean up
-      questions = text
-        .split("\n")
-        .filter((line) => line.trim() && !line.includes("```"))
-        .map((line) =>
-          line
-            .replace(/^\d+\.\s*/, "")
-            .replace(/^[-*]\s*/, "")
-            .trim(),
-        )
-        .filter((line) => line.length > 10)
-        .slice(0, 5)
+      console.error("Failed to parse questions:", parseError)
+      // Fallback questions
+      questions = [
+        { question: "Tell me about yourself and your background.", category: "General" },
+        { question: "Why are you interested in this position?", category: "Role-Specific" },
+        { question: "What are your greatest strengths?", category: "Behavioral" },
+        { question: "Describe a challenging situation you faced and how you handled it.", category: "Situational" },
+        { question: "Where do you see yourself in 5 years?", category: "Company Culture" },
+      ]
     }
 
     return NextResponse.json({
       success: true,
-      questions: Array.isArray(questions) ? questions : [questions],
+      questions: questions.slice(0, 5), // Ensure we only return 5 questions
     })
   } catch (error) {
     console.error("Gemini API error:", error)
