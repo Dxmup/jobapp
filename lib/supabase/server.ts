@@ -1,16 +1,12 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createClient } from "@supabase/supabase-js"
 
-// Create a Supabase client for server-side operations
-export function createClient() {
-  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Alias for createClient to match expected exports
-export function createServerSupabaseClient() {
-  return createClient()
-}
-
-// Another alias for createClient to match expected exports
 export function createServerClient() {
-  return createClient()
+  return createClient(supabaseUrl, supabaseServiceKey)
+}
+
+export function createServerSupabaseClient() {
+  return createClient(supabaseUrl, supabaseServiceKey)
 }
