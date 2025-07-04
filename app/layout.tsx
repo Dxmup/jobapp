@@ -2,19 +2,19 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/sonner"
+import { cn } from "@/lib/utils"
+import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "JobCraft - AI-Powered Career Assistant",
+  title: "JobCraft AI - Land Your Dream Job with AI-Powered Tools",
   description:
-    "Transform your job search with AI-powered resume optimization, cover letter generation, and interview preparation.",
-  keywords: "job search, resume optimization, cover letter, interview prep, AI career assistant",
-  authors: [{ name: "JobCraft Team" }],
+    "Transform your job search with AI-powered resume optimization, cover letter generation, and interview preparation. Get hired 3x faster.",
+  keywords: "job search, AI resume, cover letter generator, interview prep, career tools",
+  authors: [{ name: "JobCraft AI" }],
   openGraph: {
-    title: "JobCraft - AI-Powered Career Assistant",
+    title: "JobCraft AI - Land Your Dream Job with AI-Powered Tools",
     description:
       "Transform your job search with AI-powered resume optimization, cover letter generation, and interview preparation.",
     type: "website",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "JobCraft - AI-Powered Career Assistant",
+    title: "JobCraft AI - Land Your Dream Job with AI-Powered Tools",
     description:
       "Transform your job search with AI-powered resume optimization, cover letter generation, and interview preparation.",
   },
@@ -36,11 +36,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
-          {children}
-          <Toaster />
-        </ThemeProvider>
+      <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
+        {children}
+        <Toaster />
       </body>
     </html>
   )

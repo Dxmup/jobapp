@@ -1,101 +1,85 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import {
-  LayoutDashboard,
-  Users,
-  Settings,
-  FileText,
-  MessageSquare,
-  Shield,
-  Database,
-  Activity,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react"
+import { LogOut } from "lucide-react"
+
+interface AdminSidebarProps {
+  className?: string
+}
 
 const sidebarItems = [
   {
     title: "Dashboard",
     href: "/admin",
-    icon: LayoutDashboard,
   },
   {
     title: "Users",
     href: "/admin/users",
-    icon: Users,
+  },
+  {
+    title: "Analytics",
+    href: "/admin/analytics",
   },
   {
     title: "Content",
     href: "/admin/content",
-    icon: FileText,
   },
   {
     title: "Testimonials",
     href: "/admin/testimonials",
-    icon: MessageSquare,
   },
   {
-    title: "Roles & Permissions",
-    href: "/admin/roles",
-    icon: Shield,
-  },
-  {
-    title: "Database",
-    href: "/admin/migrations",
-    icon: Database,
-  },
-  {
-    title: "Audit Logs",
-    href: "/admin/audit-logs",
-    icon: Activity,
+    title: "Blogs",
+    href: "/admin/blogs",
   },
   {
     title: "Settings",
     href: "/admin/settings",
-    icon: Settings,
+  },
+  {
+    title: "Permissions",
+    href: "/admin/permissions",
+  },
+  {
+    title: "Database",
+    href: "/admin/database",
   },
 ]
 
-export function AdminSidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+export function AdminSidebar({ className }: AdminSidebarProps) {
   const pathname = usePathname()
 
   return (
-    <div
-      className={cn(
-        "flex h-screen flex-col border-r bg-gray-50/40 transition-all duration-300",
-        collapsed ? "w-16" : "w-64",
-      )}
-    >
-      <div className="flex h-16 items-center justify-between border-b px-4">
-        {!collapsed && <h2 className="text-lg font-semibold text-gray-900">Admin Panel</h2>}
-        <button onClick={() => setCollapsed(!collapsed)} className="rounded-lg p-2 hover:bg-gray-100">
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
-      </div>
-
-      <nav className="flex-1 space-y-1 p-2">
+    <div className={cn("flex h-full w-64 flex-col bg-gray-900 text-white p-4", className)}>
+      <h2 className="text-xl font-bold mb-4">Admin Panel</h2>
+      <nav className="space-y-2">
         {sidebarItems.map((item) => {
+          const Icon = item.icon
           const isActive = pathname === item.href
+
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive ? "bg-blue-100 text-blue-700" : "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
+                "group flex items-center px-2 py-2 text-sm font-medium rounded transition-colors",
+                isActive ? "bg-gray-800 text-white" : "text-gray-300 hover:bg-gray-800 hover:text-white",
               )}
             >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
-              {!collapsed && <span className="ml-3">{item.title}</span>}
+              <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
+              {item.title}
             </Link>
           )
         })}
       </nav>
+      <div className="border-t border-gray-800 p-4 mt-auto">
+        <button className="group flex w-full items-center px-2 py-2 text-sm font-medium text-gray-300 rounded hover:bg-gray-800 hover:text-white transition-colors">
+          <LogOut className="mr-3 h-5 w-5 flex-shrink-0" />
+          Sign Out
+        </button>
+      </div>
     </div>
   )
 }

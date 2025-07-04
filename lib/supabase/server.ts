@@ -90,7 +90,10 @@ export function createAdminSupabaseClient() {
   })
 }
 
-/**
- * Named export alias for createSupabaseClient to match expected import
- */
-export const createClient = createSupabaseClient
+// Named export for createClient
+export function createClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+  return createSupabaseClient(supabaseUrl, supabaseKey)
+}

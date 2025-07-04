@@ -1,38 +1,18 @@
-import dynamic from "next/dynamic"
+import { LandingHero } from "@/components/landing-hero"
+import { LandingFeatures } from "@/components/landing-features"
+import { LandingPricing } from "@/components/landing-pricing"
+import { LandingHeader } from "@/components/landing-header"
+import { LandingFooter } from "@/components/landing-footer"
+import { SocialProofSection } from "@/components/landing/social-proof-section"
 
-// Dynamic imports for performance
-const LandingHero = dynamic(() => import("@/components/landing-hero"), {
-  ssr: true,
-})
-
-const LandingFeatures = dynamic(() => import("@/components/landing-features"), {
-  ssr: true,
-})
-
-const LandingPricing = dynamic(() => import("@/components/landing-pricing"), {
-  ssr: true,
-})
-
-const LandingHeader = dynamic(() => import("@/components/landing-header"), {
-  ssr: true,
-})
-
-const LandingFooter = dynamic(() => import("@/components/landing-footer"), {
-  ssr: true,
-})
-
-const SocialProofSection = dynamic(() => import("@/components/landing/social-proof-section"), {
-  ssr: true,
-})
-
-export default function HomePage() {
+export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="flex flex-col min-h-screen">
       <LandingHeader />
-      <main>
+      <main className="flex-1">
         <LandingHero />
-        <SocialProofSection />
         <LandingFeatures />
+        <SocialProofSection />
         <LandingPricing />
       </main>
       <LandingFooter />
