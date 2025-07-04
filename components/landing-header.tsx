@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sparkles } from "lucide-react"
+import { ModeToggle } from "@/components/mode-toggle"
 
 export function LandingHeader() {
   return (
@@ -18,13 +19,8 @@ export function LandingHeader() {
         </Link>
 
         <div className="flex items-center space-x-4">
-          <Button asChild variant="ghost">
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button
-            asChild
-            className="bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-700 hover:to-cyan-600"
-          >
+          <ModeToggle />
+          <Button asChild>
             <Link href="/signup">Get Started</Link>
           </Button>
         </div>
