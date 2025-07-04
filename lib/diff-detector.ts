@@ -5,7 +5,7 @@ export interface TextChange {
   explanation: string
 }
 
-export function detectChanges(original: string, improved: string): TextChange[] {
+export function detectActualChanges(original: string, improved: string): TextChange[] {
   // Simple diff detection for demo purposes
   const changes: TextChange[] = []
 
@@ -44,4 +44,20 @@ export function detectChanges(original: string, improved: string): TextChange[] 
   }
 
   return changes.slice(0, 3) // Limit to 3 changes for demo
+}
+
+export function mergeChanges(geminiChanges: TextChange[], diffChanges: TextChange[]): TextChange[] {
+  // Prioritize Gemini changes if they exist and are valid
+  if (geminiChanges && geminiChanges.length > 0) {
+    const validGeminiChanges = geminiChanges.filter(
+      (change) => change.original && change.improved && change.original.trim().length > 0,
+    )
+
+    if (validGeminiChanges.length > 0) {
+      return validGeminiChanges
+    }
+  }
+
+  // Fall back to diff-detected changes
+  return diffChanges.slice(0, 2) // Limit to 2 changes as requested
 }
