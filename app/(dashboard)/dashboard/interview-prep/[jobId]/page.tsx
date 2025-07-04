@@ -24,6 +24,30 @@ interface JobInterviewPrepPageProps {
   }
 }
 
+// SIMPLIFIED: Function to get user's first name from user_profiles table
+async function getUserFirstName(userId: string): Promise<string> {
+  try {
+    const supabase = createServerSupabaseClient()
+
+    const { data: profile, error } = await supabase
+      .from("user_profiles")
+      .select("user_first_name")
+      .eq("user_id", userId)
+      .single()
+
+    if (!error && profile?.user_first_name) {
+      console.log(`Found user first name: ${profile.user_first_name}`)
+      return profile.user_first_name
+    }
+
+    console.log("No user_first_name found in user_profiles")
+    return "the candidate"
+  } catch (error) {
+    console.error("Error fetching user first name:", error)
+    return "the candidate"
+  }
+}
+
 export default async function JobInterviewPrepPage({ params, searchParams }: JobInterviewPrepPageProps) {
   const { jobId } = params
   const { resumeId, debug } = searchParams
@@ -43,6 +67,14 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
 
   // Use session user ID first, then fall back to cookie
   const currentUserId = userId || cookieUserId
+
+  // SIMPLIFIED: Get user's first name from user_profiles table only
+  let userFirstName = "the candidate"
+  if (currentUserId) {
+    userFirstName = await getUserFirstName(currentUserId)
+  }
+
+  console.log(`👤 User first name for interview: ${userFirstName}`)
 
   console.log(`Looking for job ${jobId} for user ${currentUserId}`)
 
@@ -114,8 +146,8 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
 
   // Build the mock interview URL with job ID and resume ID
   const mockInterviewUrl = resumeId
-    ? `/dashboard/interview-prep/${jobId}/mock-interview?resumeId=${resumeId}`
-    : `/dashboard/interview-prep/${jobId}/mock-interview`
+    ? `/dashboard/interview-prep/${jobId}/mock-interview?resumeId=${resumeId}&preload=true`
+    : `/dashboard/interview-prep/${jobId}/mock-interview?preload=true`
 
   return (
     <div className="container py-6 space-y-8">
@@ -143,6 +175,9 @@ export default async function JobInterviewPrepPage({ params, searchParams }: Job
                 <p className="text-purple-700">
                   Simulate a real phone interview with our AI interviewer based on this job description
                   {resumeId ? " and your resume" : ""}.
+                </p>
+                <p className="text-sm text-purple-600 mt-1">
+                  ✨ Questions will be pre-loaded for faster interview start
                 </p>
               </div>
               <Link href={mockInterviewUrl}>

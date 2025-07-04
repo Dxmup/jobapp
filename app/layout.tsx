@@ -1,14 +1,31 @@
 import type React from "react"
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
+import { cn } from "@/lib/utils"
+import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
-  title: "JobCraft AI - Resume & Cover Letter Assistant",
-  description: "AI-powered job application assistant for optimizing resumes and generating cover letters",
+export const metadata: Metadata = {
+  title: "JobCraft AI - Land Your Dream Job with AI-Powered Tools",
+  description:
+    "Transform your job search with AI-powered resume optimization, cover letter generation, and interview preparation. Get hired 3x faster.",
+  keywords: "job search, AI resume, cover letter generator, interview prep, career tools",
+  authors: [{ name: "JobCraft AI" }],
+  openGraph: {
+    title: "JobCraft AI - Land Your Dream Job with AI-Powered Tools",
+    description:
+      "Transform your job search with AI-powered resume optimization, cover letter generation, and interview preparation.",
+    type: "website",
+    url: "https://jobcraft.ai",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "JobCraft AI - Land Your Dream Job with AI-Powered Tools",
+    description:
+      "Transform your job search with AI-powered resume optimization, cover letter generation, and interview preparation.",
+  },
     generator: 'v0.dev'
 }
 
@@ -19,11 +36,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          {children}
-          <Toaster />
-        </ThemeProvider>
+      <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
+        {children}
+        <Toaster />
       </body>
     </html>
   )

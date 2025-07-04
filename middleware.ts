@@ -2,59 +2,39 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  const isAuthenticated = request.cookies.get("authenticated")?.value === "true"
-  const hasBaselineResume = request.cookies.get("has_baseline_resume")?.value === "true"
-  const userId = request.cookies.get("user_id")?.value
-  const path = request.nextUrl.pathname
+  const { pathname } = request.nextUrl
 
-  console.log(`Middleware processing path: ${path}`)
-  console.log(`Authentication status: ${isAuthenticated ? "authenticated" : "not authenticated"}`)
+  // Only allow landing page routes
+  const allowedPaths = [
+    "/",
+    "/signup",
+    "/api/waitlist",
+    "/api/landing/generate-interview-questions",
+    "/api/landing/optimize-resume",
+    "/api/landing/generate-cover-letter",
+  ]
 
-  // If user is not authenticated and trying to access protected routes
+  // Allow static files
   if (
-    !isAuthenticated &&
-    (path.startsWith("/dashboard") ||
-      path.startsWith("/jobs") ||
-      path.startsWith("/onboarding") ||
-      path.startsWith("/admin"))
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.includes(".") ||
+    pathname.startsWith("/audio") ||
+    pathname.startsWith("/public")
   ) {
-    console.log(`Redirecting unauthenticated user to login from ${path}`)
-    return NextResponse.redirect(new URL("/login", request.url))
+    return NextResponse.next()
   }
 
-  // For admin routes, we'll use a simplified check based on cookies
-  // In a production app, you would make this more secure
-  if (isAuthenticated && path.startsWith("/admin")) {
-    // Check if user has admin role based on email
-    const isAdmin = userId && ["4", "5"].includes(userId)
+  // Check if path is allowed
+  const isAllowed = allowedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 
-    if (!isAdmin) {
-      console.log(`Non-admin user attempted to access admin route: ${path}`)
-      return NextResponse.redirect(new URL("/dashboard", request.url))
-    }
-  }
-
-  // If user is authenticated but doesn't have a baseline resume
-  // and is trying to access dashboard or jobs (but not onboarding)
-  if (
-    isAuthenticated &&
-    !hasBaselineResume &&
-    (path.startsWith("/dashboard") || path.startsWith("/jobs")) &&
-    !path.startsWith("/onboarding")
-  ) {
-    console.log(`Redirecting user without baseline resume to onboarding`)
-    return NextResponse.redirect(new URL("/onboarding", request.url))
-  }
-
-  // If user is authenticated, has a baseline resume, and is trying to access onboarding
-  if (isAuthenticated && hasBaselineResume && path.startsWith("/onboarding")) {
-    console.log(`Redirecting user with baseline resume from onboarding to dashboard`)
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+  if (!isAllowed) {
+    return NextResponse.redirect(new URL("/", request.url))
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/jobs/:path*", "/onboarding/:path*", "/onboarding", "/admin/:path*", "/admin"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*"],
 }
