@@ -89,6 +89,10 @@ export async function getCoverLetter(id: string) {
   }
 }
 
+export async function getCoverLetterById(id: string) {
+  return getCoverLetter(id)
+}
+
 export async function updateCoverLetter(id: string, data: any) {
   const userId = await getCurrentUserId()
 
@@ -144,6 +148,37 @@ export async function deleteCoverLetter(id: string) {
     console.error("Error deleting cover letter:", error)
     return { success: false, error: "Failed to delete cover letter" }
   }
+}
+
+export async function generateCoverLetter(jobId: string, resumeContent: string) {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  try {
+    // Placeholder for AI generation logic
+    const generatedContent = `Dear Hiring Manager,
+
+I am writing to express my strong interest in the position at your company. With my background and experience, I believe I would be a valuable addition to your team.
+
+[Generated content based on job requirements and resume]
+
+Thank you for your consideration.
+
+Sincerely,
+[Your Name]`
+
+    return { success: true, content: generatedContent }
+  } catch (error) {
+    console.error("Error generating cover letter:", error)
+    return { success: false, error: "Failed to generate cover letter" }
+  }
+}
+
+export async function saveCoverLetter(data: any) {
+  return createCoverLetter(data)
 }
 
 export async function getJobCoverLetters(jobId: string) {
@@ -202,5 +237,30 @@ export async function getUserCoverLetters() {
   } catch (error) {
     console.error("Error fetching user cover letters:", error)
     return { success: false, error: "Failed to fetch cover letters" }
+  }
+}
+
+export async function getJobResumes(jobId: string) {
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const supabase = createServerSupabaseClient()
+
+  try {
+    const { data: resumes, error } = await supabase
+      .from("resumes")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return { success: true, resumes: resumes || [] }
+  } catch (error) {
+    console.error("Error fetching job resumes:", error)
+    return { success: false, error: "Failed to fetch resumes" }
   }
 }

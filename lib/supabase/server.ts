@@ -7,7 +7,7 @@
  * @module supabase/server
  */
 
-import { createClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 
 /**
@@ -28,7 +28,7 @@ export function createServerSupabaseClient() {
     console.error("Supabase server environment variables are missing!")
   }
 
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "", {
+  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "", {
     auth: {
       persistSession: false,
     },
@@ -50,16 +50,20 @@ export function createServerClient(cookieStore: ReturnType<typeof cookies>) {
     console.error("Supabase client environment variables are missing!")
   }
 
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || "", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "", {
-    auth: {
-      persistSession: false,
-      detectSessionInUrl: false,
-      flowType: "pkce",
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+    {
+      auth: {
+        persistSession: false,
+        detectSessionInUrl: false,
+        flowType: "pkce",
+      },
+      global: {
+        headers: { "Content-Type": "application/json" },
+      },
     },
-    global: {
-      headers: { "Content-Type": "application/json" },
-    },
-  })
+  )
 }
 
 /**
@@ -76,7 +80,7 @@ export function createAdminSupabaseClient() {
     console.error("Supabase admin environment variables are missing!")
   }
 
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "", {
+  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "", {
     auth: {
       persistSession: false,
     },
@@ -85,3 +89,6 @@ export function createAdminSupabaseClient() {
     },
   })
 }
+
+// Named export for createClient
+export const createClient = createSupabaseClient
