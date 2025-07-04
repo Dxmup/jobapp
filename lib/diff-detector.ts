@@ -1,53 +1,51 @@
 export interface TextChange {
   original: string
   improved: string
-  type: string
+  type: "addition" | "modification" | "enhancement" | "language" | "structure"
   explanation: string
 }
 
-export function detectActualChanges(originalText: string, optimizedText: string): TextChange[] {
-  // Simple diff detection for demo purposes
+export function detectActualChanges(original: string, optimized: string): TextChange[] {
   const changes: TextChange[] = []
 
-  // Basic word-level comparison
-  const originalWords = originalText.split(/\s+/)
-  const optimizedWords = optimizedText.split(/\s+/)
+  // Simple diff detection - you can enhance this with a proper diff library
+  const originalLines = original.split("\n").filter((line) => line.trim())
+  const optimizedLines = optimized.split("\n").filter((line) => line.trim())
 
-  // Find simple replacements
-  for (let i = 0; i < Math.min(originalWords.length, optimizedWords.length); i++) {
-    if (originalWords[i] !== optimizedWords[i]) {
-      changes.push({
-        original: originalWords[i],
-        improved: optimizedWords[i],
-        type: "improvement",
-        explanation: "Enhanced word choice for better impact",
-      })
-
-      if (changes.length >= 2) break // Limit to 2 changes for demo
-    }
+  // Look for significant additions
+  if (optimizedLines.length > originalLines.length) {
+    changes.push({
+      original: "Basic resume structure",
+      improved: "Enhanced professional formatting with clear sections",
+      type: "structure",
+      explanation: "Added professional structure and organization",
+    })
   }
 
-  // If no changes found, provide generic examples
-  if (changes.length === 0) {
-    changes.push(
-      {
-        original: "responsible for",
-        improved: "managed and delivered",
-        type: "action",
-        explanation: "Replaced passive language with strong action verbs",
-      },
-      {
-        original: "worked on projects",
-        improved: "led cross-functional initiatives resulting in 25% efficiency gains",
-        type: "impact",
-        explanation: "Added quantifiable results and leadership emphasis",
-      },
-    )
+  // Look for quantified achievements
+  const hasNumbers = /\d+[%$]?/.test(optimized) && !/\d+[%$]?/.test(original)
+  if (hasNumbers) {
+    changes.push({
+      original: "Generic accomplishments",
+      improved: "Quantified achievements with specific metrics",
+      type: "enhancement",
+      explanation: "Added measurable results to demonstrate impact",
+    })
   }
 
-  return changes
-}
+  // Look for action verbs
+  const actionVerbs = ["Led", "Managed", "Developed", "Implemented", "Optimized", "Architected"]
+  const hasActionVerbs =
+    actionVerbs.some((verb) => optimized.includes(verb)) && !actionVerbs.some((verb) => original.includes(verb))
 
-export function mergeChanges(changes: TextChange[]): string {
-  return changes.map((change) => `${change.original} → ${change.improved}`).join("; ")
+  if (hasActionVerbs) {
+    changes.push({
+      original: "Passive language",
+      improved: "Strong action verbs and active voice",
+      type: "language",
+      explanation: "Replaced weak language with powerful action verbs",
+    })
+  }
+
+  return changes.slice(0, 3) // Limit to 3 changes
 }

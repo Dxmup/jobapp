@@ -1,174 +1,390 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Loader2, FileText, Zap, CheckCircle } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Upload, Loader2, FileText, Sparkles, Copy, Check } from "lucide-react"
+import { ResumeChangesList } from "./resume-changes-list"
+import { detectActualChanges, type TextChange } from "@/lib/diff-detector"
+import { useToast } from "@/hooks/use-toast"
 
-const sampleResume = `John Smith
-Software Engineer
+interface ResumeOptimizationTabProps {
+  onActionUsed: () => void
+  isDisabled: boolean
+}
 
-Experience:
-• Developed web applications using React and Node.js
-• Worked with databases and APIs
-• Collaborated with team members on projects
+interface OptimizationResult {
+  originalResume: string
+  optimizedResume: string
+  changes: TextChange[]
+  note?: string
+}
 
-Skills:
-JavaScript, React, Node.js, HTML, CSS`
-
-const optimizedResume = `John Smith
-Senior Software Engineer | Full-Stack Developer
-
-PROFESSIONAL EXPERIENCE:
-Software Engineer | TechCorp (2021-Present)
-• Architected and developed 5+ scalable web applications using React.js and Node.js, serving 10,000+ daily active users
-• Optimized database queries and API performance, reducing response times by 40%
-• Led cross-functional team of 4 developers in agile environment, delivering projects 20% ahead of schedule
-• Implemented automated testing suites, improving code coverage from 60% to 95%
-
-TECHNICAL SKILLS:
-Frontend: React.js, TypeScript, HTML5, CSS3, Tailwind CSS
-Backend: Node.js, Express.js, Python, RESTful APIs
-Database: PostgreSQL, MongoDB, Redis
-Tools: Git, Docker, AWS, CI/CD pipelines`
-
-const improvements = [
-  { type: "added", text: "Quantified achievements with specific metrics" },
-  { type: "added", text: "Enhanced job title with relevant keywords" },
-  { type: "added", text: "Structured experience with clear company context" },
-  { type: "added", text: "Expanded technical skills with modern technologies" },
-  { type: "improved", text: "Transformed basic bullet points into impact statements" },
-]
-
-export function ResumeOptimizationTab() {
-  const [jobTitle, setJobTitle] = useState("Software Engineer")
-  const [resumeText, setResumeText] = useState(sampleResume)
+export function ResumeOptimizationTab({ onActionUsed, isDisabled }: ResumeOptimizationTabProps) {
+  const [resumeText, setResumeText] = useState("")
   const [isOptimizing, setIsOptimizing] = useState(false)
-  const [showResults, setShowResults] = useState(false)
+  const [optimizationResult, setOptimizationResult] = useState<OptimizationResult | null>(null)
+  const [copied, setCopied] = useState(false)
+  const { toast } = useToast()
 
-  const handleOptimize = async () => {
+  const handleFileUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      // Support both text and PDF files
+      if (
+        !file.type.includes("text") &&
+        file.type !== "application/pdf" &&
+        !file.name.endsWith(".txt") &&
+        !file.name.endsWith(".pdf")
+      ) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload a .txt or .pdf file, or paste your resume text directly.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB limit
+        toast({
+          title: "File too large",
+          description: "Please upload a file smaller than 5MB.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      try {
+        if (file.type === "application/pdf") {
+          // Handle PDF upload
+          const formData = new FormData()
+          formData.append("file", file)
+
+          const response = await fetch("/api/extract-pdf-text", {
+            method: "POST",
+            body: formData,
+          })
+
+          if (!response.ok) {
+            throw new Error("Failed to extract text from PDF")
+          }
+
+          const data = await response.json()
+          setResumeText(data.text || "")
+
+          toast({
+            title: "PDF uploaded successfully",
+            description: "Text has been extracted from your PDF resume.",
+          })
+        } else {
+          // Handle text file
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            const content = e.target?.result as string
+            setResumeText(content)
+          }
+          reader.readAsText(file)
+        }
+      } catch (error) {
+        console.error("Error processing file:", error)
+        toast({
+          title: "Upload failed",
+          description: "Failed to process the uploaded file. Please try again.",
+          variant: "destructive",
+        })
+      }
+    },
+    [toast],
+  )
+
+  const handleOptimizeResume = async () => {
+    if (!resumeText.trim()) {
+      toast({
+        title: "Resume required",
+        description: "Please paste your resume text or upload a file.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (resumeText.length < 50) {
+      toast({
+        title: "Resume too short",
+        description: "Please provide a more complete resume (at least 50 characters).",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsOptimizing(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsOptimizing(false)
-    setShowResults(true)
+
+    try {
+      console.log("Making request to optimize resume...")
+
+      const response = await fetch("/api/landing/optimize-resume", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          resumeContent: resumeText,
+        }),
+      })
+
+      console.log("Response status:", response.status)
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const responseText = await response.text()
+        console.error("Non-JSON response received:", responseText)
+        throw new Error("Server returned invalid response format. Please try again.")
+      }
+
+      let data
+      try {
+        data = await response.json()
+        console.log("Parsed response data:", data)
+      } catch (parseError) {
+        console.error("Failed to parse response as JSON:", parseError)
+        throw new Error("Server returned invalid response. Please try again.")
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `Server error: ${response.status}`)
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to optimize resume")
+      }
+
+      // Hybrid approach: Use Gemini changes if available, otherwise detect changes
+      let finalChanges: TextChange[] = []
+
+      if (data.changes && Array.isArray(data.changes) && data.changes.length > 0) {
+        // Use Gemini-provided changes
+        console.log("Using Gemini-provided changes:", data.changes)
+        finalChanges = data.changes
+      } else {
+        // Fall back to diff detection
+        console.log("Falling back to diff detection")
+        const detectedChanges = detectActualChanges(data.originalResume, data.optimizedResume)
+        finalChanges = detectedChanges.slice(0, 2) // Limit to 2 changes
+      }
+
+      // Ensure we have at least some changes to show
+      if (finalChanges.length === 0) {
+        finalChanges = [
+          {
+            original: "Generic resume language",
+            improved: "Professional, action-oriented language with stronger impact",
+            type: "language",
+            explanation: "Enhanced overall professional presentation and clarity",
+          },
+        ]
+      }
+
+      setOptimizationResult({
+        originalResume: data.originalResume,
+        optimizedResume: data.optimizedResume,
+        changes: finalChanges,
+        note: data.note,
+      })
+
+      onActionUsed() // Increment the usage counter
+
+      toast({
+        title: "Resume optimized!",
+        description: data.note || "Your resume has been enhanced with professional improvements.",
+      })
+    } catch (error) {
+      console.error("Error optimizing resume:", error)
+      toast({
+        title: "Optimization failed",
+        description: error instanceof Error ? error.message : "Please try again later.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsOptimizing(false)
+    }
+  }
+
+  const handleCopyResume = async () => {
+    if (!optimizationResult?.optimizedResume) return
+
+    try {
+      await navigator.clipboard.writeText(optimizationResult.optimizedResume)
+      setCopied(true)
+      toast({
+        title: "Copied!",
+        description: "Optimized resume copied to clipboard.",
+      })
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Please select and copy the text manually.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleReset = () => {
+    setResumeText("")
+    setOptimizationResult(null)
+    setCopied(false)
+  }
+
+  if (optimizationResult) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-yellow-500" />
+            Resume Optimization Results
+          </h3>
+          <Button variant="outline" onClick={handleReset}>
+            Try Another Resume
+          </Button>
+        </div>
+
+        {optimizationResult.note && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>Note:</strong> {optimizationResult.note}
+            </p>
+          </div>
+        )}
+
+        {/* AI Improvements Made - Full Width */}
+        <ResumeChangesList changes={optimizationResult.changes} />
+
+        {/* Optimized Resume - Full Width */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg text-green-600">Optimized Resume</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyResume}
+                className="flex items-center gap-2 bg-transparent"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg">
+              <pre className="text-sm leading-relaxed text-left whitespace-pre-wrap font-sans overflow-x-auto">
+                {optimizationResult.optimizedResume}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Input Section */}
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="job-title">Target Job Title</Label>
-            <Input
-              id="job-title"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              placeholder="e.g., Senior Software Engineer"
-            />
-          </div>
+      <div className="text-center space-y-2">
+        <h3 className="text-xl font-semibold flex items-center justify-center gap-2">
+          <FileText className="h-5 w-5 text-blue-600" />
+          See Your Resume Transformed
+        </h3>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Watch JobCraft turn any resume into an interview magnet in seconds. Upload yours and see the difference
+          immediately. Sign up for automated full results.
+        </p>
+      </div>
 
-          <div>
-            <Label htmlFor="resume-text">Current Resume</Label>
-            <Textarea
-              id="resume-text"
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              placeholder="Paste your current resume here..."
-              className="min-h-[200px] font-mono text-sm"
-            />
+      <Card>
+        <CardHeader>
+          <CardTitle>Upload or Paste Your Resume</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-4">
+            {/* File upload option */}
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
+              <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-muted-foreground mb-2">Upload your resume (.txt or .pdf file)</p>
+              <input
+                type="file"
+                accept=".txt,.pdf,text/plain,application/pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="resume-upload"
+                disabled={isDisabled}
+              />
+              <Button variant="outline" asChild disabled={isDisabled}>
+                <label htmlFor="resume-upload" className="cursor-pointer">
+                  Choose File
+                </label>
+              </Button>
+            </div>
+
+            <div className="text-center text-sm text-muted-foreground">or</div>
+
+            {/* Text area option */}
+            <div className="space-y-2">
+              <label htmlFor="resume-text" className="text-sm font-medium">
+                Paste your resume here and prepare to be amazed...
+              </label>
+              <Textarea
+                id="resume-text"
+                placeholder="Paste your resume content here... (minimum 50 characters)"
+                value={resumeText}
+                onChange={(e) => setResumeText(e.target.value)}
+                className="min-h-[200px] font-mono text-sm"
+                disabled={isDisabled}
+              />
+              <div className="text-xs text-muted-foreground text-right">{resumeText.length} characters</div>
+            </div>
           </div>
 
           <Button
-            onClick={handleOptimize}
-            disabled={isOptimizing || !resumeText.trim()}
-            className="w-full bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-700 hover:to-cyan-600"
+            onClick={handleOptimizeResume}
+            disabled={isOptimizing || !resumeText.trim() || isDisabled}
+            className="w-full"
+            size="lg"
           >
             {isOptimizing ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Optimizing with AI...
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Optimizing Resume...
               </>
             ) : (
               <>
-                <Zap className="mr-2 h-4 w-4" />
-                Optimize Resume
+                <Sparkles className="h-4 w-4 mr-2" />
+                Optimize My Resume
               </>
             )}
           </Button>
-        </div>
 
-        {/* Results Section */}
-        <div className="space-y-4">
-          <AnimatePresence>
-            {showResults && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="space-y-4"
-              >
-                <Card className="border-green-200 dark:border-green-800">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center text-green-700 dark:text-green-300">
-                      <CheckCircle className="mr-2 h-5 w-5" />
-                      Optimized Resume
-                    </CardTitle>
-                    <CardDescription>AI-enhanced version tailored for {jobTitle}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                      <pre className="text-sm whitespace-pre-wrap font-mono">{optimizedResume}</pre>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Key Improvements</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {improvements.map((improvement, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="flex items-start space-x-2"
-                      >
-                        <Badge
-                          variant={improvement.type === "added" ? "default" : "secondary"}
-                          className="mt-0.5 text-xs"
-                        >
-                          {improvement.type}
-                        </Badge>
-                        <span className="text-sm">{improvement.text}</span>
-                      </motion.div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {!showResults && (
-            <Card className="border-dashed border-2 border-slate-200 dark:border-slate-700">
-              <CardContent className="flex items-center justify-center h-[300px] text-center">
-                <div className="space-y-2">
-                  <FileText className="h-12 w-12 text-slate-400 mx-auto" />
-                  <p className="text-slate-500 dark:text-slate-400">Optimized resume will appear here</p>
-                </div>
-              </CardContent>
-            </Card>
+          {isDisabled && (
+            <p className="text-sm text-muted-foreground text-center">
+              Demo limit reached. Sign up to continue optimizing resumes!
+            </p>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
