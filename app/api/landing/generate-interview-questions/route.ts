@@ -65,34 +65,31 @@ Example format: ["Question 1", "Question 2", "Question 3", "Question 4", "Questi
 
     console.log("Making Gemini API call...")
 
-    // Updated to use gemini-live-2.5-flash-preview model
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1/models/gemini-live-2.5-flash-preview:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 500,
-          },
-        }),
+    // Updated to use gemini-1.5-pro which is a stable model available in the v1 API
+    const response = await fetch("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
-    )
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 500,
+        },
+      }),
+    })
 
     console.log("Gemini API response status:", response.status)
 
