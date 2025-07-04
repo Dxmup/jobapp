@@ -64,9 +64,8 @@ We are looking for a qualified ${jobTitle.trim()} to join our team. The ideal ca
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          jobTitle: jobTitle.trim(),
           jobDescription: effectiveJobDescription,
-          role: jobTitle.trim(),
-          experience: "entry to mid-level",
         }),
       })
 

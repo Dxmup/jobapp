@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
 
     const { jobTitle, jobDescription } = await request.json()
 
+    console.log("Received request:", { jobTitle, jobDescription })
+
     if (!jobTitle || jobTitle.trim().length === 0) {
       return NextResponse.json({ error: "Job title is required" }, { status: 400 })
     }
@@ -61,6 +63,8 @@ Requirements:
 
 Example format: ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"]`
 
+    console.log("Making Gemini API call...")
+
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent",
       {
@@ -89,11 +93,17 @@ Example format: ["Question 1", "Question 2", "Question 3", "Question 4", "Questi
       },
     )
 
+    console.log("Gemini API response status:", response.status)
+
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error("Gemini API error:", errorText)
       throw new Error(`Gemini API error: ${response.status}`)
     }
 
     const data = await response.json()
+    console.log("Gemini API response:", data)
+
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text
 
     if (!text) {
@@ -108,7 +118,7 @@ Example format: ["Question 1", "Question 2", "Question 3", "Question 4", "Questi
       const questions = JSON.parse(cleanText)
 
       if (Array.isArray(questions) && questions.length > 0) {
-        return NextResponse.json({ questions })
+        return NextResponse.json({ success: true, questions })
       }
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError)
@@ -122,7 +132,7 @@ Example format: ["Question 1", "Question 2", "Question 3", "Question 4", "Questi
       `How do you prioritize tasks when you have multiple deadlines?`,
     ]
 
-    return NextResponse.json({ questions: fallbackQuestions })
+    return NextResponse.json({ success: true, questions: fallbackQuestions })
   } catch (error) {
     console.error("Error generating questions:", error)
 
@@ -134,6 +144,6 @@ Example format: ["Question 1", "Question 2", "Question 3", "Question 4", "Questi
       "Where do you see yourself in five years?",
     ]
 
-    return NextResponse.json({ questions: fallbackQuestions })
+    return NextResponse.json({ success: true, questions: fallbackQuestions })
   }
 }
