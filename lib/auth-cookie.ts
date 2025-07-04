@@ -1,67 +1,37 @@
 import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
 
-/**
- * Centralized cookie-based authentication utility
- * Single source of truth for user authentication across the app
- */
-
-export async function getCurrentUserId(): Promise<string> {
+export async function getCurrentUserId(): Promise<string | null> {
   try {
-    const cookieStore = cookies()
-    const userId = cookieStore.get("user_id")?.value
-
-    if (!userId) {
-      console.log("No user ID found in cookies, redirecting to login")
-      redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
-    }
-
-    return userId
-  } catch (error) {
-    console.error("Error getting current user ID:", error)
-    redirect("/login?redirect=" + encodeURIComponent("/dashboard"))
-  }
-}
-
-export async function getCurrentUserIdOptional(): Promise<string | null> {
-  try {
-    const cookieStore = cookies()
-    const userId = cookieStore.get("user_id")?.value
-    return userId || null
+    // For landing page deployment, return null since we don't have auth
+    return null
   } catch (error) {
     console.error("Error getting current user ID:", error)
     return null
   }
 }
 
-export async function isAuthenticated(): Promise<boolean> {
-  try {
-    const cookieStore = cookies()
-    const authenticated = cookieStore.get("authenticated")?.value === "true"
-    const userId = cookieStore.get("user_id")?.value
-    return authenticated && !!userId
-  } catch (error) {
-    console.error("Error checking authentication:", error)
-    return false
-  }
+export async function setAuthCookie(token: string) {
+  const cookieStore = cookies()
+  cookieStore.set("auth-token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+  })
 }
 
-export async function hasBaselineResume(): Promise<boolean> {
-  try {
-    const cookieStore = cookies()
-    return cookieStore.get("has_baseline_resume")?.value === "true"
-  } catch (error) {
-    console.error("Error checking baseline resume:", error)
-    return false
-  }
+export async function clearAuthCookie() {
+  const cookieStore = cookies()
+  cookieStore.delete("auth-token")
 }
 
-export async function isAdmin(): Promise<boolean> {
+export async function getAuthCookie(): Promise<string | null> {
   try {
     const cookieStore = cookies()
-    return cookieStore.get("is_admin")?.value === "true"
+    const token = cookieStore.get("auth-token")
+    return token?.value || null
   } catch (error) {
-    console.error("Error checking admin status:", error)
-    return false
+    console.error("Error getting auth cookie:", error)
+    return null
   }
 }
