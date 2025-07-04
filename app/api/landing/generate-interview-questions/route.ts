@@ -1,70 +1,44 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { google } from "@ai-sdk/google"
-import { generateText } from "ai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
 
 export async function POST(request: NextRequest) {
   try {
-    const { jobTitle, jobDescription } = await request.json()
-
-    console.log("Received request:", { jobTitle, jobDescription })
+    const { jobTitle, jobDescription, experience } = await request.json()
 
     if (!jobTitle) {
-      console.error("Job title is missing")
       return NextResponse.json({ error: "Job title is required" }, { status: 400 })
     }
 
-    if (!process.env.GOOGLE_AI_API_KEY) {
-      console.error("Google AI API key is missing")
-      return NextResponse.json({ error: "API configuration error" }, { status: 500 })
-    }
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" })
 
-    console.log("Making Gemini API call...")
+    const prompt = `Generate 5 realistic interview questions for a ${jobTitle} position. 
+    ${jobDescription ? `Job Description: ${jobDescription}` : ""}
+    ${experience ? `Experience Level: ${experience}` : ""}
+    
+    Return the questions as a JSON array of strings. Only return the JSON array, no other text.`
 
-    const prompt = `Generate 5 common interview questions for a ${jobTitle} position. ${
-      jobDescription ? `Job description: ${jobDescription}` : ""
-    }
+    const result = await model.generateContent(prompt)
+    const response = await result.response
+    const text = response.text()
 
-    Return the questions as a JSON array of strings. Each question should be relevant to the role and commonly asked in interviews.
-
-    Example format:
-    ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"]`
-
-    const { text } = await generateText({
-      model: google("gemini-1.5-pro"),
-      prompt,
-    })
-
-    console.log("Gemini API response:", text)
-
-    // Try to parse the response as JSON
-    let questions
     try {
-      questions = JSON.parse(text)
+      const questions = JSON.parse(text)
+      return NextResponse.json({ success: true, questions })
     } catch (parseError) {
-      console.error("Failed to parse JSON response:", parseError)
-      // Fallback: extract questions from text
+      // If JSON parsing fails, try to extract questions from text
       const lines = text.split("\n").filter((line) => line.trim().length > 0)
-      questions = lines.slice(0, 5).map((line) => line.replace(/^\d+\.\s*/, "").replace(/^[-*]\s*/, ""))
+      const questions = lines.slice(0, 5).map((line) => line.replace(/^\d+\.\s*/, "").trim())
+      return NextResponse.json({ success: true, questions })
     }
-
-    if (!Array.isArray(questions)) {
-      console.error("Questions is not an array:", questions)
-      return NextResponse.json({ error: "Failed to generate questions" }, { status: 500 })
-    }
-
-    console.log("Generated questions:", questions)
-
-    return NextResponse.json({
-      success: true,
-      questions: questions.slice(0, 5),
-    })
-  } catch (error: any) {
+  } catch (error) {
     console.error("Gemini API error:", error)
-
-    if (error.message?.includes("404")) {
-      return NextResponse.json({ error: "Gemini API error: Model not found" }, { status: 500 })
-    }
-
-    return NextResponse.json({ error: `Gemini API error: ${error.message || "Unknown error"}` }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: `Gemini API error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      },
+      { status: 500 },
+    )
   }
 }
