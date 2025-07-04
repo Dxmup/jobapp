@@ -1,131 +1,125 @@
-import Link from "next/link"
+"use client"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import dynamic from "next/dynamic"
-import { ArrowRight, Play, Sparkles } from "lucide-react"
-
-// Optimized dynamic imports with better loading states
-const RotatingText = dynamic(() => import("./rotating-text").then((mod) => ({ default: mod.RotatingText })), {
-  loading: () => (
-    <span className="inline-block min-w-[200px] h-12 bg-gradient-to-r from-purple-200 to-cyan-200 animate-pulse rounded-lg" />
-  ),
-  ssr: false,
-})
-
-const EnhancedHeroDemoTabs = dynamic(
-  () => import("./landing/enhanced-hero-demo-tabs").then((mod) => ({ default: mod.EnhancedHeroDemoTabs })),
-  {
-    loading: () => (
-      <div className="mt-20 max-w-6xl mx-auto">
-        <div className="animate-pulse space-y-8">
-          <div className="text-center space-y-4">
-            <div className="h-10 bg-gradient-to-r from-purple-200 to-cyan-200 rounded-xl w-3/4 mx-auto"></div>
-            <div className="h-6 bg-gray-200 rounded-lg w-full mx-auto"></div>
-          </div>
-          <div className="h-[500px] bg-gradient-to-br from-purple-50 to-cyan-50 rounded-2xl border-2 border-dashed border-purple-200"></div>
-        </div>
-      </div>
-    ),
-    ssr: false,
-  },
-)
+import { ArrowRight, Sparkles, Star } from "lucide-react"
+import Link from "next/link"
+import { EnhancedHeroDemoTabs } from "@/components/landing/enhanced-hero-demo-tabs"
 
 export function LandingHero() {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-purple-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/30">
-      {/* Animated background elements */}
-      <div className="absolute inset-0">
-        {/* Gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-cyan-400/20 to-blue-400/20 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-yellow-300/10 to-orange-300/10 rounded-full blur-3xl animate-pulse delay-2000" />
-
-        {/* Grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-      </div>
+      {/* Background Elements */}
+      <div className="absolute inset-0 bg-grid-slate-100 dark:bg-grid-slate-800 bg-[size:20px_20px] [mask-image:radial-gradient(white,transparent_70%)]" />
 
       <div className="container relative z-10 py-20">
-        <div className="max-w-5xl mx-auto text-center">
-          {/* Floating badge */}
-          <div className="mb-8 flex justify-center">
-            <Badge className="mb-4 bg-gradient-to-r from-purple-600 to-cyan-600 text-white border-0 px-6 py-2 text-sm font-medium shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-              <Sparkles className="w-4 h-4 mr-2" />🚀 Stop Getting Rejected. Start Getting Hired.
-            </Badge>
-          </div>
-
-          {/* Main headline with enhanced typography */}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[0.9]">
-            <span className="block mb-4">Land Your</span>
-            <span className="block bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 bg-clip-text text-transparent relative">
-              <span className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 blur-2xl opacity-30 animate-pulse"></span>
-              Dream Job
-            </span>
-            <span className="block mt-4 text-4xl md:text-5xl lg:text-6xl">with AI-Crafted</span>
-            <div className="mt-4">
-              <RotatingText />
-            </div>
-          </h1>
-
-          {/* Enhanced subtitle */}
-          <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-12 max-w-4xl mx-auto leading-relaxed font-medium">
-            While you're bombing interviews you should have aced, smart job seekers are using AI to practice the exact
-            questions and get{" "}
-            <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-bold">
-              hired 3x faster
-            </span>
-            . Join them.
-          </p>
-
-          {/* Enhanced CTA buttons */}
-          <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
-            <Button
-              size="lg"
-              asChild
-              className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 text-white border-0 px-8 py-4 text-lg font-semibold shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 group"
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          {/* Left Column - Content */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="space-y-8"
+          >
+            {/* Badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <Link href="/signup" className="flex items-center">
-                Get Started Free
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              asChild
-              className="border-2 border-purple-200 hover:border-purple-300 bg-white/80 backdrop-blur-sm hover:bg-white text-purple-700 px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group"
+              <Badge variant="outline" className="px-4 py-2 text-sm font-medium">
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI-Powered Job Search Assistant
+              </Badge>
+            </motion.div>
+
+            {/* Main Headline */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="space-y-4"
             >
-              <Link href="#demo" className="flex items-center">
-                <Play className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
-                See How It Works
-              </Link>
-            </Button>
-          </div>
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
+                <span className="bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 dark:from-slate-100 dark:via-purple-100 dark:to-slate-100 bg-clip-text text-transparent">
+                  Land Your Dream Job
+                </span>
+                <br />
+                <span className="bg-gradient-to-r from-purple-600 to-cyan-500 bg-clip-text text-transparent">
+                  10x Faster
+                </span>
+              </h1>
+              <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl">
+                Transform your job search with AI-powered resume optimization, cover letter generation, and interview
+                preparation.
+              </p>
+            </motion.div>
 
-          {/* Trust indicators */}
-          <div className="mb-20">
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 font-medium">
-              Trusted by 12,000+ job seekers worldwide
-            </p>
-            <div className="flex justify-center items-center gap-8 opacity-60 hover:opacity-80 transition-opacity">
-              <div className="text-2xl font-bold text-slate-400">Google</div>
-              <div className="text-2xl font-bold text-slate-400">Meta</div>
-              <div className="text-2xl font-bold text-slate-400">Apple</div>
-              <div className="text-2xl font-bold text-slate-400">Netflix</div>
-              <div className="text-2xl font-bold text-slate-400">Amazon</div>
-            </div>
-          </div>
+            {/* Social Proof */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="flex items-center space-x-4"
+            >
+              <div className="flex -space-x-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-400 to-cyan-400 border-2 border-white dark:border-slate-900 flex items-center justify-center text-white font-semibold text-sm"
+                  >
+                    {String.fromCharCode(64 + i)}
+                  </div>
+                ))}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <div className="flex items-center space-x-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                  ))}
+                </div>
+                <span className="font-medium">Trusted by 10,000+ job seekers</span>
+              </div>
+            </motion.div>
 
-          {/* Interactive Demo Section */}
-          <div id="demo" className="scroll-mt-20">
+            {/* CTA Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="flex flex-col sm:flex-row gap-4"
+            >
+              <Button
+                asChild
+                size="lg"
+                className="bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-700 hover:to-cyan-600 text-white shadow-xl hover:shadow-2xl transition-all duration-300 group"
+              >
+                <Link href="/signup">
+                  Get Started Free
+                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="border-2 hover:bg-slate-50 dark:hover:bg-slate-800 bg-transparent"
+                asChild
+              >
+                <Link href="#demo">See Demo</Link>
+              </Button>
+            </motion.div>
+          </motion.div>
+
+          {/* Right Column - Demo */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="relative"
+            id="demo"
+          >
             <EnhancedHeroDemoTabs />
-          </div>
-        </div>
-      </div>
-
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-        <div className="w-6 h-10 border-2 border-slate-400 rounded-full flex justify-center">
-          <div className="w-1 h-3 bg-slate-400 rounded-full mt-2 animate-pulse"></div>
+          </motion.div>
         </div>
       </div>
     </section>
