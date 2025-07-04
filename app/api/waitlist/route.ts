@@ -7,31 +7,27 @@ export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
 
-    if (!email || !email.includes("@")) {
-      return NextResponse.json({ error: "Valid email is required" }, { status: 400 })
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
+    // Insert into waitlist table
     const { data, error } = await supabase
       .from("waitlist")
-      .insert([
-        {
-          email: email.toLowerCase().trim(),
-          source: "signup_page",
-          created_at: new Date().toISOString(),
-        },
-      ])
+      .insert([{ email, created_at: new Date().toISOString() }])
       .select()
 
     if (error) {
-      if (error.code === "23505") {
-        return NextResponse.json({ error: "Email already registered" }, { status: 409 })
-      }
-      throw error
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: "Failed to join waitlist" }, { status: 500 })
     }
 
-    return NextResponse.json({ message: "Successfully added to waitlist", data }, { status: 201 })
+    return NextResponse.json({
+      success: true,
+      message: "Successfully joined waitlist!",
+    })
   } catch (error) {
-    console.error("Waitlist error:", error)
-    return NextResponse.json({ error: "Failed to add to waitlist" }, { status: 500 })
+    console.error("Waitlist API error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
