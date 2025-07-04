@@ -270,7 +270,12 @@ export function ResumeOptimizationTab({ onActionUsed, isDisabled }: ResumeOptimi
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg text-green-600">Optimized Resume</CardTitle>
-              <Button variant="outline" size="sm" onClick={handleCopyResume} className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyResume}
+                className="flex items-center gap-2 bg-transparent"
+              >
                 {copied ? (
                   <>
                     <Check className="h-4 w-4" />
