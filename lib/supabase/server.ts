@@ -90,5 +90,7 @@ export function createAdminSupabaseClient() {
   })
 }
 
-// Named export for createClient
+/**
+ * Named export alias for createSupabaseClient to match expected import
+ */
 export const createClient = createSupabaseClient

@@ -1,139 +1,116 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
+// Rate limiting
 const rateLimit = new Map()
 
 export async function POST(request: NextRequest) {
   try {
+    // Simple rate limiting (3 requests per 10 minutes per IP)
     const ip = request.ip || "anonymous"
     const now = Date.now()
     const windowMs = 10 * 60 * 1000 // 10 minutes
     const maxRequests = 3
 
     if (!rateLimit.has(ip)) {
-      rateLimit.set(ip, { count: 0, resetTime: now + windowMs })
+      rateLimit.set(ip, { count: 1, resetTime: now + windowMs })
+    } else {
+      const limit = rateLimit.get(ip)
+      if (now > limit.resetTime) {
+        rateLimit.set(ip, { count: 1, resetTime: now + windowMs })
+      } else if (limit.count >= maxRequests) {
+        return NextResponse.json({ error: "Rate limit exceeded. Please try again later." }, { status: 429 })
+      } else {
+        limit.count++
+      }
     }
-
-    const userLimit = rateLimit.get(ip)
-    if (now > userLimit.resetTime) {
-      userLimit.count = 0
-      userLimit.resetTime = now + windowMs
-    }
-
-    if (userLimit.count >= maxRequests) {
-      return NextResponse.json({ error: "Rate limit exceeded. Please try again later." }, { status: 429 })
-    }
-
-    userLimit.count++
 
     const { jobTitle, jobDescription } = await request.json()
 
-    if (!jobTitle || jobTitle.trim().length === 0) {
+    if (!jobTitle) {
       return NextResponse.json({ error: "Job title is required" }, { status: 400 })
     }
 
-    let description = jobDescription || ""
+    // Create a comprehensive description if none provided
+    let description = jobDescription
     if (!description || description.trim().length < 50) {
-      description = `Job Title: ${jobTitle}. This is a professional ${jobTitle} position requiring relevant experience and skills. The role involves typical responsibilities associated with ${jobTitle} positions in the industry, including collaboration with team members, problem-solving, and contributing to organizational goals.`
+      description = `Job Title: ${jobTitle}
+
+This is a professional ${jobTitle} position requiring relevant experience and skills. The role involves typical responsibilities associated with ${jobTitle} positions, including collaboration with team members, problem-solving, and contributing to organizational goals. Candidates should demonstrate strong communication skills, technical competency, and the ability to work in a fast-paced environment.`
     }
 
+    // Ensure minimum length
     if (description.length < 50) {
       description +=
-        " The candidate should demonstrate strong communication skills, attention to detail, and the ability to work effectively in a team environment."
+        " The ideal candidate will bring enthusiasm, dedication, and a commitment to excellence in their work."
     }
 
-    // Use Gemini API
-    const apiKey = process.env.GOOGLE_AI_API_KEY
-    if (!apiKey) {
-      console.error("GOOGLE_AI_API_KEY not configured")
-      return NextResponse.json({ error: "AI service not configured" }, { status: 500 })
-    }
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
 
     const prompt = `Generate 5 realistic interview questions for this job:
 
 Job Title: ${jobTitle}
 Job Description: ${description}
 
-Requirements:
-- Questions should be specific to this role
-- Mix of behavioral, technical, and situational questions
-- Professional and realistic
-- Return as a JSON array of strings
+Please provide questions that are:
+1. Relevant to the specific role
+2. Professional and commonly asked
+3. Mix of behavioral and technical questions
+4. Appropriate difficulty level
 
-Example format: ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"]`
+Format as a JSON array of strings.`
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 500,
-          },
-        }),
-      },
-    )
+    const result = await model.generateContent(prompt)
+    const response = await result.response
+    const text = response.text()
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-
-    if (!text) {
-      throw new Error("No response from AI")
-    }
-
+    // Try to parse JSON, fallback to manual parsing
+    let questions
     try {
-      const cleanText = text
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim()
-      const questions = JSON.parse(cleanText)
-
-      if (Array.isArray(questions) && questions.length > 0) {
-        return NextResponse.json({ questions })
-      }
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError)
+      questions = JSON.parse(text)
+    } catch {
+      // Fallback: extract questions manually
+      const lines = text.split("\n").filter((line) => line.trim())
+      questions = lines
+        .filter((line) => line.includes("?"))
+        .map((line) =>
+          line
+            .replace(/^\d+\.?\s*/, "")
+            .replace(/^["[\]]/g, "")
+            .replace(/["[\]],?$/g, "")
+            .trim(),
+        )
+        .slice(0, 5)
     }
 
-    const fallbackQuestions = [
-      `Tell me about your experience with ${jobTitle} responsibilities.`,
-      `How do you handle challenging situations in your work?`,
-      `What interests you most about this ${jobTitle} position?`,
-      `Describe a time when you had to learn something new quickly.`,
-      `How do you prioritize tasks when you have multiple deadlines?`,
-    ]
+    // Ensure we have valid questions
+    if (!Array.isArray(questions) || questions.length === 0) {
+      questions = [
+        `Tell me about your experience relevant to the ${jobTitle} role.`,
+        `What interests you most about this ${jobTitle} position?`,
+        `How do you handle challenging situations in your work?`,
+        `Describe a time when you had to learn something new quickly.`,
+        `Where do you see yourself in your career in the next few years?`,
+      ]
+    }
 
-    return NextResponse.json({ questions: fallbackQuestions })
+    return NextResponse.json({ questions: questions.slice(0, 5) })
   } catch (error) {
     console.error("Error generating questions:", error)
 
+    // Fallback questions
     const fallbackQuestions = [
-      "Tell me about yourself and your background.",
-      "Why are you interested in this position?",
-      "What are your greatest strengths?",
-      "Describe a challenging situation you've faced and how you handled it.",
-      "Where do you see yourself in five years?",
+      "Tell me about yourself and your professional background.",
+      "What interests you most about this position?",
+      "How do you handle challenging situations at work?",
+      "Describe a time when you had to work as part of a team.",
+      "Where do you see yourself in your career in 5 years?",
     ]
 
-    return NextResponse.json({ questions: fallbackQuestions })
+    return NextResponse.json({
+      questions: fallbackQuestions,
+      note: "Generated using fallback questions due to service limitations.",
+    })
   }
 }

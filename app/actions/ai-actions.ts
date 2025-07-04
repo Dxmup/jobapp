@@ -52,17 +52,36 @@ export async function customizeResumeWithAI(resumeContent: string, jobDescriptio
   const userId = await getCurrentUserId()
 
   if (!userId) {
-    return { success: false, error: "Unauthorized" }
+    throw new Error("Unauthorized")
   }
 
   try {
-    // Placeholder for AI customization logic
-    const customizedResume = `${resumeContent}\n\n[AI-customized content based on job description]`
+    // This would integrate with AI service to customize resume
+    const customizedContent = `${resumeContent}
 
-    return { success: true, customizedResume }
+[AI-customized sections based on job description would be added here]
+
+Skills tailored for this position:
+- Relevant skill 1
+- Relevant skill 2
+- Relevant skill 3
+
+Experience highlights:
+- Achievement 1 relevant to job
+- Achievement 2 relevant to job
+- Achievement 3 relevant to job`
+
+    return {
+      success: true,
+      customizedResume: customizedContent,
+      changes: ["Added relevant skills section", "Highlighted relevant experience", "Optimized keywords for ATS"],
+    }
   } catch (error) {
     console.error("Error customizing resume with AI:", error)
-    return { success: false, error: "Failed to customize resume" }
+    return {
+      success: false,
+      error: "Failed to customize resume",
+    }
   }
 }
 
@@ -70,16 +89,36 @@ export async function reviseResumeWithAI(resumeContent: string, feedback: string
   const userId = await getCurrentUserId()
 
   if (!userId) {
-    return { success: false, error: "Unauthorized" }
+    throw new Error("Unauthorized")
   }
 
   try {
-    // Placeholder for AI revision logic
-    const revisedResume = `${resumeContent}\n\n[AI-revised content based on feedback]`
+    // This would integrate with AI service to revise resume based on feedback
+    const revisedContent = `${resumeContent}
 
-    return { success: true, revisedResume }
+[AI-revised sections based on feedback would be applied here]
+
+Improvements made:
+- Enhanced professional summary
+- Strengthened action verbs
+- Improved formatting and structure
+- Added quantifiable achievements`
+
+    return {
+      success: true,
+      revisedResume: revisedContent,
+      changes: [
+        "Enhanced professional summary",
+        "Strengthened action verbs",
+        "Improved formatting",
+        "Added quantifiable achievements",
+      ],
+    }
   } catch (error) {
     console.error("Error revising resume with AI:", error)
-    return { success: false, error: "Failed to revise resume" }
+    return {
+      success: false,
+      error: "Failed to revise resume",
+    }
   }
 }
