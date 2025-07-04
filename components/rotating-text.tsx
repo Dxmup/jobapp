@@ -3,33 +3,37 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
-const words = ["Resumes", "Cover Letters", "Interview Prep", "Applications"]
-
 export function RotatingText() {
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const terms = [
+    "Applications",
+    "Resumes",
+    "Cover Letters",
+    "Prep Questions",
+    "Practice Interviews",
+    "Thank You Letters",
+  ]
+  const [index, setIndex] = useState(0)
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % words.length)
+      setIndex((prevIndex) => (prevIndex + 1) % terms.length)
     }, 2000)
 
     return () => clearInterval(interval)
   }, [])
 
   return (
-    <div className="relative inline-block min-h-[1.2em]">
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={currentIndex}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.5 }}
-          className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 bg-clip-text text-transparent"
-        >
-          {words[currentIndex]}
-        </motion.span>
-      </AnimatePresence>
-    </div>
+    <AnimatePresence mode="wait">
+      <motion.span
+        key={terms[index]}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.3 }}
+        className="inline-block min-w-[180px] bg-gradient-to-r from-primary to-sky-500 text-transparent bg-clip-text font-semibold"
+      >
+        {terms[index]}
+      </motion.span>
+    </AnimatePresence>
   )
 }

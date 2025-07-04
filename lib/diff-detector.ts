@@ -1,100 +1,47 @@
-// Simple diff detection utility
 export interface TextChange {
   original: string
   improved: string
-  type: "impact" | "action" | "language" | "format"
-  explanation?: string
-  startIndex?: number
-  endIndex?: number
+  type: "impact" | "action" | "clarity" | "keyword"
+  explanation: string
 }
 
-export function detectActualChanges(originalText: string, optimizedText: string): TextChange[] {
+export function detectChanges(original: string, improved: string): TextChange[] {
+  // Simple diff detection for demo purposes
   const changes: TextChange[] = []
 
-  // Split into sentences for better comparison
-  const originalSentences = originalText.split(/[.!?]+/).filter((s) => s.trim().length > 0)
-  const optimizedSentences = optimizedText.split(/[.!?]+/).filter((s) => s.trim().length > 0)
+  // Split into sentences for comparison
+  const originalSentences = original.split(/[.!?]+/).filter((s) => s.trim().length > 0)
+  const improvedSentences = improved.split(/[.!?]+/).filter((s) => s.trim().length > 0)
 
-  // Find sentences that changed
-  for (let i = 0; i < Math.max(originalSentences.length, optimizedSentences.length); i++) {
-    const original = originalSentences[i]?.trim()
-    const optimized = optimizedSentences[i]?.trim()
+  // Find differences (simplified approach)
+  for (let i = 0; i < Math.min(originalSentences.length, improvedSentences.length); i++) {
+    const origSentence = originalSentences[i].trim()
+    const impSentence = improvedSentences[i].trim()
 
-    if (original && optimized && original !== optimized) {
+    if (origSentence !== impSentence) {
       // Determine change type based on content
-      const changeType = categorizeChange(original, optimized)
+      let type: TextChange["type"] = "clarity"
+      let explanation = "Improved clarity and readability"
+
+      if (impSentence.match(/\d+%|\d+\+|increased|improved|reduced/i)) {
+        type = "impact"
+        explanation = "Added quantifiable impact and results"
+      } else if (impSentence.match(/led|managed|developed|created|implemented/i)) {
+        type = "action"
+        explanation = "Used stronger action verbs"
+      } else if (impSentence.length > origSentence.length * 1.2) {
+        type = "keyword"
+        explanation = "Added relevant keywords and details"
+      }
 
       changes.push({
-        original: original,
-        improved: optimized,
-        type: changeType,
-        explanation: generateExplanation(original, optimized, changeType),
+        original: origSentence,
+        improved: impSentence,
+        type,
+        explanation,
       })
     }
   }
 
-  return changes
-}
-
-function categorizeChange(original: string, improved: string): "impact" | "action" | "language" | "format" {
-  const originalLower = original.toLowerCase()
-  const improvedLower = improved.toLowerCase()
-
-  // Check for impact improvements (numbers, metrics, results)
-  const hasNumbers = /\d+/.test(improved) && !/\d+/.test(original)
-  const hasMetrics = /(%|percent|increase|decrease|improve|reduce|save|generate|achieve)/.test(improvedLower)
-
-  if (hasNumbers || hasMetrics) {
-    return "impact"
-  }
-
-  // Check for action verb improvements
-  const passiveToActive = [
-    { passive: /was responsible for/i, active: /managed|led|directed|oversaw/i },
-    { passive: /helped with/i, active: /led|facilitated|coordinated/i },
-    { passive: /worked on/i, active: /developed|created|built|delivered/i },
-    { passive: /assisted in/i, active: /supported|enabled|facilitated/i },
-    { passive: /involved in/i, active: /participated|contributed|collaborated/i },
-  ]
-
-  for (const pattern of passiveToActive) {
-    if (pattern.passive.test(original) && pattern.active.test(improved)) {
-      return "action"
-    }
-  }
-
-  // Default to language improvement
-  return "language"
-}
-
-function generateExplanation(original: string, improved: string, type: string): string {
-  switch (type) {
-    case "impact":
-      return "Added quantifiable results and measurable impact"
-    case "action":
-      return "Replaced passive language with strong action verbs"
-    case "language":
-      return "Enhanced professional language and clarity"
-    case "format":
-      return "Improved formatting and structure"
-    default:
-      return "Enhanced professional presentation"
-  }
-}
-
-export function mergeChanges(geminiChanges: TextChange[], diffChanges: TextChange[]): TextChange[] {
-  // Prioritize Gemini changes if they exist and are valid
-  if (geminiChanges && geminiChanges.length > 0) {
-    // Verify Gemini changes are actually in the text
-    const validGeminiChanges = geminiChanges.filter(
-      (change) => change.original && change.improved && change.original.trim().length > 0,
-    )
-
-    if (validGeminiChanges.length > 0) {
-      return validGeminiChanges
-    }
-  }
-
-  // Fall back to diff-detected changes
-  return diffChanges.slice(0, 2) // Limit to 2 changes as requested
+  return changes.slice(0, 3) // Limit to 3 changes for demo
 }

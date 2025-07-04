@@ -1,43 +1,30 @@
-// Simple in-memory rate limiting (for development)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+// Simple in-memory rate limiting for demo purposes
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
 export function checkRateLimit(
+  key: string,
   identifier: string,
-  action: string,
-  maxRequests = 3,
-  windowMs: number = 10 * 60 * 1000, // 10 minutes
-): { success: boolean; remaining: number; resetTime: number } {
-  const key = `${identifier}:${action}`
+  maxRequests: number,
+  windowMs: number,
+): { success: boolean; resetTime?: number } {
   const now = Date.now()
+  const rateLimitKey = `${identifier}_${key}`
 
-  // Get or create rate limit entry
-  let entry = rateLimitMap.get(key)
+  const record = rateLimitStore.get(rateLimitKey)
 
-  // Reset if window has expired
-  if (!entry || now > entry.resetTime) {
-    entry = {
-      count: 0,
+  if (!record || now > record.resetTime) {
+    // Create new record or reset expired one
+    rateLimitStore.set(rateLimitKey, {
+      count: 1,
       resetTime: now + windowMs,
-    }
+    })
+    return { success: true }
   }
 
-  // Check if limit exceeded
-  if (entry.count >= maxRequests) {
-    rateLimitMap.set(key, entry)
-    return {
-      success: false,
-      remaining: 0,
-      resetTime: entry.resetTime,
-    }
+  if (record.count >= maxRequests) {
+    return { success: false, resetTime: record.resetTime }
   }
 
-  // Increment count
-  entry.count++
-  rateLimitMap.set(key, entry)
-
-  return {
-    success: true,
-    remaining: maxRequests - entry.count,
-    resetTime: entry.resetTime,
-  }
+  record.count++
+  return { success: true }
 }

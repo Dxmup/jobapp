@@ -125,3 +125,36 @@ export const applyTemporaryPulse = (
     element.classList.remove(className)
   }, duration)
 }
+
+// Additional animations
+export const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5 },
+}
+
+export const staggerContainer = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+}
+
+export const scaleIn = {
+  initial: { scale: 0.8, opacity: 0 },
+  animate: { scale: 1, opacity: 1 },
+  transition: { duration: 0.3 },
+}
+
+export const slideInFromLeft = {
+  initial: { x: -50, opacity: 0 },
+  animate: { x: 0, opacity: 1 },
+  transition: { duration: 0.4 },
+}
+
+export const slideInFromRight = {
+  initial: { x: 50, opacity: 0 },
+  animate: { x: 0, opacity: 1 },
+  transition: { duration: 0.4 },
+}
