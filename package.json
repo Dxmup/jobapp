@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/google": "latest",
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
     "@hookform/resolvers": "latest",
@@ -47,6 +48,7 @@
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/supabase-js": "latest",
     "@testing-library/jest-dom": "latest",
+    "ai": "latest",
     "bcryptjs": "latest",
     "cheerio": "latest",
     "class-variance-authority": "^0.7.1",
