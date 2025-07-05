@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server"
+// app/api/stripe/webhook/route.ts - FIXED VERSION
+import { NextRequest, NextResponse } from "next/server"
 import { headers } from "next/headers"
 import { stripe } from "@/lib/stripe"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { updateUserSubscription, getSubscriptionTierFromProduct } from "@/lib/subscription-service"
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = headers().get("stripe-signature") as string
 
@@ -135,8 +136,12 @@ export async function POST(request: Request) {
   return NextResponse.json({ received: true })
 }
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
+// REMOVED THE DEPRECATED CONFIG EXPORT
+// The old way (causing the error):
+// export const config = {
+//   api: {
+//     bodyParser: false,
+//   },
+// }
+
+// In App Router, this is handled differently - no config needed for raw body
