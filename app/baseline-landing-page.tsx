@@ -1,41 +1,59 @@
-const BaselineLandingPage = () => {
-  return (
-    <div className="container mx-auto py-12">
-      <header className="text-center">
-        <h1 className="text-3xl font-bold mb-4">Welcome to Our Landing Page</h1>
-        <p className="text-gray-600">Learn more about our amazing product.</p>
-      </header>
+import { LandingHero } from "@/components/landing-hero"
+import { LandingPricing } from "@/components/landing-pricing"
+import { LandingHeader } from "@/components/landing-header"
+import { LandingFooter } from "@/components/landing-footer"
+import { SocialProofSection } from "@/components/landing/social-proof-section"
+import dynamic from "next/dynamic"
 
-      <section className="mt-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-            <h2 className="text-2xl font-semibold mb-2">Key Features</h2>
-            <ul className="list-disc list-inside">
-              <li>Feature 1: Solves a common problem.</li>
-              <li>Feature 2: Easy to use interface.</li>
-              <li>Feature 3: Integrates with other services.</li>
-            </ul>
+// Optimize loading with better fallbacks
+const LandingFeatures = dynamic(
+  () => import("@/components/landing-features").then((mod) => ({ default: mod.LandingFeatures })),
+  {
+    loading: () => (
+      <section className="py-32 bg-gradient-to-br from-slate-50 via-white to-purple-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/30">
+        <div className="container">
+          <div className="text-center mb-20">
+            <div className="h-12 bg-gradient-to-r from-slate-200 to-slate-300 animate-pulse rounded-2xl mb-6 max-w-2xl mx-auto" />
+            <div className="h-8 bg-slate-200 animate-pulse rounded-xl max-w-4xl mx-auto" />
           </div>
-          <div>
-            <img
-              src="https://via.placeholder.com/500x300" // Placeholder image URL
-              alt="Product Screenshot"
-              className="rounded-lg shadow-md"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mx-auto max-w-7xl">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border p-8 shadow-xl">
+                <div className="h-12 w-12 bg-gradient-to-r from-purple-200 to-cyan-200 animate-pulse rounded-2xl mb-6" />
+                <div className="h-8 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-lg mb-4" />
+                <div className="space-y-2">
+                  <div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
+                  <div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-3/4" />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
+    ),
+    ssr: false,
+  },
+)
 
-      <section className="mt-12 text-center">
-        <h2 className="text-2xl font-semibold mb-4">Get Started Today!</h2>
-        <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Sign Up</button>
-      </section>
+const MagneticCursor = dynamic(
+  () => import("@/components/animations/magnetic-cursor").then((mod) => ({ default: mod.MagneticCursor })),
+  {
+    ssr: false,
+  },
+)
 
-      <footer className="mt-12 text-center text-gray-500">
-        <p>&copy; 2023 Your Company. All rights reserved.</p>
-      </footer>
+export default function Home() {
+  return (
+    <div className="flex flex-col min-h-screen">
+      <MagneticCursor />
+      <LandingHeader />
+      <main className="flex-1">
+        <LandingHero />
+        <LandingFeatures />
+        <SocialProofSection />
+        <LandingPricing />
+      </main>
+      <LandingFooter />
     </div>
   )
 }
-
-export default BaselineLandingPage

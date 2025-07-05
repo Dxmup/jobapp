@@ -12,10 +12,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@chakra-ui/icons": "latest",
-    "@chakra-ui/react": "latest",
     "@emotion/is-prop-valid": "latest",
-    "@emotion/react": "latest",
     "@google/genai": "latest",
     "@hookform/resolvers": "latest",
     "@jest/globals": "latest",

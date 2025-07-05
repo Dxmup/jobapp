@@ -1,5 +1,4 @@
-// app/api/stripe/webhook/route.ts - FIXED VERSION
-import { NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { headers } from "next/headers"
 import { stripe } from "@/lib/stripe"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
