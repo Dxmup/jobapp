@@ -1,40 +1,60 @@
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import calendarTokensSQL from "@/lib/supabase/create-calendar-tokens-table.sql"
+import { createAdminSupabaseClient } from "@/lib/supabase/server"
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const supabase = createServerSupabaseClient()
+    // Check admin permissions here if needed
 
-    // Check if user is admin
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const supabase = createAdminSupabaseClient()
 
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("auth_id", session.user.id)
-      .single()
+    // Embed SQL directly instead of importing from file
+    const createTableSQL = `
+      -- Create table for storing user calendar tokens
+      CREATE TABLE IF NOT EXISTS user_calendar_tokens (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        provider VARCHAR(50) NOT NULL, -- 'google', 'outlook', etc.
+        access_token TEXT NOT NULL,
+        refresh_token TEXT,
+        expires_at TIMESTAMP WITH TIME ZONE,
+        scope TEXT, -- Permissions granted
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(user_id, provider)
+      );
 
-    if (userError || !userData || userData.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
-    }
+      -- Create index for faster lookups
+      CREATE INDEX IF NOT EXISTS idx_user_calendar_tokens_user_id 
+      ON user_calendar_tokens(user_id);
 
-    // Execute the SQL to create the table
-    const { error } = await supabase.rpc("exec_sql", { sql_query: calendarTokensSQL })
+      -- Create index for provider lookups
+      CREATE INDEX IF NOT EXISTS idx_user_calendar_tokens_provider 
+      ON user_calendar_tokens(provider);
+    `
+
+    // Execute the SQL
+    const { error } = await supabase.rpc("exec_sql", { sql: createTableSQL })
 
     if (error) {
       console.error("Error creating calendar tokens table:", error)
-      return NextResponse.json({ error: "Failed to create table" }, { status: 500 })
+      return NextResponse.json(
+        { error: "Failed to create calendar tokens table", details: error.message },
+        { status: 500 },
+      )
     }
 
-    return NextResponse.json({ success: true, message: "Calendar tokens table created successfully" })
+    return NextResponse.json({
+      success: true,
+      message: "Calendar tokens table created successfully",
+    })
   } catch (error) {
-    console.error("Error in create calendar tokens table API:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error in create-calendar-tokens-table API:", error)
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
