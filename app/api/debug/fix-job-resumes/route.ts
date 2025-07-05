@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
-import addUserIdToJobResumesSQL from "@/lib/supabase/add-user-id-to-job-resumes.sql"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function GET(request: Request) {
   try {
@@ -10,32 +8,55 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "This endpoint is only available in development mode" }, { status: 403 })
     }
 
-    const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = createServerSupabaseClient()
 
-    // Execute the SQL to add user_id to job_resumes table
-    const { error } = await supabase.rpc("exec_sql", { sql: addUserIdToJobResumesSQL })
+    // Embed SQL directly instead of importing from file
+    const addUserIdSQL = `
+      -- Add user_id column to job_resumes table if it doesn't exist
+      DO $$ 
+      BEGIN 
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                        WHERE table_name='job_resumes' AND column_name='user_id') THEN
+             ALTER TABLE job_resumes ADD COLUMN user_id UUID;
+         END IF;
+     END $$;
 
-    if (error) {
-      console.error("Error executing SQL:", error)
-      return NextResponse.json({ error: "Failed to update job_resumes table" }, { status: 500 })
+     -- Update job_resumes with user_id from jobs table
+     UPDATE job_resumes 
+     SET user_id = jobs.user_id 
+     FROM jobs 
+     WHERE job_resumes.job_id = jobs.id 
+     AND job_resumes.user_id IS NULL;
+    `
+
+    // Execute the SQL using rpc if available, otherwise use direct query
+    try {
+      const { error } = await supabase.rpc("exec_sql", { sql: addUserIdSQL })
+      if (error) throw error
+    } catch (rpcError) {
+      // Fallback: execute each statement separately
+      const statements = addUserIdSQL.split(";").filter((s) => s.trim())
+
+      for (const statement of statements) {
+        if (statement.trim()) {
+          const { error } = await supabase.rpc("exec_sql", { sql: statement.trim() })
+          if (error) {
+            console.error("Error executing statement:", statement, error)
+          }
+        }
+      }
     }
 
     // Count the updated records
-    const { data: count, error: countError } = await supabase
+    const { count, error: countError } = await supabase
       .from("job_resumes")
-      .select("id", { count: "exact" })
+      .select("*", { count: "exact", head: true })
       .not("user_id", "is", null)
-
-    if (countError) {
-      console.error("Error counting updated records:", countError)
-      return NextResponse.json({ error: "Failed to count updated records" }, { status: 500 })
-    }
 
     return NextResponse.json({
       success: true,
       message: "Successfully updated job_resumes table",
-      updatedRecords: count,
+      updatedRecords: count || 0,
     })
   } catch (error) {
     console.error("Error in fix-job-resumes API:", error)

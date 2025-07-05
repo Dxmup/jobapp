@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
 
       break
     }
+
     case "customer.subscription.deleted": {
       const subscription = event.data.object as any
       const userId = subscription.metadata.supabase_user_id
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
 
       break
     }
+
     case "invoice.payment_failed": {
       const invoice = event.data.object as any
       const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
@@ -116,6 +118,7 @@ export async function POST(request: NextRequest) {
 
       break
     }
+
     case "invoice.payment_succeeded": {
       const invoice = event.data.object as any
       const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
@@ -142,5 +145,4 @@ export async function POST(request: NextRequest) {
 //     bodyParser: false,
 //   },
 // }
-
 // In App Router, this is handled differently - no config needed for raw body
