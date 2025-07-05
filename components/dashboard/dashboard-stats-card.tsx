@@ -6,6 +6,8 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarChart, Calendar, FileText, FolderKanban, TrendingUp } from "lucide-react"
+import { motion } from "framer-motion"
+import { FADE_IN_ANIMATION } from "@/lib/animation-utils"
 
 interface StatCardProps {
   title: string
@@ -20,24 +22,28 @@ interface StatCardProps {
 
 function StatCard({ title, value, description, icon, trend }: StatCardProps) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">{icon}</div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <CardDescription className="flex items-center mt-1">
-          {trend && (
-            <span className={`mr-1 ${trend.isPositive ? "text-green-500" : "text-red-500"} flex items-center`}>
-              <TrendingUp className={`h-3 w-3 mr-1 ${!trend.isPositive && "rotate-180"}`} />
-              {trend.value}%
-            </span>
-          )}
-          {description}
-        </CardDescription>
-      </CardContent>
-    </Card>
+    <motion.div variants={FADE_IN_ANIMATION}>
+      {" "}
+      {/* Removed initial, animate, exit to let parent control */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">{icon}</div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{value}</div>
+          <CardDescription className="flex items-center mt-1">
+            {trend && (
+              <span className={`mr-1 ${trend.isPositive ? "text-green-500" : "text-red-500"} flex items-center`}>
+                <TrendingUp className={`h-3 w-3 mr-1 ${!trend.isPositive && "rotate-180"}`} />
+                {trend.value}%
+              </span>
+            )}
+            {description}
+          </CardDescription>
+        </CardContent>
+      </Card>
+    </motion.div>
   )
 }
 
@@ -153,11 +159,24 @@ export function DashboardStatsCard() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <motion.div
+          className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+          initial="initial"
+          animate="animate"
+          variants={{
+            animate: {
+              transition: {
+                staggerChildren: 0.1, // Stagger animation of children
+              },
+            },
+          }}
+        >
           {stats[period as keyof typeof stats].map((stat, index) => (
+            // Pass key to motion.div if StatCard itself is not a motion component
+            // For this setup, StatCard's motion.div will inherit from this parent
             <StatCard key={index} {...stat} />
           ))}
-        </div>
+        </motion.div>
       </CardContent>
     </Card>
   )

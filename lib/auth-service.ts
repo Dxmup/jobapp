@@ -1,10 +1,6 @@
-import { cookies } from "next/headers"
 import type { Role, Permission, User, AuditLog } from "@/types/auth"
 import { createServerSupabaseClient } from "./supabase/server"
-
-// Store for users - in a real app, this would be a database
-// This will be our in-memory "database" for this demo
-const users: Record<string, { user: User; roles: Role[] }> = {}
+import { getCurrentUserIdOptional } from "@/lib/auth-cookie"
 
 // Mock permissions - keeping these for the role-based system
 const permissions: Record<string, Permission> = {
@@ -118,17 +114,16 @@ const auditLogs: AuditLog[] = []
 
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
   // In a real app, you would verify the password here with proper hashing
-  // For now, we'll accept any password for registered users
-  const userRecord = users[email.toLowerCase()]
+  const user = await getUserByEmail(email.toLowerCase())
 
-  if (!userRecord) {
+  if (!user) {
     return null
   }
 
   // Update last login
-  userRecord.user.lastLogin = new Date()
+  // In a real app, you would update the last login in the database
 
-  return userRecord.user
+  return user
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
@@ -174,8 +169,64 @@ export async function getUserById(id: string): Promise<User | null> {
 }
 
 export async function getUserRoles(userId: string): Promise<Role[]> {
-  const userEmail = Object.keys(users).find((email) => users[email].user.id === userId)
-  return userEmail ? users[userEmail].roles : []
+  try {
+    const supabase = createServerSupabaseClient()
+
+    // First, try to get roles with the relationship
+    const { data: userRolesData, error: userRolesError } = await supabase
+      .from("user_roles")
+      .select(`
+        roles (
+          name
+        )
+      `)
+      .eq("user_id", userId)
+
+    // If the relationship works, use it
+    if (!userRolesError && userRolesData && userRolesData.length > 0) {
+      return userRolesData.map((item: any) => item.roles?.name as Role).filter(Boolean)
+    }
+
+    // Fallback: Try direct query without relationship
+    const { data: directRolesData, error: directRolesError } = await supabase
+      .from("user_roles")
+      .select("role_id")
+      .eq("user_id", userId)
+
+    if (!directRolesError && directRolesData && directRolesData.length > 0) {
+      // Get role names by IDs
+      const roleIds = directRolesData.map((item: any) => item.role_id)
+      const { data: rolesData, error: rolesError } = await supabase.from("roles").select("name").in("id", roleIds)
+
+      if (!rolesError && rolesData) {
+        return rolesData.map((role: any) => role.name as Role)
+      }
+    }
+
+    // Check if user exists in users table and has admin flag
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("email, name")
+      .eq("id", userId)
+      .single()
+
+    if (!userError && userData) {
+      // Check for admin emails (fallback for development)
+      const adminEmails = ["admin@careerai.com", "test@admin.com", "admin@test.com", process.env.ADMIN_EMAIL].filter(
+        Boolean,
+      )
+
+      if (adminEmails.includes(userData.email?.toLowerCase())) {
+        return ["admin"]
+      }
+    }
+
+    console.log(`No roles found for user ${userId}, defaulting to 'user' role`)
+    return ["user"]
+  } catch (error) {
+    console.error("Exception in getUserRoles:", error)
+    return ["user"]
+  }
 }
 
 export async function getUserPermissions(userId: string): Promise<Permission[]> {
@@ -223,8 +274,7 @@ export async function logAuditEvent(
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const cookieStore = cookies()
-  const userId = cookieStore.get("user_id")?.value
+  const userId = await getCurrentUserIdOptional()
 
   if (!userId) {
     return null
@@ -234,8 +284,35 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 export async function isUserAdmin(userId: string): Promise<boolean> {
-  const roles = await getUserRoles(userId)
-  return roles.includes("admin") || roles.includes("super_admin")
+  try {
+    // Get user from database
+    const user = await getUserById(userId)
+    if (!user?.email) {
+      console.log(`No user found for ID: ${userId}`)
+      return false
+    }
+
+    // Define admin emails (including the specific user requested)
+    const adminEmails = [
+      "admin@careerai.com",
+      "test@admin.com",
+      "admin@test.com",
+      "testing@careerai.com", // Jim Halpert
+      "mctesterson@careerai.com", // Testy McTesterson
+      process.env.ADMIN_EMAIL,
+    ]
+      .filter(Boolean)
+      .map((email) => email.toLowerCase())
+
+    const isAdmin = adminEmails.includes(user.email.toLowerCase())
+    console.log(`Admin check for ${user.email} (ID: ${userId}): ${isAdmin}`)
+    console.log(`Admin emails list:`, adminEmails)
+
+    return isAdmin
+  } catch (error) {
+    console.error("Error checking admin status:", error)
+    return false
+  }
 }
 
 export async function getAuditLogs(
@@ -289,57 +366,38 @@ export async function addUser(userData: {
   email: string
   password: string // In a real app, this would be hashed
 }): Promise<User | null> {
-  // Check if user already exists
-  if (users[userData.email.toLowerCase()]) {
+  try {
+    const supabase = createServerSupabaseClient()
+
+    // Check if user already exists
+    const existingUser = await getUserByEmail(userData.email.toLowerCase())
+    if (existingUser) {
+      return null
+    }
+
+    // Create a new user in the database
+    const { data, error } = await supabase
+      .from("users")
+      .insert({
+        email: userData.email.toLowerCase(),
+        name: userData.name,
+        created_at: new Date(),
+        updated_at: new Date(),
+        last_login: new Date(),
+        is_active: true,
+      })
+      .select()
+      .single()
+
+    if (error || !data) {
+      console.error("Error creating user:", error)
+      return null
+    }
+
+    console.log(`New user created: ${data.email}`)
+    return data as User
+  } catch (error) {
+    console.error("Exception in addUser:", error)
     return null
   }
-
-  // Generate a unique ID
-  const userId = `user_${Date.now()}`
-
-  // Create a new user
-  const newUser: User = {
-    id: userId,
-    email: userData.email.toLowerCase(),
-    name: userData.name,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastLogin: new Date(),
-    isActive: true,
-  }
-
-  // Add user to our "database"
-  users[userData.email.toLowerCase()] = {
-    user: newUser,
-    roles: ["user"], // New users get basic user role
-  }
-
-  console.log(`New user created: ${newUser.email}`)
-  return newUser
 }
-
-// For development/testing - add an admin user if needed
-export function ensureAdminUser() {
-  const adminEmail = "admin@example.com"
-  if (!users[adminEmail]) {
-    const adminUser: User = {
-      id: "admin_user",
-      email: adminEmail,
-      name: "Admin User",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastLogin: new Date(),
-      isActive: true,
-    }
-
-    users[adminEmail] = {
-      user: adminUser,
-      roles: ["user", "admin"],
-    }
-
-    console.log("Admin user created for testing")
-  }
-}
-
-// Call this function to ensure we have an admin user for testing
-ensureAdminUser()

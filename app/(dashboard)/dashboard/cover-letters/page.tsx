@@ -2,11 +2,10 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { Download, FileEdit, Search, Sparkles } from "lucide-react"
+import { Download, FileEdit, Search, Sparkles, TrendingUp, Clock, Target } from "lucide-react"
 import Link from "next/link"
 import { useRef, useEffect, useState } from "react"
 import { getUserCoverLetters } from "@/app/actions/cover-letter-actions"
@@ -47,6 +46,14 @@ export default function CoverLettersPage() {
 
   const [newCoverLetterId, setNewCoverLetterId] = useState<string | null>(null)
   const newCoverLetterRef = useRef<HTMLDivElement>(null)
+
+  // Stats state
+  const [stats, setStats] = useState({
+    total: 0,
+    recent: 0,
+    aiGenerated: 0,
+    jobSpecific: 0,
+  })
 
   // Function to get the actual user ID
   const getUserId = async () => {
@@ -126,23 +133,47 @@ export default function CoverLettersPage() {
         // Get user cover letters using the server action
         const result = await getUserCoverLetters()
 
-        debugLog += `Server action result: ${JSON.stringify(result)}
-`
+        debugLog += `Server action result: ${JSON.stringify(result, null, 2)}\n`
 
-        if (result.success && result.coverLetters) {
+        if (result.success && result.coverLetters && Array.isArray(result.coverLetters)) {
           setCoverLetters(result.coverLetters)
 
-          // Extract unique companies
+          // Calculate stats with defensive checks
+          const coverLettersArray = result.coverLetters || []
+          const total = coverLettersArray.length
+          const recent = coverLettersArray.filter((letter) => {
+            if (!letter?.created_at) return false
+            const createdDate = new Date(letter.created_at)
+            const weekAgo = new Date()
+            weekAgo.setDate(weekAgo.getDate() - 7)
+            return createdDate > weekAgo
+          }).length
+          const aiGenerated = coverLettersArray.filter(
+            (letter) => letter?.name?.toLowerCase().includes("ai") || letter?.name?.toLowerCase().includes("generated"),
+          ).length
+          const jobSpecific = coverLettersArray.filter((letter) => letter?.jobs?.title || letter?.jobs?.company).length
+
+          setStats({ total, recent, aiGenerated, jobSpecific })
+
+          // Extract unique companies with defensive checks
           const uniqueCompanies = Array.from(
-            new Set(result.coverLetters.filter((letter) => letter.jobs?.company).map((letter) => letter.jobs?.company)),
+            new Set(
+              coverLettersArray
+                .filter((letter) => letter?.jobs?.company)
+                .map((letter) => letter.jobs.company)
+                .filter(Boolean),
+            ),
           )
 
           setCompanies(uniqueCompanies as string[])
-          debugLog += `Found ${result.coverLetters.length} cover letters
-`
+          debugLog += `Found ${result.coverLetters.length} cover letters\n`
         } else {
-          debugLog += `Error: ${result.error || "Unknown error"}
-`
+          // Handle case where no cover letters or error
+          setCoverLetters([])
+          setStats({ total: 0, recent: 0, aiGenerated: 0, jobSpecific: 0 })
+          setCompanies([])
+
+          debugLog += `Error or no data: ${result.error || "No cover letters found"}\n`
           if (result.error) {
             toast({
               title: "Error",
@@ -152,9 +183,14 @@ export default function CoverLettersPage() {
           }
         }
       } catch (error) {
-        debugLog += `Error in fetchCoverLetters: ${error instanceof Error ? error.message : String(error)}
-`
+        debugLog += `Error in fetchCoverLetters: ${error instanceof Error ? error.message : String(error)}\n`
         console.error("Error fetching cover letters:", error)
+
+        // Reset state on error
+        setCoverLetters([])
+        setStats({ total: 0, recent: 0, aiGenerated: 0, jobSpecific: 0 })
+        setCompanies([])
+
         toast({
           title: "Error",
           description: "Failed to load cover letters",
@@ -172,58 +208,22 @@ export default function CoverLettersPage() {
   const fetchJobs = async () => {
     setIsLoadingJobs(true)
     try {
-      // Get the user ID
-      const currentUserId = userId || (await getUserId())
+      // Use our working API endpoint instead of direct Supabase query
+      const response = await fetch("/api/jobs/list-for-user")
 
-      if (!currentUserId) {
-        console.error("No user ID available")
-        toast({
-          title: "Authentication Error",
-          description: "Could not determine your user ID",
-          variant: "destructive",
-        })
-        setIsLoadingJobs(false)
-        return
+      if (!response.ok) {
+        throw new Error("Failed to fetch jobs")
       }
 
-      console.log("Using user ID for jobs:", currentUserId)
+      const data = await response.json()
 
-      // Try a simple query to check if we can access the jobs table
-      const { data: testData, error: testError } = await supabase.from("jobs").select("count").limit(1)
-
-      if (testError) {
-        console.error("Error testing jobs table access:", testError)
-        toast({
-          title: "Database Error",
-          description: "Could not access jobs table",
-          variant: "destructive",
-        })
-        setIsLoadingJobs(false)
-        return
+      if (data.success && data.jobs) {
+        setJobs(data.jobs)
+        console.log(`Found ${data.jobs.length} jobs:`, data.jobs)
+      } else {
+        throw new Error(data.error || "Failed to load jobs")
+        setJobs([])
       }
-
-      console.log("Jobs table access test successful")
-
-      // Now fetch the actual jobs for this user
-      const { data: jobsData, error: jobsError } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("user_id", currentUserId)
-        .order("created_at", { ascending: false })
-
-      if (jobsError) {
-        console.error("Error fetching jobs:", jobsError)
-        toast({
-          title: "Error",
-          description: "Failed to load jobs",
-          variant: "destructive",
-        })
-        setIsLoadingJobs(false)
-        return
-      }
-
-      console.log(`Found ${jobsData?.length || 0} jobs for user ID ${currentUserId}:`, jobsData)
-      setJobs(jobsData || [])
     } catch (error) {
       console.error("Error fetching jobs:", error)
       toast({
@@ -231,6 +231,7 @@ export default function CoverLettersPage() {
         description: "Failed to load jobs",
         variant: "destructive",
       })
+      setJobs([])
     } finally {
       setIsLoadingJobs(false)
     }
@@ -269,9 +270,11 @@ export default function CoverLettersPage() {
     }
   }, [userId])
 
-  // Filter and sort the cover letters
-  const filteredCoverLetters = coverLetters
+  // Filter and sort the cover letters with defensive checks
+  const filteredCoverLetters = (coverLetters || [])
     .filter((letter) => {
+      if (!letter) return false
+
       // Filter by company if a specific company is selected
       if (selectedCompany !== "all" && letter.jobs?.company !== selectedCompany) {
         return false
@@ -290,11 +293,17 @@ export default function CoverLettersPage() {
       return true
     })
     .sort((a, b) => {
+      if (!a || !b) return 0
+
       switch (sortOrder) {
         case "newest":
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+          return dateB - dateA
         case "oldest":
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          const dateA2 = a.created_at ? new Date(a.created_at).getTime() : 0
+          const dateB2 = b.created_at ? new Date(b.created_at).getTime() : 0
+          return dateA2 - dateB2
         case "name-asc":
           return (a.name || "").localeCompare(b.name || "")
         case "name-desc":
@@ -346,7 +355,7 @@ export default function CoverLettersPage() {
       const textWidth = doc.internal.pageSize.width - margins.left - margins.right
 
       // Split text to fit within margins
-      const splitText = doc.splitTextToSize(letter.content, textWidth)
+      const splitText = doc.splitTextToSize(letter.content || "No content available", textWidth)
 
       // Add text to document (starting below the title)
       doc.text(splitText, margins.left, margins.top + 10)
@@ -355,6 +364,11 @@ export default function CoverLettersPage() {
       doc.save(`${letter.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.pdf`)
     } catch (error) {
       console.error("Error generating PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      })
     }
   }
 
@@ -383,248 +397,363 @@ export default function CoverLettersPage() {
   }, [toast])
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       <style jsx global>
         {pulseAnimationCSS}
       </style>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Cover Letters</h1>
-          <p className="text-muted-foreground">Generate and manage tailored cover letters for your job applications.</p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={fetchJobs}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate New Cover Letter
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Generate New Cover Letter</DialogTitle>
-              <DialogDescription>Select a job to generate a tailored cover letter.</DialogDescription>
-            </DialogHeader>
 
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="job">Select Job</Label>
-                <select
-                  id="job"
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={selectedJobId}
-                  onChange={(e) => setSelectedJobId(e.target.value)}
-                  disabled={isLoadingJobs}
-                >
-                  <option value="" disabled>
-                    {isLoadingJobs ? "Loading jobs..." : jobs.length === 0 ? "No jobs found" : "Select a job"}
-                  </option>
-                  {jobs.map((job) => (
-                    <option key={job.id} value={job.id}>
-                      {job.title} - {job.company}
-                    </option>
-                  ))}
-                </select>
-                {jobs.length === 0 && !isLoadingJobs && (
-                  <p className="text-sm text-amber-600">No jobs found. Please add a job first.</p>
-                )}
-                {isLoadingJobs && (
-                  <div className="flex items-center mt-2 text-sm text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading jobs...
+      {/* Hero Section */}
+      <div className="relative overflow-hidden bg-white border border-gray-200 bg-[linear-gradient(to_right,#8882_1px,transparent_1px),linear-gradient(to_bottom,#8882_1px,transparent_1px)] bg-[size:14px_24px] text-gray-900 rounded-3xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative px-6 py-16">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                    <FileEdit className="h-6 w-6" />
                   </div>
-                )}
+                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Cover Letters</h1>
+                </div>
+                <p className="text-lg text-gray-900/90 max-w-2xl">
+                  Generate and manage tailored cover letters for your job applications with AI-powered customization.
+                </p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Total</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                </div>
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Recent</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.recent}</div>
+                </div>
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">AI-Generated</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.aiGenerated}</div>
+                </div>
+                <div className="bg-gray-50/80 backdrop-blur-sm rounded-xl border border-gray-200 text-gray-900 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-gray-900/80" />
+                    <span className="text-sm text-gray-900/80">Job-Specific</span>
+                  </div>
+                  <div className="text-2xl font-bold">{stats.jobSpecific}</div>
+                </div>
               </div>
             </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleGenerateCoverLetter} disabled={isGenerating || !selectedJobId}>
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Navigating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Continue
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-      <Separator />
-
-      <div className="flex items-center space-x-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search cover letters..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          </div>
         </div>
-        <select
-          className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          value={selectedCompany}
-          onChange={(e) => setSelectedCompany(e.target.value)}
-        >
-          <option value="all">All Companies</option>
-          {companies.map((company) => (
-            <option key={company} value={company}>
-              {company}
-            </option>
-          ))}
-        </select>
-        <select
-          className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-        >
-          <option value="newest">Newest First</option>
-          <option value="oldest">Oldest First</option>
-          <option value="name-asc">Name (A-Z)</option>
-          <option value="name-desc">Name (Z-A)</option>
-        </select>
       </div>
 
-      <Tabs defaultValue="grid" className="w-full">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="grid">Grid View</TabsTrigger>
-            <TabsTrigger value="list">List View</TabsTrigger>
-          </TabsList>
+      <div className="mx-auto max-w-7xl px-6 py-8 rounded-2xl">
+        {/* Debug Info - Remove in production */}
+        {process.env.NODE_ENV === "development" && debugInfo && (
+          <div className="mb-4 p-4 bg-gray-100 rounded-lg text-xs">
+            <details>
+              <summary>Debug Info</summary>
+              <pre>{debugInfo}</pre>
+            </details>
+          </div>
+        )}
 
-          <div className="text-sm text-muted-foreground">Showing {filteredCoverLetters.length} cover letters</div>
-        </div>
+        {/* Action Bar */}
+        <div className="mb-8">
+          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search cover letters..."
+                    className="pl-10 bg-white/50 border-white/20"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
 
-        <TabsContent value="grid" className="mt-6">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {isLoading && (
-              <div className="col-span-full flex justify-center py-12">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  <p className="text-sm text-muted-foreground">Loading cover letters...</p>
+                <div className="flex flex-wrap gap-3">
+                  <select
+                    className="h-10 rounded-lg border border-white/20 bg-white/50 px-3 py-2 text-sm backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    value={selectedCompany}
+                    onChange={(e) => setSelectedCompany(e.target.value)}
+                  >
+                    <option value="all">All Companies</option>
+                    {companies.map((company) => (
+                      <option key={company} value={company}>
+                        {company}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    className="h-10 rounded-lg border border-white/20 bg-white/50 px-3 py-2 text-sm backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                  </select>
+
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        onClick={fetchJobs}
+                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg"
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Generate New Cover Letter
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Generate New Cover Letter</DialogTitle>
+                        <DialogDescription>Select a job to generate a tailored cover letter.</DialogDescription>
+                      </DialogHeader>
+
+                      <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="job">Select Job</Label>
+                          <select
+                            id="job"
+                            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            value={selectedJobId}
+                            onChange={(e) => setSelectedJobId(e.target.value)}
+                            disabled={isLoadingJobs}
+                          >
+                            <option value="" disabled>
+                              {isLoadingJobs ? "Loading jobs..." : jobs.length === 0 ? "No jobs found" : "Select a job"}
+                            </option>
+                            {jobs.map((job) => (
+                              <option key={job.id} value={job.id}>
+                                {job.title} - {job.company}
+                              </option>
+                            ))}
+                          </select>
+                          {jobs.length === 0 && !isLoadingJobs && (
+                            <p className="text-sm text-amber-600">No jobs found. Please add a job first.</p>
+                          )}
+                          {isLoadingJobs && (
+                            <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Loading jobs...
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleGenerateCoverLetter} disabled={isGenerating || !selectedJobId}>
+                          {isGenerating ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Navigating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Continue
+                            </>
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
-            )}
-            {filteredCoverLetters.map((letter) => (
-              <Card
-                key={letter.id}
-                ref={letter.id === newCoverLetterId ? newCoverLetterRef : null}
-                className={letter.id === newCoverLetterId ? "border-blue-500 animate-pulse-border" : ""}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg truncate max-w-[70%]">{letter.name}</CardTitle>
-                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100 text-xs whitespace-nowrap">
-                      <Sparkles className="mr-1 h-3 w-3" />
-                      AI
-                    </Badge>
-                  </div>
-                  <CardDescription className="truncate">{letter.file_name || `${letter.name}.pdf`}</CardDescription>
-                </CardHeader>
-                <CardContent className="pb-2">
-                  <div className="space-y-1 text-sm">
-                    <div className="overflow-hidden">
-                      <span className="font-medium">Job Title:</span>{" "}
-                      <span className="truncate">{letter.jobs?.title || "N/A"}</span>
-                    </div>
-                    <div className="overflow-hidden">
-                      <span className="font-medium">Company:</span>{" "}
-                      <span className="truncate">{letter.jobs?.company || "N/A"}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium">Created:</span> {formatDate(letter.created_at)}
-                    </div>
-                    <div>
-                      <span className="font-medium">Expires:</span>{" "}
-                      {letter.expires_at ? formatDate(letter.expires_at) : "N/A"}
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex flex-col space-y-2">
-                  <div className="grid grid-cols-2 gap-2 w-full">
-                    <Button variant="outline" className="w-full" onClick={() => handleDownloadPDF(letter)}>
-                      <Download className="mr-1 h-4 w-4" />
-                      PDF
-                    </Button>
-                    <Button variant="outline" className="w-full" asChild>
-                      <Link href={`/dashboard/cover-letters/${letter.id}`}>View</Link>
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
 
-        <TabsContent value="list" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Cover Letters</CardTitle>
-              <CardDescription>A detailed list view of all your cover letters.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <div className="grid grid-cols-6 p-4 font-medium border-b">
-                  <div>Name</div>
-                  <div>Job Title</div>
-                  <div>Company</div>
-                  <div>Tone</div>
-                  <div>Created</div>
-                  <div>Actions</div>
-                </div>
-
-                {filteredCoverLetters.map((letter) => (
-                  <div
-                    key={letter.id}
-                    ref={letter.id === newCoverLetterId ? newCoverLetterRef : null}
-                    className={`grid grid-cols-6 p-4 border-b hover:bg-muted/50 ${letter.id === newCoverLetterId ? "border-blue-500 animate-pulse-border" : ""}`}
-                  >
-                    <div className="font-medium">{letter.name}</div>
-                    <div>{letter.jobs?.title || "N/A"}</div>
-                    <div>{letter.jobs?.company || "N/A"}</div>
-                    <div>{letter.tone || "Professional"}</div>
-                    <div>{formatDate(letter.created_at)}</div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleDownloadPDF(letter)}>
-                        <Download className="h-4 w-4" />
-                        <span className="sr-only">PDF</span>
-                      </Button>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/dashboard/cover-letters/${letter.id}`}>View</Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                <span>Showing {filteredCoverLetters.length} cover letters</span>
+                <Badge variant="outline" className="bg-white/50">
+                  {filteredCoverLetters.length} results
+                </Badge>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
-
-      {!isLoading && filteredCoverLetters.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="rounded-full bg-muted p-3 mb-4">
-            <FileEdit className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-medium">No cover letters found</h3>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">
-            Generate tailored cover letters for your job applications with AI.
-          </p>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Sparkles className="mr-2 h-4 w-4" />
-            Generate Cover Letter
-          </Button>
         </div>
-      )}
+
+        {/* Content Tabs */}
+        <Tabs defaultValue="grid" className="w-full">
+          <div className="mb-6">
+            <TabsList className="bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg">
+              <TabsTrigger
+                value="grid"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+              >
+                Grid View
+              </TabsTrigger>
+              <TabsTrigger
+                value="list"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+              >
+                List View
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="grid" className="mt-6">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {isLoading && (
+                <div className="col-span-full flex justify-center py-12">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-600 border-t-transparent"></div>
+                    <p className="text-sm text-muted-foreground">Loading cover letters...</p>
+                  </div>
+                </div>
+              )}
+              {filteredCoverLetters.map((letter) => (
+                <Card
+                  key={letter.id}
+                  ref={letter.id === newCoverLetterId ? newCoverLetterRef : null}
+                  className={`border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group ${letter.id === newCoverLetterId ? "border-purple-500 animate-pulse-border" : ""} rounded-2xl`}
+                >
+                  <div className="relative">
+                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
+                    <CardHeader className="pb-2 pt-6">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg truncate max-w-[70%] group-hover:text-purple-600 transition-colors">
+                            {letter.name}
+                          </CardTitle>
+                          <CardDescription className="truncate">
+                            {letter.file_name || `${letter.name}.pdf`}
+                          </CardDescription>
+                        </div>
+                        <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100 text-xs whitespace-nowrap">
+                          <Sparkles className="mr-1 h-3 w-3" />
+                          AI
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                  </div>
+                  <CardContent className="pb-2">
+                    <div className="space-y-1 text-sm">
+                      <div className="overflow-hidden">
+                        <span className="font-medium">Job Title:</span>{" "}
+                        <span className="truncate">{letter.jobs?.title || "N/A"}</span>
+                      </div>
+                      <div className="overflow-hidden">
+                        <span className="font-medium">Company:</span>{" "}
+                        <span className="truncate">{letter.jobs?.company || "N/A"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Created:</span> {formatDate(letter.created_at)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Expires:</span>{" "}
+                        {letter.expires_at ? formatDate(letter.expires_at) : "N/A"}
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex flex-col space-y-2 bg-gradient-to-r from-gray-50/50 to-purple-50/50">
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                      <Button
+                        variant="outline"
+                        className="w-full bg-white/50 border-white/20 hover:bg-white/80"
+                        onClick={() => handleDownloadPDF(letter)}
+                      >
+                        <Download className="mr-1 h-4 w-4" />
+                        PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full bg-white/50 border-white/20 hover:bg-white/80"
+                        asChild
+                      >
+                        <Link href={`/dashboard/cover-letters/${letter.id}`}>View</Link>
+                      </Button>
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="list" className="mt-6">
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-white/20">
+                <CardTitle>All Cover Letters</CardTitle>
+                <CardDescription>A detailed list view of all your cover letters.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-hidden">
+                  <div className="grid grid-cols-6 p-4 font-medium border-b bg-gray-50/50 text-gray-700">
+                    <div>Name</div>
+                    <div>Job Title</div>
+                    <div>Company</div>
+                    <div>Tone</div>
+                    <div>Created</div>
+                    <div>Actions</div>
+                  </div>
+
+                  {filteredCoverLetters.map((letter) => (
+                    <div
+                      key={letter.id}
+                      ref={letter.id === newCoverLetterId ? newCoverLetterRef : null}
+                      className={`grid grid-cols-6 p-4 border-b hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-indigo-50/50 transition-all duration-200 ${letter.id === newCoverLetterId ? "border-purple-500 animate-pulse-border" : ""}`}
+                    >
+                      <div className="font-medium text-gray-900">{letter.name}</div>
+                      <div className="text-gray-700">{letter.jobs?.title || "N/A"}</div>
+                      <div className="text-gray-700">{letter.jobs?.company || "N/A"}</div>
+                      <div className="text-gray-600">{letter.tone || "Professional"}</div>
+                      <div className="text-gray-600">{formatDate(letter.created_at)}</div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownloadPDF(letter)}
+                          className="hover:bg-purple-50"
+                        >
+                          <Download className="h-4 w-4" />
+                          <span className="sr-only">PDF</span>
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild className="hover:bg-purple-50">
+                          <Link href={`/dashboard/cover-letters/${letter.id}`}>View</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {!isLoading && filteredCoverLetters.length === 0 && (
+          <div className="text-center py-16">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 shadow-lg border border-white/20 max-w-md mx-auto">
+              <div className="bg-gradient-to-r from-purple-100 to-indigo-100 rounded-full p-4 w-16 h-16 mx-auto mb-6">
+                <FileEdit className="h-8 w-8 text-purple-600" />
+              </div>
+              <h3 className="text-2xl font-semibold text-gray-900 mb-4">No cover letters found</h3>
+              <p className="text-gray-600 mb-6">Generate tailored cover letters for your job applications with AI.</p>
+              <Button
+                onClick={() => setIsDialogOpen(true)}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate Cover Letter
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

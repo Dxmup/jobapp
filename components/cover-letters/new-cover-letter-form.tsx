@@ -70,28 +70,26 @@ export function NewCoverLetterForm({ onSuccess }: NewCoverLetterFormProps) {
   const fetchJobs = async () => {
     setIsLoadingJobs(true)
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      // Use our working API endpoint instead of direct Supabase query
+      const response = await fetch("/api/jobs/list-for-user")
 
-      if (!user) {
-        setResumeError("User not authenticated")
-        return
+      if (!response.ok) {
+        throw new Error("Failed to fetch jobs")
       }
 
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("id, title, company, description")
-        .order("created_at", { ascending: false })
+      const data = await response.json()
 
-      if (error) {
-        console.error("Error fetching jobs:", error)
-        setResumeError("Failed to load jobs")
-        return
-      }
-
-      if (data) {
-        setAvailableJobs(data)
+      if (data.success && data.jobs) {
+        setAvailableJobs(
+          data.jobs.map((job) => ({
+            id: job.id,
+            title: job.title,
+            company: job.company,
+            description: job.description || "",
+          })),
+        )
+      } else {
+        throw new Error(data.error || "Failed to load jobs")
       }
     } catch (error) {
       console.error("Error fetching jobs:", error)

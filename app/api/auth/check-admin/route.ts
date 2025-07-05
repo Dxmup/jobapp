@@ -19,6 +19,13 @@ export async function GET() {
       return NextResponse.json({ isAdmin: false }, { status: 403 })
     }
 
+    // Set the admin cookie
+    cookieStore.set("is_admin", "true", {
+      path: "/",
+      maxAge: 86400,
+      sameSite: "lax",
+    })
+
     return NextResponse.json({ isAdmin: true })
   } catch (error) {
     console.error("Admin check error:", error)

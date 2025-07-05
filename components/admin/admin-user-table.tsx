@@ -1,192 +1,131 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+"use client"
+
+import { useState } from "react"
+import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal } from "lucide-react"
 
-const users = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah.j@example.com",
-    status: "active",
-    plan: "Premium",
-    joined: "Mar 12, 2023",
-    lastActive: "2 hours ago",
-    jobApplications: 12,
-    location: "New York, USA",
-  },
-  {
-    id: "2",
-    name: "Michael Chen",
-    email: "michael.c@example.com",
-    status: "active",
-    plan: "Free",
-    joined: "Apr 5, 2023",
-    lastActive: "1 day ago",
-    jobApplications: 5,
-    location: "San Francisco, USA",
-  },
-  {
-    id: "3",
-    name: "Emily Rodriguez",
-    email: "emily.r@example.com",
-    status: "inactive",
-    plan: "Premium",
-    joined: "Jan 22, 2023",
-    lastActive: "2 weeks ago",
-    jobApplications: 8,
-    location: "Chicago, USA",
-  },
-  {
-    id: "4",
-    name: "David Kim",
-    email: "david.k@example.com",
-    status: "active",
-    plan: "Enterprise",
-    joined: "May 18, 2023",
-    lastActive: "3 hours ago",
-    jobApplications: 20,
-    location: "Austin, USA",
-  },
-  {
-    id: "5",
-    name: "Jessica Taylor",
-    email: "jessica.t@example.com",
-    status: "active",
-    plan: "Free",
-    joined: "Jun 2, 2023",
-    lastActive: "Just now",
-    jobApplications: 3,
-    location: "Seattle, USA",
-  },
-  {
-    id: "6",
-    name: "Robert Johnson",
-    email: "robert.j@example.com",
-    status: "active",
-    plan: "Premium",
-    joined: "Feb 15, 2023",
-    lastActive: "5 hours ago",
-    jobApplications: 15,
-    location: "Boston, USA",
-  },
-  {
-    id: "7",
-    name: "Lisa Wong",
-    email: "lisa.w@example.com",
-    status: "inactive",
-    plan: "Free",
-    joined: "Jul 10, 2023",
-    lastActive: "1 month ago",
-    jobApplications: 2,
-    location: "Portland, USA",
-  },
-  {
-    id: "8",
-    name: "James Smith",
-    email: "james.s@example.com",
-    status: "active",
-    plan: "Free",
-    joined: "Aug 5, 2023",
-    lastActive: "2 days ago",
-    jobApplications: 7,
-    location: "Denver, USA",
-  },
-]
+interface User {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  lastLogin: string
+}
 
-export function AdminUserTable({ filter }: { filter?: string }) {
-  // Filter users based on the provided filter
-  const filteredUsers = filter
-    ? users.filter((user) => {
-        if (filter === "active" || filter === "inactive") {
-          return user.status === filter
-        }
-        if (filter === "premium") {
-          return user.plan === "Premium"
-        }
-        if (filter === "free") {
-          return user.plan === "Free"
-        }
-        return true
-      })
-    : users
+interface AdminUserTableProps {
+  users?: User[]
+  filter?: string
+}
+
+export function AdminUserTable({ users = [], filter }: AdminUserTableProps) {
+  const [searchTerm, setSearchTerm] = useState("")
+
+  // Filter users based on the filter prop
+  let filteredUsers = users.filter(
+    (user) =>
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  // Apply additional filtering based on the filter prop
+  if (filter && filter !== "all") {
+    filteredUsers = filteredUsers.filter((user) => {
+      switch (filter) {
+        case "active":
+          return user.status.toLowerCase() === "active"
+        case "inactive":
+          return user.status.toLowerCase() === "inactive"
+        case "premium":
+          return user.role.toLowerCase().includes("premium")
+        case "free":
+          return user.role.toLowerCase().includes("free") || user.role.toLowerCase() === "user"
+        default:
+          return true
+      }
+    })
+  }
 
   return (
-    <Card>
-      <CardContent className="p-0">
+    <div className="space-y-4">
+      <div className="flex justify-between">
+        <Input
+          placeholder="Search users..."
+          className="max-w-sm"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <Button>Add User</Button>
+      </div>
+
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>User</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Applications</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead>Last Active</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>Last Login</TableHead>
+              <TableHead className="w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage
-                        src={`/abstract-geometric-shapes.png?height=32&width=32&query=${user.name}`}
-                        alt={user.name}
-                      />
-                      <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{user.name}</div>
-                      <div className="text-sm text-muted-foreground">{user.email}</div>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={user.status === "active" ? "default" : "secondary"}>{user.status}</Badge>
-                </TableCell>
-                <TableCell>{user.plan}</TableCell>
-                <TableCell>{user.location}</TableCell>
-                <TableCell>{user.jobApplications}</TableCell>
-                <TableCell>{user.joined}</TableCell>
-                <TableCell>{user.lastActive}</TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>View Profile</DropdownMenuItem>
-                      <DropdownMenuItem>Edit User</DropdownMenuItem>
-                      <DropdownMenuItem>Reset Password</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-600">Suspend User</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {filteredUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  No users found
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <Link href={`/admin/users/${user.id}`} className="text-blue-600 hover:underline">
+                      {user.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.role}</TableCell>
+                  <TableCell>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        user.status === "Active"
+                          ? "bg-green-100 text-green-800"
+                          : user.status === "Inactive"
+                            ? "bg-gray-100 text-gray-800"
+                            : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {user.status}
+                    </span>
+                  </TableCell>
+                  <TableCell>{user.lastLogin}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>Edit</DropdownMenuItem>
+                        <DropdownMenuItem>Suspend</DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
