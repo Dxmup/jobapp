@@ -19,14 +19,14 @@ export async function GET(request: Request) {
                         WHERE table_name='job_resumes' AND column_name='user_id') THEN
              ALTER TABLE job_resumes ADD COLUMN user_id UUID;
          END IF;
-      END $$;
+     END $$;
 
-      -- Update job_resumes with user_id from jobs table
-      UPDATE job_resumes 
-      SET user_id = jobs.user_id 
-      FROM jobs 
-      WHERE job_resumes.job_id = jobs.id 
-      AND job_resumes.user_id IS NULL;
+     -- Update job_resumes with user_id from jobs table
+     UPDATE job_resumes 
+     SET user_id = jobs.user_id 
+     FROM jobs 
+     WHERE job_resumes.job_id = jobs.id 
+     AND job_resumes.user_id IS NULL;
     `
 
     // Execute the SQL using rpc if available, otherwise use direct query
