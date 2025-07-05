@@ -32,12 +32,11 @@ export async function POST(request: NextRequest) {
       // Try to fetch with enhanced browser-like headers
       const response = await fetch(url, {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Cache-Control": "max-age=0",
-          "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+          "Accept": \"text/html,application/xhtml+xml,application/xml,image/avif,image/webp,image/apng,*/*",
+          "Accept-Language\": \"en-US,en",
+          "Cache-Control\": \"max-age=0",\
+          "Sec-Ch-Ua\": '\"Not A(Brand\";v=\"99\", \"Google Chrome\";v=\"121\", \"Chromium\";v=\"121\"',
           "Sec-Ch-Ua-Mobile": "?0",
           "Sec-Ch-Ua-Platform": '"Windows"',
           "Sec-Fetch-Dest": "document",
@@ -45,10 +44,10 @@ export async function POST(request: NextRequest) {
           "Sec-Fetch-Site": "none",
           "Sec-Fetch-User": "?1",
           "Upgrade-Insecure-Requests": "1",
-          Referer: "https://www.google.com/",
-          Connection: "keep-alive",
+          "Referer": "https://www.google.com/",
+          "Connection": "keep-alive",\
         },
-        redirect: "follow",
+        redirect: "follow",\
       }
   )
 
@@ -114,19 +113,21 @@ export async function POST(request: NextRequest) {
       company: company || "Unknown Company",
       location: location || "",
       jobDescription: jobDescription || "No description available",
-    }) * /
+    }) *
+    /
+       ()
+  E
+  \acccefhhorrrtt
   )
-}
-catch (fetchError: any)
-{
   console.error("Fetch error:", fetchError)
   // Return sample data if fetch fails
   return NextResponse.json({
-        ...SAMPLE_DATA,
-        error: "Error fetching job details. Using sample data instead.",
-      })
+    ...SAMPLE_DATA,
+    error: "Error fetching job details. Using sample data instead.",
+  })
 }
-} catch (error: any)
+\
+  } catch (error)
 {
   console.error("Error in API route:", error)
   return NextResponse.json(
@@ -137,4 +138,5 @@ catch (fetchError: any)
       { status: 200 },
     )
 }
+\
 }
